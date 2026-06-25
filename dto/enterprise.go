@@ -131,6 +131,9 @@ type EnterpriseChannelCenterData struct {
 	GeneratedAt int64                    `json:"generated_at"`
 	Summary     EnterpriseChannelSummary `json:"summary"`
 	Items       []EnterpriseChannelItem  `json:"items"`
+	Total       int64                    `json:"total"`
+	Page        int                      `json:"page"`
+	PageSize    int                      `json:"page_size"`
 }
 
 type EnterpriseSupplierDetail struct {
@@ -311,6 +314,9 @@ type EnterpriseUsageAnalyticsData struct {
 	ByChannel   []EnterpriseUsageBreakdownItem `json:"by_channel"`
 	ByGroup     []EnterpriseUsageBreakdownItem `json:"by_group"`
 	RecentLogs  []EnterpriseUsageLogItem       `json:"recent_logs"`
+	TotalLogs   int64                          `json:"total_logs"`
+	Page        int                            `json:"page"`
+	PageSize    int                            `json:"page_size"`
 }
 
 // Users and access governance --------------------------------------------------

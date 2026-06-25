@@ -201,3 +201,54 @@ func GetEnterpriseBilling(startTimestamp int64, endTimestamp int64) (*dto.Enterp
 	}
 	return data, nil
 }
+
+func enterpriseSettlementSubjectName(statement *model.SettlementStatement) string {
+	if statement == nil {
+		return ""
+	}
+	if statement.SubjectType == model.SettlementSubjectSupplier {
+		var supplier model.Supplier
+		if statement.SupplierId > 0 && model.DB.Select("id", "name").First(&supplier, statement.SupplierId).Error == nil && supplier.Name != "" {
+			return supplier.Name
+		}
+		return fmt.Sprintf("%s #%d", statement.SubjectType, statement.SupplierId)
+	}
+	var user model.User
+	if statement.UserId > 0 && model.DB.Select("id", "username", "display_name").First(&user, statement.UserId).Error == nil {
+		if user.DisplayName != "" {
+			return user.DisplayName
+		}
+		if user.Username != "" {
+			return user.Username
+		}
+	}
+	return fmt.Sprintf("%s #%d", statement.SubjectType, statement.UserId)
+}
+
+func enterpriseSettlementItemFromStatement(statement *model.SettlementStatement) dto.EnterpriseSettlementItem {
+	if statement == nil {
+		return dto.EnterpriseSettlementItem{}
+	}
+	subjectId := 0
+	subjectId = statement.UserId
+	if statement.SubjectType == model.SettlementSubjectSupplier {
+		subjectId = statement.SupplierId
+	}
+	return dto.EnterpriseSettlementItem{
+		Id: statement.Id, SubjectType: statement.SubjectType, SubjectId: subjectId,
+		SubjectName: enterpriseSettlementSubjectName(statement),
+		PeriodStart: statement.PeriodStart, PeriodEnd: statement.PeriodEnd,
+		TotalSellQuota: statement.TotalSellQuota, TotalCostQuota: statement.TotalCostQuota,
+		GrossProfitQuota: statement.GrossProfitQuota, TotalRequests: statement.TotalRequests,
+		Status: statement.Status,
+	}
+}
+
+func GenerateEnterpriseSettlementStatement(input model.SettlementStatementGenerateInput) (*dto.EnterpriseSettlementItem, error) {
+	statement, err := model.GenerateSettlementStatement(input)
+	if err != nil {
+		return nil, err
+	}
+	item := enterpriseSettlementItemFromStatement(statement)
+	return &item, nil
+}

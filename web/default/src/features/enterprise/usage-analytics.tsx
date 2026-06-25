@@ -1,3 +1,21 @@
+import { useQuery } from '@tanstack/react-query'
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Boxes,
+  Clock3,
+  Coins,
+  DatabaseZap,
+  Download,
+  Filter,
+  Gauge,
+  RefreshCw,
+  Search,
+  Sparkles,
+  UsersRound,
+} from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,24 +35,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import {
-  Activity,
-  AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
-  Boxes,
-  Clock3,
-  Coins,
-  DatabaseZap,
-  Download,
-  Filter,
-  Gauge,
-  RefreshCw,
-  Search,
-  Sparkles,
-  UsersRound,
-} from 'lucide-react'
 import {
   Area,
   AreaChart,
@@ -50,6 +50,7 @@ import {
   YAxis,
 } from 'recharts'
 import { toast } from 'sonner'
+
 import {
   EnterprisePageHeader,
   EnterprisePanel,
@@ -75,7 +76,11 @@ import {
   formatTokens,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { exportEnterpriseUsageAnalytics, getEnterpriseUsageAnalytics } from './api'
+
+import {
+  exportEnterpriseUsageAnalytics,
+  getEnterpriseUsageAnalytics,
+} from './api'
 import type {
   EnterpriseUsageAnalyticsData,
   EnterpriseUsageBreakdownItem,
@@ -103,6 +108,9 @@ const EMPTY_USAGE: EnterpriseUsageAnalyticsData = {
   by_channel: [],
   by_group: [],
   recent_logs: [],
+  total_logs: 0,
+  page: 1,
+  page_size: 50,
 }
 
 const PIE_COLORS = [
@@ -146,7 +154,7 @@ function BreakdownList(props: {
 }) {
   if (props.items.length === 0) {
     return (
-      <div className='flex min-h-52 items-center justify-center text-sm text-muted-foreground'>
+      <div className='text-muted-foreground flex min-h-52 items-center justify-center text-sm'>
         {props.emptyText}
       </div>
     )
@@ -158,27 +166,30 @@ function BreakdownList(props: {
         <div key={`${item.name}-${item.quota}`} className='space-y-2'>
           <div className='flex items-center justify-between gap-3 text-xs'>
             <div className='flex min-w-0 items-center gap-2.5'>
-              <span className='flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[10px] font-semibold text-muted-foreground'>
+              <span className='bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold'>
                 {position + 1}
               </span>
               <span className='truncate font-medium'>{item.name}</span>
             </div>
             <div className='shrink-0 text-right'>
-              <p className='font-semibold tabular-nums'>{formatCurrencyUSD(item.cost)}</p>
-              <p className='text-[10px] text-muted-foreground'>
+              <p className='font-semibold tabular-nums'>
+                {formatCurrencyUSD(item.cost)}
+              </p>
+              <p className='text-muted-foreground text-[10px]'>
                 {formatPercent(item.share)}
               </p>
             </div>
           </div>
-          <div className='h-1.5 overflow-hidden rounded-full bg-muted'>
+          <div className='bg-muted h-1.5 overflow-hidden rounded-full'>
             <div
               className='h-full rounded-full bg-linear-to-r from-blue-500 to-violet-500'
-              style={{ width: `${Math.max(3, Math.min(100, item.share * 100))}%` }}
+              style={{
+                width: `${Math.max(3, Math.min(100, item.share * 100))}%`,
+              }}
             />
           </div>
         </div>
       ))}
-
     </div>
   )
 }
@@ -203,7 +214,7 @@ function LogStatusBadge(props: { status: string }) {
 function UsageLogTable(props: { logs: EnterpriseUsageLogItem[] }) {
   if (props.logs.length === 0) {
     return (
-      <div className='flex min-h-72 items-center justify-center text-sm text-muted-foreground'>
+      <div className='text-muted-foreground flex min-h-72 items-center justify-center text-sm'>
         当前筛选条件下暂无调用日志
       </div>
     )
@@ -229,20 +240,25 @@ function UsageLogTable(props: { logs: EnterpriseUsageLogItem[] }) {
         <TableBody>
           {props.logs.map((log) => (
             <TableRow key={log.id} className='hover:bg-muted/25'>
-              <TableCell className='font-mono text-[11px] text-muted-foreground'>
+              <TableCell className='text-muted-foreground font-mono text-[11px]'>
                 {log.request_id || `log_${log.id}`}
               </TableCell>
-              <TableCell className='text-xs text-muted-foreground'>
+              <TableCell className='text-muted-foreground text-xs'>
                 {formatDateTime(log.created_at)}
               </TableCell>
               <TableCell>
-                <p className='text-xs font-medium'>{log.username || '系统调用'}</p>
-                <p className='mt-0.5 text-[10px] text-muted-foreground'>
+                <p className='text-xs font-medium'>
+                  {log.username || '系统调用'}
+                </p>
+                <p className='text-muted-foreground mt-0.5 text-[10px]'>
                   {log.group || log.token_name || '默认分组'}
                 </p>
               </TableCell>
               <TableCell>
-                <Badge variant='secondary' className='max-w-36 truncate text-[10px]'>
+                <Badge
+                  variant='secondary'
+                  className='max-w-36 truncate text-[10px]'
+                >
                   {log.model_name || '未知模型'}
                 </Badge>
               </TableCell>
@@ -256,7 +272,8 @@ function UsageLogTable(props: { logs: EnterpriseUsageLogItem[] }) {
                 {formatLogQuota(log.quota)}
               </TableCell>
               <TableCell className='max-w-32 truncate text-xs'>
-                {log.channel_name || (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
+                {log.channel_name ||
+                  (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
               </TableCell>
               <TableCell className='text-right text-xs tabular-nums'>
                 {formatNumber(log.use_time_ms)} ms
@@ -268,28 +285,38 @@ function UsageLogTable(props: { logs: EnterpriseUsageLogItem[] }) {
           ))}
         </TableBody>
       </Table>
-
     </div>
   )
 }
 
-export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) {
+export function EnterpriseUsageAnalytics(props: {
+  classicContent?: ReactNode
+}) {
   const [search, setSearch] = useState('')
   const [modelFilter, setModelFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
   const [exportingUsage, setExportingUsage] = useState(false)
   const range = useMemo(() => {
     const end = Math.floor(Date.now() / 1000)
     return { start: end - 7 * 24 * 60 * 60, end }
   }, [])
+  const usageParams = useMemo(
+    () => ({
+      start_timestamp: range.start,
+      end_timestamp: range.end,
+      keyword: search.trim() || undefined,
+      model_name: modelFilter !== 'all' ? modelFilter : undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      page,
+      page_size: 50,
+    }),
+    [modelFilter, page, range.end, range.start, search, statusFilter]
+  )
 
   const usageQuery = useQuery({
-    queryKey: ['enterprise-usage', range.start, range.end],
-    queryFn: () =>
-      getEnterpriseUsageAnalytics({
-        start_timestamp: range.start,
-        end_timestamp: range.end,
-      }),
+    queryKey: ['enterprise-usage', usageParams],
+    queryFn: () => getEnterpriseUsageAnalytics(usageParams),
     staleTime: 30_000,
     refetchInterval: 60_000,
   })
@@ -303,29 +330,25 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
     errorRate: point.requests > 0 ? point.errors / point.requests : 0,
   }))
   const models = useMemo(
-    () => Array.from(new Set(usage.recent_logs.map((log) => log.model_name).filter(Boolean))),
-    [usage.recent_logs]
+    () => [
+      ...new Set([
+        ...usage.by_model.map((item) => item.name).filter(Boolean),
+        ...usage.recent_logs.map((log) => log.model_name).filter(Boolean),
+      ]),
+    ],
+    [usage.by_model, usage.recent_logs]
   )
-  const filteredLogs = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-    return usage.recent_logs.filter((log) => {
-      if (statusFilter !== 'all' && log.status !== statusFilter) return false
-      if (modelFilter !== 'all' && log.model_name !== modelFilter) return false
-      if (keyword === '') return true
-      return [
-        log.request_id,
-        log.username,
-        log.token_name,
-        log.model_name,
-        log.channel_name,
-        log.group,
-        log.ip,
-      ].some((value) => value.toLowerCase().includes(keyword))
-    })
-  }, [modelFilter, search, statusFilter, usage.recent_logs])
+  const totalLogPages = Math.max(
+    1,
+    Math.ceil((usage.total_logs ?? 0) / (usage.page_size ?? 50))
+  )
 
   const anomalyItems = useMemo(() => {
-    const items: Array<{ title: string; detail: string; tone: 'rose' | 'amber' | 'blue' }> = []
+    const items: Array<{
+      title: string
+      detail: string
+      tone: 'rose' | 'amber' | 'blue'
+    }> = []
     if (metrics.error_rate >= 0.02) {
       items.push({
         title: '错误率超过企业告警线',
@@ -355,15 +378,19 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
       })
     }
     return items
-  }, [metrics.average_latency_ms, metrics.cache_hit_rate, metrics.error_rate, metrics.total_requests])
+  }, [
+    metrics.average_latency_ms,
+    metrics.cache_hit_rate,
+    metrics.error_rate,
+    metrics.total_requests,
+  ])
 
   const dateRangeLabel = `${formatDate(usage.range.start_timestamp || range.start)} - ${formatDate(usage.range.end_timestamp || range.end)}`
   const exportUsageCsv = async () => {
     setExportingUsage(true)
     try {
       await exportEnterpriseUsageAnalytics({
-        start_timestamp: range.start,
-        end_timestamp: range.end,
+        ...usageParams,
       })
       toast.success('用量明细已导出')
     } catch (error) {
@@ -381,7 +408,10 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
         description='按客户、部门、模型和渠道追踪请求、Token、延迟与成本，支持运营、财务和客户成功协同分析。'
         actions={
           <>
-            <Badge variant='outline' className='h-8 rounded-lg bg-background/70 px-3 text-xs font-normal'>
+            <Badge
+              variant='outline'
+              className='bg-background/70 h-8 rounded-lg px-3 text-xs font-normal'
+            >
               {dateRangeLabel}
             </Badge>
             <Button
@@ -399,7 +429,12 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
               onClick={() => void usageQuery.refetch()}
               disabled={usageQuery.isFetching}
             >
-              <RefreshCw className={cn('size-4', usageQuery.isFetching && 'animate-spin')} />
+              <RefreshCw
+                className={cn(
+                  'size-4',
+                  usageQuery.isFetching && 'animate-spin'
+                )}
+              />
               刷新数据
             </Button>
           </>
@@ -460,15 +495,24 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
       <EnterprisePanel bodyClassName='p-3 sm:p-4'>
         <div className='grid gap-3 lg:grid-cols-[1.2fr_repeat(2,minmax(0,.7fr))_auto]'>
           <label className='relative block'>
-            <Search className='pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
+            <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
             <Input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
               placeholder='搜索客户、用户、请求编号、模型或渠道'
               className='pl-9'
             />
           </label>
-          <NativeSelect value={modelFilter} onChange={(event) => setModelFilter(event.target.value)}>
+          <NativeSelect
+            value={modelFilter}
+            onChange={(event) => {
+              setModelFilter(event.target.value)
+              setPage(1)
+            }}
+          >
             <NativeSelectOption value='all'>全部模型</NativeSelectOption>
             {models.map((model) => (
               <NativeSelectOption key={model} value={model}>
@@ -476,7 +520,13 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
               </NativeSelectOption>
             ))}
           </NativeSelect>
-          <NativeSelect value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <NativeSelect
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value)
+              setPage(1)
+            }}
+          >
             <NativeSelectOption value='all'>全部状态</NativeSelectOption>
             <NativeSelectOption value='success'>成功</NativeSelectOption>
             <NativeSelectOption value='error'>失败</NativeSelectOption>
@@ -487,6 +537,7 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
               setSearch('')
               setModelFilter('all')
               setStatusFilter('all')
+              setPage(1)
             }}
           >
             <Filter className='size-4' />
@@ -505,65 +556,165 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
             bodyClassName='h-80 p-3 sm:p-5'
           >
             {chartData.length === 0 ? (
-              <div className='flex h-full items-center justify-center text-sm text-muted-foreground'>
+              <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
                 当前时间范围内暂无趋势数据
               </div>
             ) : (
               <ResponsiveContainer width='100%' height='100%'>
-                <AreaChart data={chartData} margin={{ top: 12, right: 12, left: -20, bottom: 0 }}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
+                >
                   <defs>
-                    <linearGradient id='usagePrompt' x1='0' y1='0' x2='0' y2='1'>
-                      <stop offset='5%' stopColor='var(--chart-1)' stopOpacity={0.35} />
-                      <stop offset='95%' stopColor='var(--chart-1)' stopOpacity={0.02} />
+                    <linearGradient
+                      id='usagePrompt'
+                      x1='0'
+                      y1='0'
+                      x2='0'
+                      y2='1'
+                    >
+                      <stop
+                        offset='5%'
+                        stopColor='var(--chart-1)'
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset='95%'
+                        stopColor='var(--chart-1)'
+                        stopOpacity={0.02}
+                      />
                     </linearGradient>
-                    <linearGradient id='usageCompletion' x1='0' y1='0' x2='0' y2='1'>
-                      <stop offset='5%' stopColor='var(--chart-2)' stopOpacity={0.3} />
-                      <stop offset='95%' stopColor='var(--chart-2)' stopOpacity={0.02} />
+                    <linearGradient
+                      id='usageCompletion'
+                      x1='0'
+                      y1='0'
+                      x2='0'
+                      y2='1'
+                    >
+                      <stop
+                        offset='5%'
+                        stopColor='var(--chart-2)'
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset='95%'
+                        stopColor='var(--chart-2)'
+                        stopOpacity={0.02}
+                      />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray='4 6' vertical={false} stroke='var(--border)' opacity={0.7} />
-                  <XAxis dataKey='label' axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => formatCompactNumber(Number(value))} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                  <ChartTooltip
-                    contentStyle={{ borderRadius: 12, borderColor: 'var(--border)', background: 'var(--popover)' }}
-                    formatter={(value, name) => [formatTokens(Number(value ?? 0)), name === 'prompt_tokens' ? '输入 Tokens' : '输出 Tokens']}
+                  <CartesianGrid
+                    strokeDasharray='4 6'
+                    vertical={false}
+                    stroke='var(--border)'
+                    opacity={0.7}
                   />
-                  <Area type='monotone' dataKey='prompt_tokens' stroke='var(--chart-1)' fill='url(#usagePrompt)' strokeWidth={2.2} />
-                  <Area type='monotone' dataKey='completion_tokens' stroke='var(--chart-2)' fill='url(#usageCompletion)' strokeWidth={2.2} />
+                  <XAxis
+                    dataKey='label'
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) =>
+                      formatCompactNumber(Number(value))
+                    }
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                  />
+                  <ChartTooltip
+                    contentStyle={{
+                      borderRadius: 12,
+                      borderColor: 'var(--border)',
+                      background: 'var(--popover)',
+                    }}
+                    formatter={(value, name) => [
+                      formatTokens(Number(value ?? 0)),
+                      name === 'prompt_tokens' ? '输入 Tokens' : '输出 Tokens',
+                    ]}
+                  />
+                  <Area
+                    type='monotone'
+                    dataKey='prompt_tokens'
+                    stroke='var(--chart-1)'
+                    fill='url(#usagePrompt)'
+                    strokeWidth={2.2}
+                  />
+                  <Area
+                    type='monotone'
+                    dataKey='completion_tokens'
+                    stroke='var(--chart-2)'
+                    fill='url(#usageCompletion)'
+                    strokeWidth={2.2}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             )}
           </EnterprisePanel>
 
-          <EnterprisePanel title='模型成本分布' description='按模型查看费用与调用占比'>
-            <BreakdownList items={usage.by_model} emptyText='暂无模型成本数据' />
+          <EnterprisePanel
+            title='模型成本分布'
+            description='按模型查看费用与调用占比'
+          >
+            <BreakdownList
+              items={usage.by_model}
+              emptyText='暂无模型成本数据'
+            />
           </EnterprisePanel>
 
-          <EnterprisePanel title='成本中心占比' description='按用户分组聚合企业内部成本'>
+          <EnterprisePanel
+            title='成本中心占比'
+            description='按用户分组聚合企业内部成本'
+          >
             {usage.by_group.length === 0 ? (
-              <div className='flex min-h-52 items-center justify-center text-sm text-muted-foreground'>
+              <div className='text-muted-foreground flex min-h-52 items-center justify-center text-sm'>
                 暂无成本中心数据
               </div>
             ) : (
               <div className='grid min-h-52 grid-cols-[140px_minmax(0,1fr)] items-center gap-2'>
                 <ResponsiveContainer width='100%' height={150}>
                   <PieChart>
-                    <Pie data={usage.by_group.slice(0, 5)} dataKey='cost' nameKey='name' innerRadius={40} outerRadius={64} paddingAngle={3}>
+                    <Pie
+                      data={usage.by_group.slice(0, 5)}
+                      dataKey='cost'
+                      nameKey='name'
+                      innerRadius={40}
+                      outerRadius={64}
+                      paddingAngle={3}
+                    >
                       {usage.by_group.slice(0, 5).map((item, index) => (
-                        <Cell key={item.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        <Cell
+                          key={item.name}
+                          fill={PIE_COLORS[index % PIE_COLORS.length]}
+                        />
                       ))}
                     </Pie>
-                    <ChartTooltip formatter={(value) => formatCurrencyUSD(Number(value ?? 0))} />
+                    <ChartTooltip
+                      formatter={(value) =>
+                        formatCurrencyUSD(Number(value ?? 0))
+                      }
+                    />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className='space-y-2.5'>
                   {usage.by_group.slice(0, 5).map((item, index) => (
-                    <div key={item.name} className='flex items-center justify-between gap-3 text-xs'>
+                    <div
+                      key={item.name}
+                      className='flex items-center justify-between gap-3 text-xs'
+                    >
                       <span className='flex min-w-0 items-center gap-2'>
-                        <span className='size-2 rounded-full' style={{ background: PIE_COLORS[index % PIE_COLORS.length] }} />
+                        <span
+                          className='size-2 rounded-full'
+                          style={{
+                            background: PIE_COLORS[index % PIE_COLORS.length],
+                          }}
+                        />
                         <span className='truncate'>{item.name}</span>
                       </span>
-                      <span className='shrink-0 font-semibold'>{formatPercent(item.share)}</span>
+                      <span className='shrink-0 font-semibold'>
+                        {formatPercent(item.share)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -578,18 +729,56 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
             bodyClassName='h-64 p-3 sm:p-5'
           >
             {chartData.length === 0 ? (
-              <div className='flex h-full items-center justify-center text-sm text-muted-foreground'>
+              <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
                 暂无服务质量趋势
               </div>
             ) : (
               <ResponsiveContainer width='100%' height='100%'>
-                <BarChart data={chartData} margin={{ top: 12, right: 12, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray='4 6' vertical={false} stroke='var(--border)' opacity={0.7} />
-                  <XAxis dataKey='label' axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                  <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => formatCompactNumber(Number(value))} tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                  <ChartTooltip contentStyle={{ borderRadius: 12, borderColor: 'var(--border)', background: 'var(--popover)' }} />
-                  <Bar dataKey='errors' name='错误请求' fill='var(--chart-5)' radius={[6, 6, 0, 0]} maxBarSize={36} />
-                  <Bar dataKey='average_latency_ms' name='平均延迟 (ms)' fill='var(--chart-3)' radius={[6, 6, 0, 0]} maxBarSize={36} />
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray='4 6'
+                    vertical={false}
+                    stroke='var(--border)'
+                    opacity={0.7}
+                  />
+                  <XAxis
+                    dataKey='label'
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) =>
+                      formatCompactNumber(Number(value))
+                    }
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                  />
+                  <ChartTooltip
+                    contentStyle={{
+                      borderRadius: 12,
+                      borderColor: 'var(--border)',
+                      background: 'var(--popover)',
+                    }}
+                  />
+                  <Bar
+                    dataKey='errors'
+                    name='错误请求'
+                    fill='var(--chart-5)'
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={36}
+                  />
+                  <Bar
+                    dataKey='average_latency_ms'
+                    name='平均延迟 (ms)'
+                    fill='var(--chart-3)'
+                    radius={[6, 6, 0, 0]}
+                    maxBarSize={36}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -597,16 +786,23 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
         </div>
 
         <div className='space-y-4'>
-          <EnterprisePanel title='成本异常检测' action={<Badge variant='outline'>{anomalyItems.length}</Badge>}>
+          <EnterprisePanel
+            title='成本异常检测'
+            action={<Badge variant='outline'>{anomalyItems.length}</Badge>}
+          >
             <div className='space-y-3'>
               {anomalyItems.map((item) => (
-                <article key={item.title} className='rounded-xl border border-border/70 bg-background/55 p-3.5'>
+                <article
+                  key={item.title}
+                  className='border-border/70 bg-background/55 rounded-xl border p-3.5'
+                >
                   <div className='flex gap-3'>
                     <span
                       className={cn(
                         'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl',
                         item.tone === 'rose' && 'bg-rose-500/10 text-rose-600',
-                        item.tone === 'amber' && 'bg-amber-500/10 text-amber-600',
+                        item.tone === 'amber' &&
+                          'bg-amber-500/10 text-amber-600',
                         item.tone === 'blue' && 'bg-blue-500/10 text-blue-600'
                       )}
                     >
@@ -614,7 +810,9 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
                     </span>
                     <div>
                       <p className='text-xs font-semibold'>{item.title}</p>
-                      <p className='mt-1 text-[11px] leading-5 text-muted-foreground'>{item.detail}</p>
+                      <p className='text-muted-foreground mt-1 text-[11px] leading-5'>
+                        {item.detail}
+                      </p>
                     </div>
                   </div>
                 </article>
@@ -633,7 +831,7 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
                   <Sparkles className='size-4' />
                   提升缓存命中率
                 </div>
-                <p className='mt-1.5 text-[11px] leading-5 text-muted-foreground'>
+                <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
                   对高频 Prompt 建立稳定缓存键，减少重复上游调用和成本。
                 </p>
               </div>
@@ -642,7 +840,7 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
                   <ArrowDownRight className='size-4' />
                   优化模型组合
                 </div>
-                <p className='mt-1.5 text-[11px] leading-5 text-muted-foreground'>
+                <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
                   将低复杂度请求路由到更低成本模型，并保留高价值请求的质量兜底。
                 </p>
               </div>
@@ -651,7 +849,7 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
                   <ArrowUpRight className='size-4' />
                   建立部门预算线
                 </div>
-                <p className='mt-1.5 text-[11px] leading-5 text-muted-foreground'>
+                <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
                   对高增长成本中心设置预警线，提前发现预算透支风险。
                 </p>
               </div>
@@ -660,15 +858,19 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
 
           <EnterprisePanel title='运行概况'>
             <div className='grid grid-cols-2 gap-3'>
-              <div className='rounded-xl bg-muted/40 p-3'>
+              <div className='bg-muted/40 rounded-xl p-3'>
                 <Clock3 className='size-4 text-violet-500' />
-                <p className='mt-2 text-lg font-semibold'>{formatNumber(metrics.average_latency_ms)} ms</p>
-                <p className='text-[10px] text-muted-foreground'>平均延迟</p>
+                <p className='mt-2 text-lg font-semibold'>
+                  {formatNumber(metrics.average_latency_ms)} ms
+                </p>
+                <p className='text-muted-foreground text-[10px]'>平均延迟</p>
               </div>
-              <div className='rounded-xl bg-muted/40 p-3'>
+              <div className='bg-muted/40 rounded-xl p-3'>
                 <UsersRound className='size-4 text-blue-500' />
-                <p className='mt-2 text-lg font-semibold'>{formatNumber(usage.by_user.length)}</p>
-                <p className='text-[10px] text-muted-foreground'>活跃主体</p>
+                <p className='mt-2 text-lg font-semibold'>
+                  {formatNumber(usage.by_user.length)}
+                </p>
+                <p className='text-muted-foreground text-[10px]'>活跃主体</p>
               </div>
             </div>
           </EnterprisePanel>
@@ -677,11 +879,35 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
 
       <EnterprisePanel
         title='用量日志'
-        description={`展示最新 ${filteredLogs.length} 条企业调用记录`}
-        action={<Badge variant='outline'>实时聚合</Badge>}
+        description={`共 ${formatNumber(usage.total_logs ?? 0)} 条匹配记录，当前展示 ${usage.recent_logs.length} 条`}
+        action={
+          <div className='flex flex-wrap items-center gap-2'>
+            <Badge variant='outline'>
+              第 {usage.page || page} / {totalLogPages} 页
+            </Badge>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+              disabled={page <= 1 || usageQuery.isFetching}
+            >
+              上一页
+            </Button>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() =>
+                setPage((value) => Math.min(totalLogPages, value + 1))
+              }
+              disabled={page >= totalLogPages || usageQuery.isFetching}
+            >
+              下一页
+            </Button>
+          </div>
+        }
         bodyClassName='p-0'
       >
-        <UsageLogTable logs={filteredLogs} />
+        <UsageLogTable logs={usage.recent_logs} />
       </EnterprisePanel>
 
       {props.classicContent && (
@@ -693,7 +919,6 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
           {props.classicContent}
         </EnterprisePanel>
       )}
-
     </div>
   )
 }

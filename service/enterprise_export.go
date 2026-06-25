@@ -110,6 +110,10 @@ func enterpriseAPIKeyStatusLabel(status int) string {
 }
 
 func enterpriseUsageLogItems(startTimestamp int64, endTimestamp int64, limit int) ([]dto.EnterpriseUsageLogItem, error) {
+	return enterpriseUsageLogItemsWithFilters(startTimestamp, endTimestamp, EnterpriseUsageFilters{}, limit)
+}
+
+func enterpriseUsageLogItemsWithFilters(startTimestamp int64, endTimestamp int64, filters EnterpriseUsageFilters, limit int) ([]dto.EnterpriseUsageLogItem, error) {
 	items := []dto.EnterpriseUsageLogItem{}
 	if model.LOG_DB == nil {
 		return items, nil
@@ -118,7 +122,7 @@ func enterpriseUsageLogItems(startTimestamp int64, endTimestamp int64, limit int
 		limit = enterpriseExportLimit
 	}
 	var logs []model.Log
-	if err := model.LOG_DB.Where("created_at >= ? AND created_at <= ? AND type IN ?", startTimestamp, endTimestamp, []int{model.LogTypeConsume, model.LogTypeError}).
+	if err := enterpriseUsageLogQuery(model.LOG_DB, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume, model.LogTypeError}).
 		Order("id DESC").Limit(limit).Find(&logs).Error; err != nil {
 		return nil, err
 	}
@@ -169,11 +173,15 @@ func enterpriseBreakdownCSVRows(items []dto.EnterpriseUsageBreakdownItem) [][]st
 }
 
 func BuildEnterpriseUsageAnalyticsCSV(startTimestamp int64, endTimestamp int64) ([]byte, error) {
-	data, err := GetEnterpriseUsageAnalytics(startTimestamp, endTimestamp)
+	return BuildEnterpriseUsageAnalyticsCSVWithFilters(startTimestamp, endTimestamp, EnterpriseUsageFilters{})
+}
+
+func BuildEnterpriseUsageAnalyticsCSVWithFilters(startTimestamp int64, endTimestamp int64, filters EnterpriseUsageFilters) ([]byte, error) {
+	data, err := GetEnterpriseUsageAnalyticsWithFilters(startTimestamp, endTimestamp, filters)
 	if err != nil {
 		return nil, err
 	}
-	logs, err := enterpriseUsageLogItems(startTimestamp, endTimestamp, enterpriseExportLimit)
+	logs, err := enterpriseUsageLogItemsWithFilters(startTimestamp, endTimestamp, filters, enterpriseExportLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -294,6 +302,62 @@ func BuildEnterpriseAPIKeysCSV(filters model.EnterpriseTokenFilters) ([]byte, er
 		}
 	}
 	if err := enterpriseWriteCSVSection(writer, "企业 API Key 清单", []string{"密钥ID", "用户ID", "用户名", "显示名", "邮箱", "用户分组", "密钥名称", "脱敏Key", "配置状态", "有效状态", "路由分组", "无限额度", "剩余额度", "已用额度", "启用模型白名单", "模型白名单", "IP 白名单", "跨组重试", "创建时间", "最近使用", "过期时间"}, rows); err != nil {
+		return nil, err
+	}
+	return enterpriseFlushCSV(buffer, writer)
+}
+
+func BuildEnterpriseChannelsCSV(startTimestamp int64, endTimestamp int64, filters EnterpriseChannelFilters) ([]byte, error) {
+	filters.Page = 1
+	filters.PageSize = enterpriseExportLimit
+	data, err := GetEnterpriseChannelCenterWithFilters(startTimestamp, endTimestamp, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	buffer, writer := newEnterpriseCSV()
+	summary := data.Summary
+	if err := enterpriseWriteCSVSection(writer, "渠道与供应商指标", []string{"指标", "值"}, [][]string{
+		{"统计开始", enterpriseFormatUnixDateTime(startTimestamp)},
+		{"统计结束", enterpriseFormatUnixDateTime(endTimestamp)},
+		{"启用渠道数", enterpriseFormatInt(summary.EnabledChannels)},
+		{"健康供应商数", enterpriseFormatInt(summary.HealthySuppliers)},
+		{"平均成功率", enterpriseFormatFloat(summary.AverageSuccessRate)},
+		{"平均延迟 ms", enterpriseFormatFloat(summary.AverageLatencyMs)},
+		{"总余额 USD", enterpriseFormatFloat(summary.TotalBalance)},
+		{"低余额告警", enterpriseFormatInt(summary.LowBalanceAlerts)},
+		{"匹配渠道数", enterpriseFormatInt(data.Total)},
+	}); err != nil {
+		return nil, err
+	}
+
+	rows := make([][]string, 0, len(data.Items))
+	for _, item := range data.Items {
+		rows = append(rows, []string{
+			enterpriseFormatInt(int64(item.Id)),
+			item.Name,
+			enterpriseFormatInt(int64(item.Type)),
+			enterpriseAPIKeyStatusLabel(item.Status),
+			enterpriseFormatInt(int64(item.SupplierId)),
+			item.SupplierName,
+			item.SupplierType,
+			enterpriseAPIKeyStatusLabel(item.SupplierStatus),
+			item.Models,
+			item.Group,
+			item.Tag,
+			item.Remark,
+			enterpriseFormatFloat(item.Balance),
+			enterpriseFormatInt(int64(item.UsedQuota)),
+			enterpriseFormatFloat(item.SuccessRate),
+			enterpriseFormatFloat(item.AverageLatencyMs),
+			enterpriseFormatInt(item.Requests),
+			enterpriseFormatInt(item.Priority),
+			enterpriseFormatInt(int64(item.Weight)),
+			enterpriseFormatUnixDateTime(item.LastCheckedAt),
+			enterpriseFormatUnixDateTime(item.BalanceUpdatedTime),
+		})
+	}
+	if err := enterpriseWriteCSVSection(writer, "渠道明细（最多 10000 条）", []string{"渠道ID", "渠道名称", "渠道类型", "渠道状态", "供应商ID", "供应商名称", "供应商类型", "供应商状态", "模型", "路由分组", "标签", "备注", "余额 USD", "已用额度", "成功率", "平均延迟 ms", "请求数", "优先级", "权重", "最后检查", "余额更新时间"}, rows); err != nil {
 		return nil, err
 	}
 	return enterpriseFlushCSV(buffer, writer)

@@ -1,3 +1,20 @@
+import { useQuery } from '@tanstack/react-query'
+import { Link, useNavigate } from '@tanstack/react-router'
+import {
+  AlertTriangle,
+  BadgeDollarSign,
+  CircleDollarSign,
+  CreditCard,
+  Download,
+  FileText,
+  Landmark,
+  PieChart as PieChartIcon,
+  ReceiptText,
+  RefreshCw,
+  Scale,
+  Sparkles,
+  WalletCards,
+} from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,23 +34,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
-import {
-  AlertTriangle,
-  BadgeDollarSign,
-  CircleDollarSign,
-  CreditCard,
-  Download,
-  FileText,
-  Landmark,
-  PieChart as PieChartIcon,
-  ReceiptText,
-  RefreshCw,
-  Scale,
-  Sparkles,
-  WalletCards,
-} from 'lucide-react'
 import {
   Bar,
   BarChart,
@@ -54,6 +54,16 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -69,7 +79,11 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { exportEnterpriseBilling, getEnterpriseBilling } from './api'
+import {
+  exportEnterpriseBilling,
+  generateEnterpriseSettlement,
+  getEnterpriseBilling,
+} from './api'
 import type { EnterpriseBillingData, EnterpriseSettlementItem } from './types'
 
 type CsvValue = boolean | null | number | string | undefined
@@ -121,6 +135,28 @@ function formatShortDate(timestamp: number): string {
 function formatFileDate(timestamp: number): string {
   if (timestamp <= 0) return 'unknown'
   return new Date(timestamp * 1000).toISOString().slice(0, 10)
+}
+
+function dateInputValue(timestamp: number): string {
+  if (timestamp <= 0) return ''
+  return new Date(timestamp * 1000).toISOString().slice(0, 10)
+}
+
+function dateInputTimestamp(value: string, endOfDay = false): number {
+  const parts = value.split('-').map((part) => Number(part))
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+    return 0
+  }
+  const [year, month, day] = parts
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0
+  )
+  return Math.floor(date.getTime() / 1000)
 }
 
 function csvCell(value: CsvValue): string {
@@ -296,6 +332,18 @@ export function EnterpriseBillingCenter(props: {
     const end = Math.floor(Date.now() / 1000)
     return { start: end - 30 * 24 * 60 * 60, end }
   }, [])
+  const [settlementDialogOpen, setSettlementDialogOpen] = useState(false)
+  const [settlementSubjectType, setSettlementSubjectType] = useState<
+    'user' | 'supplier'
+  >('user')
+  const [settlementSubjectId, setSettlementSubjectId] = useState('')
+  const [settlementPeriodStart, setSettlementPeriodStart] = useState(() =>
+    dateInputValue(range.start)
+  )
+  const [settlementPeriodEnd, setSettlementPeriodEnd] = useState(() =>
+    dateInputValue(range.end)
+  )
+  const [generatingSettlement, setGeneratingSettlement] = useState(false)
   const billingQuery = useQuery({
     queryKey: ['enterprise-billing', range.start, range.end],
     queryFn: () =>
@@ -337,9 +385,39 @@ export function EnterpriseBillingCenter(props: {
       setExportingBilling(false)
     }
   }
-  const openSettlementWorkbench = () => {
-    toast.info('已进入 Token Router，请打开 Settlements 页签生成或复核结算单')
-    void navigate({ to: '/token-router' })
+  const submitSettlement = async () => {
+    const subjectId = Number(settlementSubjectId)
+    if (!Number.isInteger(subjectId) || subjectId <= 0) {
+      toast.error('请输入有效的客户或供应商 ID')
+      return
+    }
+    const periodStart = dateInputTimestamp(settlementPeriodStart)
+    const periodEnd = dateInputTimestamp(settlementPeriodEnd, true)
+    if (periodStart <= 0 || periodEnd <= 0 || periodEnd < periodStart) {
+      toast.error('请选择有效的结算周期')
+      return
+    }
+    setGeneratingSettlement(true)
+    try {
+      const result = await generateEnterpriseSettlement({
+        subject_type: settlementSubjectType,
+        supplier_id:
+          settlementSubjectType === 'supplier' ? subjectId : undefined,
+        user_id: settlementSubjectType === 'user' ? subjectId : undefined,
+        period_start: periodStart,
+        period_end: periodEnd,
+      })
+      if (!result.success) {
+        throw new Error(result.message || '生成失败')
+      }
+      toast.success(`结算单 #${result.data?.id ?? subjectId} 已生成`)
+      setSettlementDialogOpen(false)
+      void billingQuery.refetch()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '生成失败')
+    } finally {
+      setGeneratingSettlement(false)
+    }
   }
   const openFeeAnalysis = () => {
     toast.info('已打开模型调用分析，可按模型核对用量与费用')
@@ -486,7 +564,7 @@ export function EnterpriseBillingCenter(props: {
                     maxBarSize={34}
                   />
                   <Bar
-                    dataKey='profit_quota'
+                    dataKey='gross_profit_quota'
                     name='毛利'
                     fill='var(--chart-3)'
                     radius={[6, 6, 0, 0]}
@@ -679,7 +757,7 @@ export function EnterpriseBillingCenter(props: {
               <Button
                 variant='outline'
                 className='h-auto flex-col gap-2 py-3'
-                onClick={openSettlementWorkbench}
+                onClick={() => setSettlementDialogOpen(true)}
               >
                 <ReceiptText className='size-4 text-violet-500' />
                 <span className='text-xs'>生成结算单</span>
@@ -691,7 +769,9 @@ export function EnterpriseBillingCenter(props: {
                 disabled={exportingBilling}
               >
                 <Download className='size-4 text-blue-500' />
-                <span className='text-xs'>{exportingBilling ? '导出中' : '导出账单'}</span>
+                <span className='text-xs'>
+                  {exportingBilling ? '导出中' : '导出账单'}
+                </span>
               </Button>
               <Button
                 variant='outline'
@@ -726,6 +806,90 @@ export function EnterpriseBillingCenter(props: {
           {props.classicContent}
         </EnterprisePanel>
       )}
+
+      <Dialog
+        open={settlementDialogOpen}
+        onOpenChange={setSettlementDialogOpen}
+      >
+        <DialogContent className='sm:max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>生成结算单</DialogTitle>
+            <DialogDescription>
+              按客户或供应商生成当前周期结算单，重复生成会覆盖同周期草稿数据。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-4'>
+            <label className='grid gap-2 text-sm'>
+              <span className='font-medium'>结算对象</span>
+              <NativeSelect
+                value={settlementSubjectType}
+                onChange={(event) =>
+                  setSettlementSubjectType(
+                    event.target.value as 'user' | 'supplier'
+                  )
+                }
+              >
+                <NativeSelectOption value='user'>
+                  客户 / 下游用户
+                </NativeSelectOption>
+                <NativeSelectOption value='supplier'>
+                  供应商 / 上游
+                </NativeSelectOption>
+              </NativeSelect>
+            </label>
+            <label className='grid gap-2 text-sm'>
+              <span className='font-medium'>
+                {settlementSubjectType === 'supplier' ? '供应商 ID' : '用户 ID'}
+              </span>
+              <Input
+                inputMode='numeric'
+                value={settlementSubjectId}
+                onChange={(event) => setSettlementSubjectId(event.target.value)}
+                placeholder={
+                  settlementSubjectType === 'supplier' ? '例如 12' : '例如 1001'
+                }
+              />
+            </label>
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <label className='grid gap-2 text-sm'>
+                <span className='font-medium'>周期开始</span>
+                <Input
+                  type='date'
+                  value={settlementPeriodStart}
+                  onChange={(event) =>
+                    setSettlementPeriodStart(event.target.value)
+                  }
+                />
+              </label>
+              <label className='grid gap-2 text-sm'>
+                <span className='font-medium'>周期结束</span>
+                <Input
+                  type='date'
+                  value={settlementPeriodEnd}
+                  onChange={(event) =>
+                    setSettlementPeriodEnd(event.target.value)
+                  }
+                />
+              </label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => setSettlementDialogOpen(false)}
+              disabled={generatingSettlement}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => void submitSettlement()}
+              disabled={generatingSettlement}
+            >
+              {generatingSettlement ? '生成中' : '生成结算单'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

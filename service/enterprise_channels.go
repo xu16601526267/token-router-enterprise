@@ -17,6 +17,17 @@ type enterpriseChannelLogAggregate struct {
 	Latency      float64
 }
 
+type EnterpriseChannelFilters struct {
+	Keyword    string
+	Status     int
+	SupplierId int
+	Group      string
+	Page       int
+	PageSize   int
+	SortBy     string
+	SortOrder  string
+}
+
 func enterpriseChannelAggregates(startTimestamp int64, endTimestamp int64) (map[int]enterpriseChannelLogAggregate, error) {
 	result := make(map[int]enterpriseChannelLogAggregate)
 	if model.LOG_DB == nil {
@@ -73,8 +84,71 @@ func enterpriseChannelItem(channel model.Channel, supplier model.Supplier, logs 
 }
 
 func GetEnterpriseChannelCenter(startTimestamp int64, endTimestamp int64) (*dto.EnterpriseChannelCenterData, error) {
+	return GetEnterpriseChannelCenterWithFilters(startTimestamp, endTimestamp, EnterpriseChannelFilters{})
+}
+
+func enterpriseApplyChannelFilters(query *gorm.DB, filters EnterpriseChannelFilters) *gorm.DB {
+	if filters.Status > 0 {
+		query = query.Where("channels.status = ?", filters.Status)
+	}
+	if filters.SupplierId > 0 {
+		query = query.Where("channels.supplier_id = ?", filters.SupplierId)
+	}
+	if filters.Group != "" {
+		query = query.Where("channels."+model.CommonGroupColumn()+" = ?", filters.Group)
+	}
+	if keyword := strings.TrimSpace(filters.Keyword); keyword != "" {
+		like := enterpriseLikePattern(keyword)
+		query = query.Where(
+			"channels.name LIKE ? ESCAPE '!' OR channels.models LIKE ? ESCAPE '!' OR channels.tag LIKE ? ESCAPE '!' OR channels.remark LIKE ? ESCAPE '!' OR channels."+model.CommonGroupColumn()+" LIKE ? ESCAPE '!' OR suppliers.name LIKE ? ESCAPE '!'",
+			like, like, like, like, like, like,
+		)
+	}
+	return query
+}
+
+func enterpriseChannelOrder(filters EnterpriseChannelFilters) string {
+	column := "channels.status DESC, channels.priority DESC, channels.used_quota DESC, channels.id DESC"
+	switch strings.ToLower(strings.TrimSpace(filters.SortBy)) {
+	case "id":
+		column = "channels.id"
+	case "name":
+		column = "channels.name"
+	case "balance":
+		column = "channels.balance"
+	case "response_time":
+		column = "channels.response_time"
+	case "used_quota":
+		column = "channels.used_quota"
+	case "priority":
+		column = "channels.priority"
+	}
+	if column == "channels.status DESC, channels.priority DESC, channels.used_quota DESC, channels.id DESC" {
+		return column
+	}
+	if strings.ToLower(strings.TrimSpace(filters.SortOrder)) == "asc" {
+		return column + " ASC"
+	}
+	return column + " DESC"
+}
+
+func GetEnterpriseChannelCenterWithFilters(startTimestamp int64, endTimestamp int64, filters EnterpriseChannelFilters) (*dto.EnterpriseChannelCenterData, error) {
+	page, pageSize := normalizeEnterprisePage(filters.Page, filters.PageSize, 50, 500)
+	filters.Page = page
+	filters.PageSize = pageSize
+	var total int64
+	countQuery := enterpriseApplyChannelFilters(model.DB.Model(&model.Channel{}).
+		Joins("LEFT JOIN suppliers ON suppliers.id = channels.supplier_id"), filters)
+	if err := countQuery.Count(&total).Error; err != nil {
+		return nil, err
+	}
 	var channels []model.Channel
-	if err := model.DB.Order("status DESC, priority DESC, used_quota DESC, id DESC").Find(&channels).Error; err != nil {
+	pageQuery := enterpriseApplyChannelFilters(model.DB.Model(&model.Channel{}).
+		Joins("LEFT JOIN suppliers ON suppliers.id = channels.supplier_id"), filters)
+	if err := pageQuery.Select("channels.*").
+		Order(enterpriseChannelOrder(filters)).
+		Limit(pageSize).Offset((page - 1) * pageSize).
+		Find(&channels).Error; err != nil {
 		return nil, err
 	}
 	var suppliers []model.Supplier
@@ -125,6 +199,7 @@ func GetEnterpriseChannelCenter(startTimestamp int64, endTimestamp int64) (*dto.
 	}
 	return &dto.EnterpriseChannelCenterData{
 		GeneratedAt: common.GetTimestamp(), Summary: summary, Items: items,
+		Total: total, Page: page, PageSize: pageSize,
 	}, nil
 }
 
@@ -178,7 +253,7 @@ func GetEnterpriseChannelDetail(channelId int, startTimestamp int64, endTimestam
 	incidents := make([]dto.EnterpriseChannelIncident, 0, 8)
 	if model.LOG_DB != nil {
 		var logs []model.Log
-		if err := model.LOG_DB.Where("channel = ? AND created_at >= ? AND created_at <= ? AND type = ?", channelId, startTimestamp, endTimestamp, model.LogTypeError).
+		if err := model.LOG_DB.Where("channel_id = ? AND created_at >= ? AND created_at <= ? AND type = ?", channelId, startTimestamp, endTimestamp, model.LogTypeError).
 			Order("id DESC").Limit(8).Find(&logs).Error; err != nil {
 			return nil, err
 		}

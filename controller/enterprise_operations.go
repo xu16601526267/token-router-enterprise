@@ -90,6 +90,22 @@ func writeEnterpriseCSV(c *gin.Context, filename string, body []byte) {
 	c.Data(http.StatusOK, "text/csv; charset=utf-8", body)
 }
 
+func enterpriseUsageFiltersFromQuery(c *gin.Context) service.EnterpriseUsageFilters {
+	channelId, _ := strconv.Atoi(c.Query("channel_id"))
+	return service.EnterpriseUsageFilters{
+		Keyword:   strings.TrimSpace(c.Query("keyword")),
+		ModelName: strings.TrimSpace(c.Query("model_name")),
+		Username:  strings.TrimSpace(c.Query("username")),
+		Group:     strings.TrimSpace(c.Query("group")),
+		Status:    strings.TrimSpace(c.Query("status")),
+		ChannelId: channelId,
+		Page:      enterprisePositiveInt(c, "page", 1, 1000000),
+		PageSize:  enterprisePositiveInt(c, "page_size", 50, 500),
+		SortBy:    strings.TrimSpace(c.Query("sort_by")),
+		SortOrder: strings.TrimSpace(c.Query("sort_order")),
+	}
+}
+
 func GetEnterpriseControlTower(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
 	data, err := service.GetEnterpriseControlTower(startTimestamp, endTimestamp)
@@ -102,12 +118,42 @@ func GetEnterpriseControlTower(c *gin.Context) {
 
 func GetEnterpriseChannels(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
-	data, err := service.GetEnterpriseChannelCenter(startTimestamp, endTimestamp)
+	status, _ := strconv.Atoi(c.Query("status"))
+	supplierId, _ := strconv.Atoi(c.Query("supplier_id"))
+	data, err := service.GetEnterpriseChannelCenterWithFilters(startTimestamp, endTimestamp, service.EnterpriseChannelFilters{
+		Keyword:    strings.TrimSpace(c.Query("keyword")),
+		Status:     status,
+		SupplierId: supplierId,
+		Group:      strings.TrimSpace(c.Query("group")),
+		Page:       enterprisePositiveInt(c, "page", 1, 1000000),
+		PageSize:   enterprisePositiveInt(c, "page_size", 50, 500),
+		SortBy:     strings.TrimSpace(c.Query("sort_by")),
+		SortOrder:  strings.TrimSpace(c.Query("sort_order")),
+	})
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
 	common.ApiSuccess(c, data)
+}
+
+func ExportEnterpriseChannels(c *gin.Context) {
+	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
+	status, _ := strconv.Atoi(c.Query("status"))
+	supplierId, _ := strconv.Atoi(c.Query("supplier_id"))
+	body, err := service.BuildEnterpriseChannelsCSV(startTimestamp, endTimestamp, service.EnterpriseChannelFilters{
+		Keyword:    strings.TrimSpace(c.Query("keyword")),
+		Status:     status,
+		SupplierId: supplierId,
+		Group:      strings.TrimSpace(c.Query("group")),
+		SortBy:     strings.TrimSpace(c.Query("sort_by")),
+		SortOrder:  strings.TrimSpace(c.Query("sort_order")),
+	})
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	writeEnterpriseCSV(c, enterpriseCSVFilename("enterprise-channels", startTimestamp, endTimestamp), body)
 }
 
 func GetEnterpriseChannelDetail(c *gin.Context) {
@@ -253,7 +299,7 @@ func DeleteEnterpriseAPIKey(c *gin.Context) {
 
 func GetEnterpriseUsageAnalytics(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
-	data, err := service.GetEnterpriseUsageAnalytics(startTimestamp, endTimestamp)
+	data, err := service.GetEnterpriseUsageAnalyticsWithFilters(startTimestamp, endTimestamp, enterpriseUsageFiltersFromQuery(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -263,7 +309,7 @@ func GetEnterpriseUsageAnalytics(c *gin.Context) {
 
 func ExportEnterpriseUsageAnalytics(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
-	body, err := service.BuildEnterpriseUsageAnalyticsCSV(startTimestamp, endTimestamp)
+	body, err := service.BuildEnterpriseUsageAnalyticsCSVWithFilters(startTimestamp, endTimestamp, enterpriseUsageFiltersFromQuery(c))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -299,4 +345,18 @@ func ExportEnterpriseBilling(c *gin.Context) {
 		return
 	}
 	writeEnterpriseCSV(c, enterpriseCSVFilename("enterprise-billing", startTimestamp, endTimestamp), body)
+}
+
+func GenerateEnterpriseBillingSettlement(c *gin.Context) {
+	var input model.SettlementStatementGenerateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		common.ApiErrorMsg(c, "结算单参数格式不正确")
+		return
+	}
+	item, err := service.GenerateEnterpriseSettlementStatement(input)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, item)
 }

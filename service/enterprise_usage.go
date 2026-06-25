@@ -50,6 +50,37 @@ type enterpriseUsageChannelRow struct {
 	Quota     int64
 }
 
+type EnterpriseUsageFilters struct {
+	Keyword   string
+	ModelName string
+	Username  string
+	Group     string
+	Status    string
+	ChannelId int
+	Page      int
+	PageSize  int
+	SortBy    string
+	SortOrder string
+}
+
+func normalizeEnterprisePage(page int, pageSize int, defaultPageSize int, maxPageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	if maxPageSize > 0 && pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	return page, pageSize
+}
+
+func enterpriseLikePattern(value string) string {
+	replacer := strings.NewReplacer("!", "!!", "%", "!%", "_", "!_")
+	return "%" + replacer.Replace(value) + "%"
+}
+
 func enterpriseQuotaCurrency(quota int64) float64 {
 	if common.QuotaPerUnit <= 0 {
 		return 0
@@ -57,16 +88,48 @@ func enterpriseQuotaCurrency(quota int64) float64 {
 	return float64(quota) / common.QuotaPerUnit
 }
 
-func enterpriseUsageBreakdown(db *gorm.DB, column string, startTimestamp int64, endTimestamp int64, totalQuota int64) ([]dto.EnterpriseUsageBreakdownItem, error) {
+func enterpriseUsageLogQuery(db *gorm.DB, startTimestamp int64, endTimestamp int64, filters EnterpriseUsageFilters, logTypes []int) *gorm.DB {
+	query := db.Model(&model.Log{}).
+		Where("created_at >= ? AND created_at <= ?", startTimestamp, endTimestamp)
+	if len(logTypes) > 0 {
+		query = query.Where("type IN ?", logTypes)
+	}
+	if filters.Status == "success" {
+		query = query.Where("type = ?", model.LogTypeConsume)
+	} else if filters.Status == "error" {
+		query = query.Where("type = ?", model.LogTypeError)
+	}
+	if filters.ModelName != "" {
+		query = query.Where("model_name = ?", filters.ModelName)
+	}
+	if filters.Username != "" {
+		query = query.Where("username = ?", filters.Username)
+	}
+	if filters.Group != "" {
+		query = query.Where(model.LogGroupColumn()+" = ?", filters.Group)
+	}
+	if filters.ChannelId > 0 {
+		query = query.Where("channel_id = ?", filters.ChannelId)
+	}
+	if keyword := strings.TrimSpace(filters.Keyword); keyword != "" {
+		like := enterpriseLikePattern(keyword)
+		query = query.Where(
+			"request_id LIKE ? ESCAPE '!' OR username LIKE ? ESCAPE '!' OR token_name LIKE ? ESCAPE '!' OR model_name LIKE ? ESCAPE '!' OR ip LIKE ? ESCAPE '!' OR content LIKE ? ESCAPE '!'",
+			like, like, like, like, like, like,
+		)
+	}
+	return query
+}
+
+func enterpriseUsageBreakdown(db *gorm.DB, column string, startTimestamp int64, endTimestamp int64, totalQuota int64, filters EnterpriseUsageFilters) ([]dto.EnterpriseUsageBreakdownItem, error) {
 	allowed := map[string]string{"model_name": "model_name", "username": "username", "group": model.LogGroupColumn()}
 	sqlColumn, ok := allowed[column]
 	if !ok {
 		return nil, fmt.Errorf("unsupported enterprise usage breakdown: %s", column)
 	}
 	var rows []enterpriseUsageBreakdownRow
-	err := db.Model(&model.Log{}).
-		Select(sqlColumn+" AS name, COALESCE(SUM(quota), 0) AS quota").
-		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, model.LogTypeConsume).
+	err := enterpriseUsageLogQuery(db, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume}).
+		Select(sqlColumn + " AS name, COALESCE(SUM(quota), 0) AS quota").
 		Clauses(clause.GroupBy{Columns: []clause.Column{{Name: sqlColumn, Raw: true}}}).
 		Order("quota DESC").Limit(12).Scan(&rows).Error
 	if err != nil {
@@ -93,11 +156,10 @@ func enterpriseUsageBreakdown(db *gorm.DB, column string, startTimestamp int64, 
 	return items, nil
 }
 
-func enterpriseUsageChannelBreakdown(db *gorm.DB, startTimestamp int64, endTimestamp int64, totalQuota int64) ([]dto.EnterpriseUsageBreakdownItem, error) {
+func enterpriseUsageChannelBreakdown(db *gorm.DB, startTimestamp int64, endTimestamp int64, totalQuota int64, filters EnterpriseUsageFilters) ([]dto.EnterpriseUsageBreakdownItem, error) {
 	var rows []enterpriseUsageChannelRow
-	err := db.Model(&model.Log{}).
+	err := enterpriseUsageLogQuery(db, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume}).
 		Select("channel_id, COALESCE(SUM(quota), 0) AS quota").
-		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, model.LogTypeConsume).
 		Group("channel_id").Order("quota DESC").Limit(12).Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -139,27 +201,33 @@ func enterpriseUsageChannelBreakdown(db *gorm.DB, startTimestamp int64, endTimes
 }
 
 func GetEnterpriseUsageAnalytics(startTimestamp int64, endTimestamp int64) (*dto.EnterpriseUsageAnalyticsData, error) {
+	return GetEnterpriseUsageAnalyticsWithFilters(startTimestamp, endTimestamp, EnterpriseUsageFilters{})
+}
+
+func GetEnterpriseUsageAnalyticsWithFilters(startTimestamp int64, endTimestamp int64, filters EnterpriseUsageFilters) (*dto.EnterpriseUsageAnalyticsData, error) {
+	page, pageSize := normalizeEnterprisePage(filters.Page, filters.PageSize, 50, 500)
+	filters.Page = page
+	filters.PageSize = pageSize
 	data := &dto.EnterpriseUsageAnalyticsData{
 		GeneratedAt: common.GetTimestamp(),
 		Range:       dto.EnterpriseUsageRange{StartTimestamp: startTimestamp, EndTimestamp: endTimestamp},
 		Trend:       []dto.EnterpriseUsageTrendPoint{}, ByModel: []dto.EnterpriseUsageBreakdownItem{},
 		ByUser: []dto.EnterpriseUsageBreakdownItem{}, ByChannel: []dto.EnterpriseUsageBreakdownItem{},
 		ByGroup: []dto.EnterpriseUsageBreakdownItem{}, RecentLogs: []dto.EnterpriseUsageLogItem{},
+		Page: page, PageSize: pageSize,
 	}
 	if model.LOG_DB == nil {
 		return data, nil
 	}
 
 	var consumed enterpriseUsageAggregate
-	if err := model.LOG_DB.Model(&model.Log{}).
+	if err := enterpriseUsageLogQuery(model.LOG_DB, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume}).
 		Select("COUNT(*) AS requests, COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens, COALESCE(SUM(completion_tokens), 0) AS completion_tokens, COALESCE(SUM(quota), 0) AS quota, COALESCE(AVG(use_time), 0) AS latency").
-		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, model.LogTypeConsume).
 		Scan(&consumed).Error; err != nil {
 		return nil, err
 	}
 	var errorCount int64
-	if err := model.LOG_DB.Model(&model.Log{}).
-		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, model.LogTypeError).
+	if err := enterpriseUsageLogQuery(model.LOG_DB, startTimestamp, endTimestamp, filters, []int{model.LogTypeError}).
 		Count(&errorCount).Error; err != nil {
 		return nil, err
 	}
@@ -206,7 +274,9 @@ func GetEnterpriseUsageAnalytics(startTimestamp int64, endTimestamp int64) (*dto
 		UseTime          int
 	}
 	if err := model.LOG_DB.Model(&model.Log{}).Select("created_at", "type", "prompt_tokens", "completion_tokens", "quota", "use_time").
-		Where("created_at >= ? AND created_at <= ? AND type IN ?", startTimestamp, endTimestamp, []int{model.LogTypeConsume, model.LogTypeError}).
+		Scopes(func(db *gorm.DB) *gorm.DB {
+			return enterpriseUsageLogQuery(db, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume, model.LogTypeError})
+		}).
 		Find(&trendRows).Error; err != nil {
 		return nil, err
 	}
@@ -240,22 +310,40 @@ func GetEnterpriseUsageAnalytics(startTimestamp int64, endTimestamp int64) (*dto
 	sort.Slice(data.Trend, func(i, j int) bool { return data.Trend[i].Timestamp < data.Trend[j].Timestamp })
 
 	var err error
-	if data.ByModel, err = enterpriseUsageBreakdown(model.LOG_DB, "model_name", startTimestamp, endTimestamp, consumed.Quota); err != nil {
+	if data.ByModel, err = enterpriseUsageBreakdown(model.LOG_DB, "model_name", startTimestamp, endTimestamp, consumed.Quota, filters); err != nil {
 		return nil, err
 	}
-	if data.ByUser, err = enterpriseUsageBreakdown(model.LOG_DB, "username", startTimestamp, endTimestamp, consumed.Quota); err != nil {
+	if data.ByUser, err = enterpriseUsageBreakdown(model.LOG_DB, "username", startTimestamp, endTimestamp, consumed.Quota, filters); err != nil {
 		return nil, err
 	}
-	if data.ByGroup, err = enterpriseUsageBreakdown(model.LOG_DB, "group", startTimestamp, endTimestamp, consumed.Quota); err != nil {
+	if data.ByGroup, err = enterpriseUsageBreakdown(model.LOG_DB, "group", startTimestamp, endTimestamp, consumed.Quota, filters); err != nil {
 		return nil, err
 	}
-	if data.ByChannel, err = enterpriseUsageChannelBreakdown(model.LOG_DB, startTimestamp, endTimestamp, consumed.Quota); err != nil {
+	if data.ByChannel, err = enterpriseUsageChannelBreakdown(model.LOG_DB, startTimestamp, endTimestamp, consumed.Quota, filters); err != nil {
 		return nil, err
 	}
 
 	var recent []model.Log
-	if err := model.LOG_DB.Where("created_at >= ? AND created_at <= ? AND type IN ?", startTimestamp, endTimestamp, []int{model.LogTypeConsume, model.LogTypeError}).
-		Order("id DESC").Limit(50).Find(&recent).Error; err != nil {
+	if err := enterpriseUsageLogQuery(model.LOG_DB, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume, model.LogTypeError}).
+		Count(&data.TotalLogs).Error; err != nil {
+		return nil, err
+	}
+	order := "id"
+	switch strings.ToLower(strings.TrimSpace(filters.SortBy)) {
+	case "created_at":
+		order = "created_at"
+	case "quota":
+		order = "quota"
+	case "use_time":
+		order = "use_time"
+	}
+	if strings.ToLower(strings.TrimSpace(filters.SortOrder)) == "asc" {
+		order += " ASC"
+	} else {
+		order += " DESC"
+	}
+	if err := enterpriseUsageLogQuery(model.LOG_DB, startTimestamp, endTimestamp, filters, []int{model.LogTypeConsume, model.LogTypeError}).
+		Order(order).Limit(pageSize).Offset((page - 1) * pageSize).Find(&recent).Error; err != nil {
 		return nil, err
 	}
 	channelIds := make([]int, 0, len(recent))

@@ -17,10 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+
 import type {
   EnterpriseApiResponse,
   EnterpriseBillingData,
   EnterpriseOverviewData,
+  EnterpriseSettlementItem,
   EnterpriseUsageAnalyticsData,
   EnterpriseUsersData,
 } from './types'
@@ -28,6 +30,27 @@ import type {
 type EnterpriseRangeParams = {
   start_timestamp: number
   end_timestamp: number
+}
+
+type EnterpriseUsageParams = EnterpriseRangeParams & {
+  keyword?: string
+  model_name?: string
+  username?: string
+  group?: string
+  status?: string
+  channel_id?: number
+  page?: number
+  page_size?: number
+  sort_by?: string
+  sort_order?: string
+}
+
+export type EnterpriseSettlementGenerateInput = {
+  subject_type: 'supplier' | 'user'
+  supplier_id?: number
+  user_id?: number
+  period_start: number
+  period_end: number
 }
 
 async function downloadEnterpriseCsv(
@@ -63,15 +86,17 @@ export async function getEnterpriseOverview(
 }
 
 export async function getEnterpriseUsageAnalytics(
-  params: EnterpriseRangeParams
+  params: EnterpriseUsageParams
 ): Promise<EnterpriseApiResponse<EnterpriseUsageAnalyticsData>> {
   const res = await api.get('/api/enterprise/usage-analytics', { params })
   return res.data
 }
 
-export async function getEnterpriseUsers(params: {
-  limit?: number
-} = {}): Promise<EnterpriseApiResponse<EnterpriseUsersData>> {
+export async function getEnterpriseUsers(
+  params: {
+    limit?: number
+  } = {}
+): Promise<EnterpriseApiResponse<EnterpriseUsersData>> {
   const res = await api.get('/api/enterprise/users', { params })
   return res.data
 }
@@ -84,7 +109,7 @@ export async function getEnterpriseBilling(
 }
 
 export async function exportEnterpriseUsageAnalytics(
-  params: EnterpriseRangeParams
+  params: EnterpriseUsageParams
 ): Promise<void> {
   await downloadEnterpriseCsv(
     '/api/enterprise/usage-analytics/export',
@@ -101,4 +126,14 @@ export async function exportEnterpriseBilling(
     params,
     'enterprise-billing.csv'
   )
+}
+
+export async function generateEnterpriseSettlement(
+  payload: EnterpriseSettlementGenerateInput
+): Promise<EnterpriseApiResponse<EnterpriseSettlementItem>> {
+  const res = await api.post(
+    '/api/enterprise/billing/settlements/generate',
+    payload
+  )
+  return res.data
 }

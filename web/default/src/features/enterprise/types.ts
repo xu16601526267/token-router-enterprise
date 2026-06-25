@@ -156,6 +156,9 @@ export type EnterpriseUsageAnalyticsData = {
   by_channel: EnterpriseUsageBreakdownItem[]
   by_group: EnterpriseUsageBreakdownItem[]
   recent_logs: EnterpriseUsageLogItem[]
+  total_logs: number
+  page: number
+  page_size: number
 }
 
 export type EnterpriseUserItem = {

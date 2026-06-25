@@ -326,6 +326,7 @@ func SetApiRouter(router *gin.Engine) {
 			enterpriseRoute.GET("/overview", controller.GetEnterpriseOverview)
 			enterpriseRoute.GET("/control-tower", controller.GetEnterpriseControlTower)
 			enterpriseRoute.GET("/channels", controller.GetEnterpriseChannels)
+			enterpriseRoute.GET("/channels/export", controller.ExportEnterpriseChannels)
 			enterpriseRoute.GET("/channels/:id", controller.GetEnterpriseChannelDetail)
 			enterpriseRoute.GET("/api-keys", controller.GetEnterpriseAPIKeys)
 			enterpriseRoute.GET("/api-keys/export", controller.ExportEnterpriseAPIKeys)
@@ -339,6 +340,7 @@ func SetApiRouter(router *gin.Engine) {
 			enterpriseRoute.GET("/users", controller.GetEnterpriseUsers)
 			enterpriseRoute.GET("/billing", controller.GetEnterpriseBilling)
 			enterpriseRoute.GET("/billing/export", controller.ExportEnterpriseBilling)
+			enterpriseRoute.POST("/billing/settlements/generate", controller.GenerateEnterpriseBillingSettlement)
 		}
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
