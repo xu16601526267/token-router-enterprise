@@ -16,29 +16,28 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
-import { SectionPageLayout } from '@/components/layout'
 import { UsersDeleteDialog } from './components/users-delete-dialog'
 import { UsersMutateDrawer } from './components/users-mutate-drawer'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider, useUsers } from './components/users-provider'
 import { UsersTable } from './components/users-table'
+import { EnterpriseUsersGovernance } from '@/features/enterprise/users-governance'
 
 function UsersContent() {
-  const { t } = useTranslation()
   const { open, setOpen, currentRow } = useUsers()
 
   return (
     <>
-      <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>{t('Users')}</SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <UsersPrimaryButtons />
-        </SectionPageLayout.Actions>
-        <SectionPageLayout.Content>
-          <UsersTable />
-        </SectionPageLayout.Content>
-      </SectionPageLayout>
+      <div className='h-full overflow-auto px-4 py-4 sm:px-6'>
+        <EnterpriseUsersGovernance
+          actions={<UsersPrimaryButtons />}
+          classicTable={
+            <div className='h-[620px] min-h-0'>
+              <UsersTable />
+            </div>
+          }
+        />
+      </div>
 
       <UsersMutateDrawer
         open={open === 'create' || open === 'update'}

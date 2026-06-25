@@ -320,6 +320,24 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute.GET("/flow", middleware.AdminAuth(), controller.GetAllFlowQuotaDates)
 		dataRoute.GET("/flow/self", middleware.UserAuth(), controller.GetUserFlowQuotaDates)
 
+		enterpriseRoute := apiRouter.Group("/enterprise")
+		enterpriseRoute.Use(middleware.AdminAuth())
+		{
+			enterpriseRoute.GET("/overview", controller.GetEnterpriseOverview)
+			enterpriseRoute.GET("/control-tower", controller.GetEnterpriseControlTower)
+			enterpriseRoute.GET("/channels", controller.GetEnterpriseChannels)
+			enterpriseRoute.GET("/channels/:id", controller.GetEnterpriseChannelDetail)
+			enterpriseRoute.GET("/api-keys", controller.GetEnterpriseAPIKeys)
+			enterpriseRoute.GET("/api-keys/users", controller.GetEnterpriseAPIKeyUsers)
+			enterpriseRoute.POST("/api-keys", controller.CreateEnterpriseAPIKey)
+			enterpriseRoute.PUT("/api-keys/:id", controller.UpdateEnterpriseAPIKey)
+			enterpriseRoute.POST("/api-keys/:id/rotate", controller.RotateEnterpriseAPIKey)
+			enterpriseRoute.DELETE("/api-keys/:id", controller.DeleteEnterpriseAPIKey)
+			enterpriseRoute.GET("/usage-analytics", controller.GetEnterpriseUsageAnalytics)
+			enterpriseRoute.GET("/users", controller.GetEnterpriseUsers)
+			enterpriseRoute.GET("/billing", controller.GetEnterpriseBilling)
+		}
+
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{
 			logRoute.GET("/token", middleware.TokenAuthReadOnly(), controller.GetLogByKey)

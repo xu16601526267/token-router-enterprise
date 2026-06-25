@@ -20,10 +20,12 @@ import { useCallback, useMemo } from 'react'
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { useSidebarConfig } from '@/hooks/use-sidebar-config'
+import { useIsAdmin } from '@/hooks/use-admin'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SectionPageLayout } from '@/components/layout'
 import type { NavGroup } from '@/components/layout/types'
 import { CacheStatsDialog } from '@/features/system-settings/general/channel-affinity/cache-stats-dialog'
+import { EnterpriseUsageAnalytics } from '@/features/enterprise/usage-analytics'
 import { UserInfoDialog } from './components/dialogs/user-info-dialog'
 import {
   UsageLogsProvider,
@@ -54,6 +56,7 @@ const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
 function UsageLogsContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const isAdmin = useIsAdmin()
   const params = route.useParams()
   const activeCategory: UsageLogsSectionId =
     params.section && isUsageLogsSectionId(params.section)
@@ -115,22 +118,34 @@ function UsageLogsContent() {
           {t(pageMeta.titleKey)}
         </SectionPageLayout.Title>
         <SectionPageLayout.Content>
-          <div className='flex h-full min-h-0 flex-col gap-4'>
-            {showTaskSwitcher && (
-              <Tabs value={activeCategory} onValueChange={handleSectionChange}>
-                <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-                  {visibleSections.map((section) => (
-                    <TabsTrigger key={section} value={section}>
-                      {t(SECTION_META[section].titleKey)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            )}
-            <div className='min-h-0 flex-1'>
-              <UsageLogsTable logCategory={activeCategory} />
+          {isAdmin && activeCategory === 'common' ? (
+            <div className='h-full min-h-0 overflow-auto'>
+              <EnterpriseUsageAnalytics
+                classicContent={
+                  <div className='h-[620px] min-h-0'>
+                    <UsageLogsTable logCategory={activeCategory} />
+                  </div>
+                }
+              />
             </div>
-          </div>
+          ) : (
+            <div className='flex h-full min-h-0 flex-col gap-4'>
+              {showTaskSwitcher && (
+                <Tabs value={activeCategory} onValueChange={handleSectionChange}>
+                  <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
+                    {visibleSections.map((section) => (
+                      <TabsTrigger key={section} value={section}>
+                        {t(SECTION_META[section].titleKey)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
+              <div className='min-h-0 flex-1'>
+                <UsageLogsTable logCategory={activeCategory} />
+              </div>
+            </div>
+          )}
         </SectionPageLayout.Content>
       </SectionPageLayout>
 

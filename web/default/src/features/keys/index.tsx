@@ -18,13 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useTranslation } from 'react-i18next'
 import { SectionPageLayout } from '@/components/layout'
+import { useIsAdmin } from '@/hooks/use-admin'
 import { ApiKeysDialogs } from './components/api-keys-dialogs'
 import { ApiKeysPrimaryButtons } from './components/api-keys-primary-buttons'
 import { ApiKeysProvider } from './components/api-keys-provider'
 import { ApiKeysTable } from './components/api-keys-table'
+import { EnterpriseApiKeys } from './enterprise-api-keys'
 
 export function ApiKeys() {
   const { t } = useTranslation()
+  const isAdmin = useIsAdmin()
+
+  if (isAdmin) {
+    return <EnterpriseApiKeys />
+  }
+
   return (
     <ApiKeysProvider>
       <SectionPageLayout fixedContent>

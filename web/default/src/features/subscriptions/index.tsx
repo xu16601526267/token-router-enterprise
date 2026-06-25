@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { SectionPageLayout } from '@/components/layout'
 import { SubscriptionsDialogs } from './components/subscriptions-dialogs'
 import { SubscriptionsPrimaryButtons } from './components/subscriptions-primary-buttons'
 import {
@@ -27,6 +26,7 @@ import {
   useSubscriptions,
 } from './components/subscriptions-provider'
 import { SubscriptionsTable } from './components/subscriptions-table'
+import { EnterpriseBillingCenter } from '@/features/enterprise/billing-center'
 
 function SubscriptionsContent() {
   const { t } = useTranslation()
@@ -34,40 +34,35 @@ function SubscriptionsContent() {
 
   return (
     <>
-      <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          {t('Subscription Management')}
-        </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <div className='flex items-center gap-2'>
-            <Alert variant='default' className='hidden px-3 py-2 sm:flex'>
-              <Info className='h-4 w-4' />
-              <AlertDescription className='text-xs'>
-                {t(
-                  'Stripe/Creem requires creating products on the third-party platform and entering the ID'
-                )}
-              </AlertDescription>
-            </Alert>
-            <SubscriptionsPrimaryButtons />
-          </div>
-        </SectionPageLayout.Actions>
-        <SectionPageLayout.Content>
-          <div className='flex h-full min-h-0 flex-col gap-4'>
-            {!complianceConfirmed ? (
-              <Alert variant='destructive' className='shrink-0'>
-                <AlertDescription>
+      <div className='h-full overflow-auto px-4 py-4 sm:px-6'>
+        <EnterpriseBillingCenter
+          actions={<SubscriptionsPrimaryButtons />}
+          classicContent={
+            <div className='flex min-h-[620px] flex-col gap-4'>
+              <Alert variant='default' className='shrink-0 px-3 py-2'>
+                <Info className='h-4 w-4' />
+                <AlertDescription className='text-xs'>
                   {t(
-                    'Subscription plan creation and changes are locked until the administrator confirms compliance terms in Payment Gateway settings.'
+                    'Stripe/Creem requires creating products on the third-party platform and entering the ID'
                   )}
                 </AlertDescription>
               </Alert>
-            ) : null}
-            <div className='min-h-0 flex-1'>
-              <SubscriptionsTable />
+              {!complianceConfirmed ? (
+                <Alert variant='destructive' className='shrink-0'>
+                  <AlertDescription>
+                    {t(
+                      'Subscription plan creation and changes are locked until the administrator confirms compliance terms in Payment Gateway settings.'
+                    )}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              <div className='h-[540px] min-h-0'>
+                <SubscriptionsTable />
+              </div>
             </div>
-          </div>
-        </SectionPageLayout.Content>
-      </SectionPageLayout>
+          }
+        />
+      </div>
 
       <SubscriptionsDialogs />
     </>

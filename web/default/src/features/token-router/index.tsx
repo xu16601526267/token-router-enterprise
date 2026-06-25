@@ -157,6 +157,7 @@ import {
   updateSupplier,
   updateSupplierAgreement,
 } from './api'
+import { ControlTower } from './components/control-tower'
 import type {
   MarginGroupBy,
   MarginSummaryRow,
@@ -223,6 +224,7 @@ import type {
 } from './types'
 
 type TabValue =
+  | 'control-tower'
   | 'overview'
   | 'suppliers'
   | 'quality'
@@ -4768,7 +4770,7 @@ function useTokenRouterPeriod() {
 export function TokenRouter() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState<TabValue>('overview')
+  const [activeTab, setActiveTab] = useState<TabValue>('control-tower')
   const [groupBy, setGroupBy] = useState<MarginGroupBy>('supplier')
   const [qualityGroupBy, setQualityGroupBy] =
     useState<QualityGroupBy>('supplier')
@@ -7237,7 +7239,8 @@ export function TokenRouter() {
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
-            <div className='flex flex-wrap items-end gap-3'>
+            {activeTab !== 'control-tower' && (
+              <div className='flex flex-wrap items-end gap-3'>
               <Field className='w-full sm:w-auto'>
                 <FieldLabel htmlFor='token-router-start'>
                   {t('Period Start')}
@@ -7260,7 +7263,8 @@ export function TokenRouter() {
                   onChange={(event) => setEndInput(event.target.value)}
                 />
               </Field>
-            </div>
+              </div>
+            )}
 
             <Tabs
               value={activeTab}
@@ -7268,6 +7272,7 @@ export function TokenRouter() {
               className='min-h-0 flex-1'
             >
               <TabsList className='w-full max-w-full flex-nowrap justify-start overflow-x-auto group-data-horizontal/tabs:h-auto [&_[data-slot=tabs-trigger]]:flex-none'>
+                <TabsTrigger value='control-tower'>控制塔</TabsTrigger>
                 <TabsTrigger value='overview'>{t('Overview')}</TabsTrigger>
                 <TabsTrigger value='suppliers'>{t('Suppliers')}</TabsTrigger>
                 <TabsTrigger value='quality'>{t('Quality')}</TabsTrigger>
@@ -7310,6 +7315,10 @@ export function TokenRouter() {
                   {t('Settlements')}
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value='control-tower' className='min-h-0 overflow-auto'>
+                <ControlTower />
+              </TabsContent>
 
               <TabsContent value='overview' className='min-h-0 overflow-auto'>
                 <div className='flex flex-col gap-4'>

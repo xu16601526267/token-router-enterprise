@@ -20,7 +20,6 @@ import { useTranslation } from 'react-i18next'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Settings2 } from 'lucide-react'
-import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import {
   Tooltip,
@@ -33,7 +32,7 @@ import { getChannelOps } from './api'
 import { ChannelsDialogs } from './components/channels-dialogs'
 import { ChannelsPrimaryButtons } from './components/channels-primary-buttons'
 import { ChannelsProvider } from './components/channels-provider'
-import { ChannelsTable } from './components/channels-table'
+import { EnterpriseChannelsCenter } from './enterprise-channels-center'
 
 export function Channels() {
   const { t } = useTranslation()
@@ -86,21 +85,10 @@ export function Channels() {
 
   return (
     <ChannelsProvider>
-      <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          <span className='flex min-w-0 items-center gap-2'>
-            <span className='truncate'>{t('Channels')}</span>
-            {retryBadge}
-          </span>
-        </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <ChannelsPrimaryButtons />
-        </SectionPageLayout.Actions>
-        <SectionPageLayout.Content>
-          <ChannelsTable />
-        </SectionPageLayout.Content>
-      </SectionPageLayout>
-
+      <EnterpriseChannelsCenter
+        retryBadge={retryBadge}
+        actions={<ChannelsPrimaryButtons />}
+      />
       <ChannelsDialogs />
     </ChannelsProvider>
   )
