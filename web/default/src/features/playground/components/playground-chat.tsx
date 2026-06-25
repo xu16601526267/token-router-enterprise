@@ -17,9 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo, useState } from 'react'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+
 import {
   Branch,
   BranchMessages,
@@ -48,6 +46,10 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '@/components/ai-elements/sources'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+
 import { MESSAGE_ROLES } from '../constants'
 import { getMessageContentStyles } from '../lib/message-styles'
 import { parseThinkTags } from '../lib/message-utils'
@@ -162,8 +164,11 @@ export function PlaygroundChat({
                               const isAssistant =
                                 message.from === MESSAGE_ROLES.ASSISTANT
                               const hasSources = !!message.sources?.length
+                              const sources = message.sources ?? []
                               const showReasoning =
                                 isAssistant && !!message.reasoning?.content
+                              const reasoningContent =
+                                message.reasoning?.content ?? ''
                               const showLoader =
                                 isAssistant &&
                                 !message.isReasoningStreaming &&
@@ -198,19 +203,15 @@ export function PlaygroundChat({
                                   {/* Sources */}
                                   {hasSources && (
                                     <Sources>
-                                      <SourcesTrigger
-                                        count={message.sources!.length}
-                                      />
+                                      <SourcesTrigger count={sources.length} />
                                       <SourcesContent>
-                                        {message.sources!.map(
-                                          (source, sourceIndex) => (
-                                            <Source
-                                              href={source.href}
-                                              key={`${message.key}-source-${sourceIndex}`}
-                                              title={source.title}
-                                            />
-                                          )
-                                        )}
+                                        {sources.map((source, sourceIndex) => (
+                                          <Source
+                                            href={source.href}
+                                            key={`${message.key}-source-${sourceIndex}`}
+                                            title={source.title}
+                                          />
+                                        ))}
                                       </SourcesContent>
                                     </Sources>
                                   )}
@@ -218,12 +219,12 @@ export function PlaygroundChat({
                                   {/* Reasoning */}
                                   {showReasoning && (
                                     <Reasoning
-                                      defaultOpen={true}
+                                      defaultOpen
                                       isStreaming={message.isReasoningStreaming}
                                     >
                                       <ReasoningTrigger />
                                       <ReasoningContent>
-                                        {message.reasoning!.content}
+                                        {reasoningContent}
                                       </ReasoningContent>
                                     </Reasoning>
                                   )}

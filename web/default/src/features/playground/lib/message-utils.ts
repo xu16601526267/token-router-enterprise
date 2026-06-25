@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { nanoid } from 'nanoid'
+
 import { MESSAGE_ROLES, MESSAGE_STATUS, ERROR_MESSAGES } from '../constants'
 import type {
   Message,
@@ -246,7 +247,7 @@ export function updateLastAssistantMessage(
   updater: (message: Message) => Message
 ): Message[] {
   if (messages.length === 0) return messages
-  const last = messages[messages.length - 1]
+  const last = messages.at(-1)
   if (!last || last.from !== MESSAGE_ROLES.ASSISTANT) return messages
 
   const updated = [...messages]

@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-
 export const INTERFACE_LANGUAGE_OPTIONS = [
   { code: 'zh', label: '简体中文' },
   { code: 'en', label: 'English' },
@@ -32,7 +31,7 @@ export type InterfaceLanguageCode =
 export function normalizeInterfaceLanguage(value?: string | null): string {
   if (!value) return 'en'
 
-  const normalized = value.trim().replace(/_/g, '-').toLowerCase()
+  const normalized = value.trim().replaceAll(/_/g, '-').toLowerCase()
   if (normalized.startsWith('zh')) return 'zh'
 
   return INTERFACE_LANGUAGE_OPTIONS.some((lang) => lang.code === normalized)

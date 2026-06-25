@@ -16,14 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo, useState } from 'react'
-import * as z from 'zod'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, Edit, Trash2, Save } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { getBgColorClass } from '@/lib/colors'
+import * as z from 'zod'
+
+import { BadgeCell, StaticDataTable } from '@/components/data-table'
+import { Dialog } from '@/components/dialog'
+import { StatusBadge } from '@/components/status-badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,9 +57,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { BadgeCell, StaticDataTable } from '@/components/data-table'
-import { Dialog } from '@/components/dialog'
-import { StatusBadge } from '@/components/status-badge'
+import { getBgColorClass } from '@/lib/colors'
+
 import { SettingsSwitchField } from '../components/settings-form-layout'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
@@ -476,16 +478,16 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
                   <FormLabel>{t('Badge Color')}</FormLabel>
                   <Select
                     items={colorOptions.map((option) => ({
-                        value: option.value,
-                        label: (
-                          <div className='flex items-center gap-2'>
-                            <div
-                              className={`h-4 w-4 rounded-full ${getBgColorClass(option.value)}`}
-                            />
-                            {option.label}
-                          </div>
-                        ),
-                      }))}
+                      value: option.value,
+                      label: (
+                        <div className='flex items-center gap-2'>
+                          <div
+                            className={`h-4 w-4 rounded-full ${getBgColorClass(option.value)}`}
+                          />
+                          {option.label}
+                        </div>
+                      ),
+                    }))}
                     onValueChange={field.onChange}
                     value={field.value}
                   >

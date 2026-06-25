@@ -17,9 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
-import { type Row } from '@tanstack/react-table'
+import type { Row } from '@tanstack/react-table'
 import { MoreHorizontal, Power, PowerOff, Pencil, Edit } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -29,6 +30,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+
 import { handleEnableTagChannels, handleDisableTagChannels } from '../lib'
 import type { Channel } from '../types'
 import { useChannels } from './channels-provider'

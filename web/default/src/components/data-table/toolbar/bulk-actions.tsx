@@ -16,11 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { type Table } from '@tanstack/react-table'
+import type { Table } from '@tanstack/react-table'
 import { X } from 'lucide-react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -29,6 +29,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 type DataTableBulkActionsProps<TData> = {
   table: Table<TData>
@@ -82,8 +83,9 @@ export function DataTableBulkActions<TData>({
   const handleKeyDown = (event: React.KeyboardEvent) => {
     const buttons = buttonsRef.current
     if (!buttons) return
+    const buttonList = Array.from(buttons)
 
-    const currentIndex = Array.from(buttons).findIndex(
+    const currentIndex = buttonList.findIndex(
       (button) => button === document.activeElement
     )
 
@@ -107,7 +109,7 @@ export function DataTableBulkActions<TData>({
         break
       case 'End':
         event.preventDefault()
-        buttons[buttons.length - 1]?.focus()
+        buttonList.at(-1)?.focus()
         break
       case 'Escape': {
         // Check if the Escape key came from a dropdown trigger or content

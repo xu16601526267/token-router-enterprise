@@ -39,9 +39,10 @@ import {
   Wallet,
   Workflow,
 } from 'lucide-react'
-import { useAuthStore } from '@/stores/auth-store'
-import { ROLE } from '@/lib/roles'
+
 import type { SidebarData } from '@/components/layout/types'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 /**
  * 根导航使用中文产品文案，并根据角色提供两套信息架构：

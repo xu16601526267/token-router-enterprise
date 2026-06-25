@@ -19,6 +19,18 @@ For commercial licensing, please contact support@quantumnous.com
 /* eslint-disable react-refresh/only-export-components */
 'use client'
 
+import type { ChatStatus, FileUIPart } from 'ai'
+import {
+  ImageIcon,
+  Loader2Icon,
+  MicIcon,
+  PaperclipIcon,
+  PlusIcon,
+  SendIcon,
+  SquareIcon,
+  XIcon,
+} from 'lucide-react'
+import { nanoid } from 'nanoid'
 import {
   type ChangeEvent,
   type ChangeEventHandler,
@@ -41,20 +53,8 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { ChatStatus, FileUIPart } from 'ai'
-import {
-  ImageIcon,
-  Loader2Icon,
-  MicIcon,
-  PaperclipIcon,
-  PlusIcon,
-  SendIcon,
-  SquareIcon,
-  XIcon,
-} from 'lucide-react'
-import { nanoid } from 'nanoid'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
+
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -89,6 +89,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 // ============================================================================
 // Provider Context & Types
@@ -176,7 +177,7 @@ export function PromptInputProvider({
   const openRef = useRef<() => void>(() => {})
 
   const add = useCallback((files: File[] | FileList) => {
-    const incoming = Array.from(files)
+    const incoming = [...files]
     if (incoming.length === 0) return
 
     setAttachements((prev) =>
@@ -508,7 +509,7 @@ export const PromptInput = ({
 
   const addLocal = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = Array.from(fileList)
+      const incoming = [...fileList]
       const accepted = incoming.filter((f) => matchesAccept(f))
       if (incoming.length && accepted.length === 0) {
         onError?.({
@@ -726,17 +727,18 @@ export const PromptInput = ({
     }
 
     // Convert blob URLs to data URLs asynchronously
-    Promise.all(
-      files.map(async ({ id, ...item }) => {
-        if (item.url && item.url.startsWith('blob:')) {
-          return {
-            ...item,
-            url: await convertBlobUrlToDataUrl(item.url),
+    void (async () => {
+      const convertedFiles = await Promise.all(
+        files.map(async ({ id, ...item }) => {
+          if (item.url && item.url.startsWith('blob:')) {
+            return {
+              ...item,
+              url: await convertBlobUrlToDataUrl(item.url),
+            }
           }
-        }
-        return item
-      })
-    ).then((convertedFiles: FileUIPart[]) => {
+          return item
+        })
+      )
       try {
         const result = onSubmit({ text, files: convertedFiles }, event)
 
@@ -759,10 +761,10 @@ export const PromptInput = ({
             controller.textInput.clear()
           }
         }
-      } catch (_error) {
+      } catch {
         // Don't clear on error - user may want to retry
       }
-    })
+    })()
   }
 
   // Render with or without local provider
@@ -841,9 +843,7 @@ export const PromptInputTextarea = ({
     ) {
       e.preventDefault()
       const lastAttachment =
-        attachments.files.length > 0
-          ? attachments.files[attachments.files.length - 1]
-          : undefined
+        attachments.files.length > 0 ? attachments.files.at(-1) : undefined
       if (lastAttachment) {
         attachments.remove(lastAttachment.id)
       }

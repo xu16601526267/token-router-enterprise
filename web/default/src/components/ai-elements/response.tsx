@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { type ComponentProps, memo } from 'react'
 import { Streamdown } from 'streamdown'
+
 import { cn } from '@/lib/utils'
 
 type ResponseProps = ComponentProps<typeof Streamdown>
@@ -31,12 +32,12 @@ export const Response = memo(
       return (
         input
           // Remove known AI custom wrapper tags but keep inner content
-          .replace(
+          .replaceAll(
             /<\/?(conversation|conversationcontent|reasoning|reasoningcontent|reasoningtrigger|sources|sourcescontent|sourcestrigger|branch|branchmessages|branchnext|branchpage|branchprevious|branchselector|message|messagecontent)\b[^>]*>/gi,
             ''
           )
           // Remove any stray <think> tags if they still appear
-          .replace(/<\/?think\b[^>]*>/gi, '')
+          .replaceAll(/<\/?think\b[^>]*>/gi, '')
       )
     }
 

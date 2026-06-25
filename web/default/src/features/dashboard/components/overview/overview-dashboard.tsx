@@ -16,9 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useIsAdmin } from '@/hooks/use-admin'
 import { EnterpriseOverview } from '@/features/enterprise/enterprise-overview'
 import { PersonalWorkbench } from '@/features/enterprise/personal-workbench'
+import { useIsAdmin } from '@/hooks/use-admin'
 
 export function OverviewDashboard() {
   const isAdmin = useIsAdmin()

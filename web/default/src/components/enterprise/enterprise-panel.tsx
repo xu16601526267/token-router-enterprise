@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { HTMLAttributes, ReactNode } from 'react'
+
 import { cn } from '@/lib/utils'
 
 type EnterprisePanelProps = HTMLAttributes<HTMLDivElement> & {
@@ -44,15 +45,15 @@ export function EnterprisePanel({
       {...props}
     >
       {(title != null || description != null || action != null) && (
-        <header className='flex min-h-14 items-start justify-between gap-4 border-b border-border/65 px-4 py-3.5 sm:px-5'>
+        <header className='border-border/65 flex min-h-14 items-start justify-between gap-4 border-b px-4 py-3.5 sm:px-5'>
           <div className='min-w-0'>
             {title != null && (
-              <h3 className='truncate text-sm font-semibold tracking-tight text-foreground sm:text-[15px]'>
+              <h3 className='text-foreground truncate text-sm font-semibold tracking-tight sm:text-[15px]'>
                 {title}
               </h3>
             )}
             {description != null && (
-              <p className='mt-0.5 text-xs leading-5 text-muted-foreground'>
+              <p className='text-muted-foreground mt-0.5 text-xs leading-5'>
                 {description}
               </p>
             )}

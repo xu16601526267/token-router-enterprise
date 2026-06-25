@@ -16,13 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+
+import {
+  SideDrawerSection,
+  sideDrawerContentClassName,
+  sideDrawerFooterClassName,
+  sideDrawerFormClassName,
+  sideDrawerHeaderClassName,
+} from '@/components/drawer-layout'
+import { JsonEditor } from '@/components/json-editor'
+import { StatusBadge } from '@/components/status-badge'
+import { TagInput } from '@/components/tag-input'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -52,16 +63,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  SideDrawerSection,
-  sideDrawerContentClassName,
-  sideDrawerFooterClassName,
-  sideDrawerFormClassName,
-  sideDrawerHeaderClassName,
-} from '@/components/drawer-layout'
-import { JsonEditor } from '@/components/json-editor'
-import { StatusBadge } from '@/components/status-badge'
-import { TagInput } from '@/components/tag-input'
+
 import { createPrefillGroup, updatePrefillGroup } from '../../api'
 import { ENDPOINT_TEMPLATES } from '../../constants'
 import { prefillGroupsQueryKeys } from '../../lib'
@@ -157,11 +159,13 @@ export function PrefillGroupFormDrawer({
 
     try {
       const response = isEdit
-        ? await updatePrefillGroup({
-            id: currentGroup!.id,
+        ? currentGroup &&
+          (await updatePrefillGroup({
+            id: currentGroup.id,
             ...payload,
-          })
+          }))
         : await createPrefillGroup(payload)
+      if (!response) return
 
       if (response.success) {
         toast.success(
@@ -275,22 +279,20 @@ export function PrefillGroupFormDrawer({
                   <FormItem>
                     <FormLabel>Group Type</FormLabel>
                     <Select
-                      items={[
-                        ...PREFILL_GROUP_TYPES.map((type) => ({
-                          value: type.value,
-                          label: (
-                            <div className='flex flex-col text-left'>
-                              <span className='font-medium'>{type.label}</span>
-                              <span
-                                data-prefill-description
-                                className='text-muted-foreground text-xs'
-                              >
-                                {type.description}
-                              </span>
-                            </div>
-                          ),
-                        })),
-                      ]}
+                      items={PREFILL_GROUP_TYPES.map((type) => ({
+                        value: type.value,
+                        label: (
+                          <div className='flex flex-col text-left'>
+                            <span className='font-medium'>{type.label}</span>
+                            <span
+                              data-prefill-description
+                              className='text-muted-foreground text-xs'
+                            >
+                              {type.description}
+                            </span>
+                          </div>
+                        ),
+                      }))}
                       value={field.value}
                       onValueChange={(value) =>
                         value !== null &&

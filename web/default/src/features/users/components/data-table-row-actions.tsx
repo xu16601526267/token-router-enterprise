@@ -16,8 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
-import { type Row } from '@tanstack/react-table'
+import type { Row } from '@tanstack/react-table'
 import {
   MoreHorizontal,
   Pencil,
@@ -31,8 +30,11 @@ import {
   Link2,
   CreditCard,
 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -42,8 +44,8 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { UserSubscriptionsDialog } from '@/features/subscriptions/components/dialogs/user-subscriptions-dialog'
+
 import { manageUser, resetUserPasskey, resetUserTwoFA } from '../api'
 import {
   USER_STATUS,
@@ -52,7 +54,7 @@ import {
   isUserDeleted,
 } from '../constants'
 import { getUserActionMessage } from '../lib'
-import { type User, type ManageUserAction } from '../types'
+import type { User, ManageUserAction } from '../types'
 import { UserBindingDialog } from './dialogs/user-binding-dialog'
 import { useUsers } from './users-provider'
 
@@ -90,7 +92,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           result.message || t('Failed to {{action}} user', { action })
         )
       }
-    } catch (_error) {
+    } catch {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     }
   }
@@ -104,7 +106,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
       } else {
         toast.error(result.message || t('Failed to reset Passkey'))
       }
-    } catch (_error) {
+    } catch {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     } finally {
       setResetPasskeyOpen(false)
@@ -120,7 +122,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
       } else {
         toast.error(result.message || t('Failed to reset 2FA'))
       }
-    } catch (_error) {
+    } catch {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
     } finally {
       setResetTwoFAOpen(false)

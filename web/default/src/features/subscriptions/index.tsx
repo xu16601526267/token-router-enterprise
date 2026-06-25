@@ -18,7 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { EnterpriseBillingCenter } from '@/features/enterprise/billing-center'
+
 import { SubscriptionsDialogs } from './components/subscriptions-dialogs'
 import { SubscriptionsPrimaryButtons } from './components/subscriptions-primary-buttons'
 import {
@@ -26,7 +29,6 @@ import {
   useSubscriptions,
 } from './components/subscriptions-provider'
 import { SubscriptionsTable } from './components/subscriptions-table'
-import { EnterpriseBillingCenter } from '@/features/enterprise/billing-center'
 
 function SubscriptionsContent() {
   const { t } = useTranslation()

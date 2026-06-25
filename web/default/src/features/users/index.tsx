@@ -16,12 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { EnterpriseUsersGovernance } from '@/features/enterprise/users-governance'
+
 import { UsersDeleteDialog } from './components/users-delete-dialog'
 import { UsersMutateDrawer } from './components/users-mutate-drawer'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider, useUsers } from './components/users-provider'
 import { UsersTable } from './components/users-table'
-import { EnterpriseUsersGovernance } from '@/features/enterprise/users-governance'
 
 function UsersContent() {
   const { open, setOpen, currentRow } = useUsers()

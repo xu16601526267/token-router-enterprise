@@ -16,16 +16,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState, useMemo } from 'react'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { StaticDataTable } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { StaticDataTable } from '@/components/data-table'
 import {
   formatCreemPrice,
   formatQuotaShort,
 } from '@/features/wallet/lib/format'
+
 import { safeJsonParseWithValidation } from '../utils/json-parser'
 import { isArray } from '../utils/json-validators'
 import {

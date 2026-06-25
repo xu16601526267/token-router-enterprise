@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { LucideIcon } from 'lucide-react'
+
 import { cn } from '@/lib/utils'
 
 type EnterpriseStatTone =
@@ -58,17 +59,17 @@ export function EnterpriseStatCard({
   loading = false,
 }: EnterpriseStatCardProps) {
   return (
-    <article className='enterprise-stat-card group relative min-h-28 overflow-hidden rounded-2xl border bg-card/95 p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03),0_10px_30px_rgb(15_23_42/0.035)] transition-transform duration-200 hover:-translate-y-0.5 sm:p-4.5'>
-      <div className='pointer-events-none absolute inset-x-6 -top-px h-px bg-linear-to-r from-transparent via-primary/25 to-transparent opacity-0 transition-opacity group-hover:opacity-100' />
+    <article className='enterprise-stat-card group bg-card/95 relative min-h-28 overflow-hidden rounded-2xl border p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03),0_10px_30px_rgb(15_23_42/0.035)] transition-transform duration-200 hover:-translate-y-0.5 sm:p-4.5'>
+      <div className='via-primary/25 pointer-events-none absolute inset-x-6 -top-px h-px bg-linear-to-r from-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100' />
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='truncate text-xs font-medium text-muted-foreground'>
+          <p className='text-muted-foreground truncate text-xs font-medium'>
             {title}
           </p>
           {loading ? (
-            <div className='mt-2 h-8 w-24 animate-pulse rounded-lg bg-muted' />
+            <div className='bg-muted mt-2 h-8 w-24 animate-pulse rounded-lg' />
           ) : (
-            <p className='mt-1.5 truncate text-2xl font-semibold tracking-[-0.035em] text-foreground'>
+            <p className='text-foreground mt-1.5 truncate text-2xl font-semibold tracking-[-0.035em]'>
               {value}
             </p>
           )}
@@ -87,7 +88,8 @@ export function EnterpriseStatCard({
           <span
             className={cn(
               'font-semibold',
-              trendTone === 'positive' && 'text-emerald-600 dark:text-emerald-400',
+              trendTone === 'positive' &&
+                'text-emerald-600 dark:text-emerald-400',
               trendTone === 'negative' && 'text-rose-600 dark:text-rose-400',
               trendTone === 'neutral' && 'text-foreground/70'
             )}
@@ -96,7 +98,7 @@ export function EnterpriseStatCard({
           </span>
         )}
         {helper != null && (
-          <span className='truncate text-muted-foreground'>{helper}</span>
+          <span className='text-muted-foreground truncate'>{helper}</span>
         )}
       </div>
     </article>

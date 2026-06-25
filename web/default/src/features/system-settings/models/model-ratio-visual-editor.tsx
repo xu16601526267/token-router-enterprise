@@ -16,6 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type {
+  ColumnFiltersState,
+  OnChangeFn,
+  PaginationState,
+  RowSelectionState,
+  VisibilityState,
+  SortingState,
+} from '@tanstack/react-table'
+import { Copy, Plus } from 'lucide-react'
 import {
   useState,
   useMemo,
@@ -26,19 +35,9 @@ import {
   useImperativeHandle,
   useRef,
 } from 'react'
-import {
-  type ColumnFiltersState,
-  type OnChangeFn,
-  type PaginationState,
-  type RowSelectionState,
-  type VisibilityState,
-  type SortingState,
-} from '@tanstack/react-table'
-import { useMediaQuery } from '@/hooks'
-import { Copy, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+
 import {
   DataTableBulkActions,
   DataTableToolbar,
@@ -47,7 +46,10 @@ import {
   DataTableView,
   useDataTable,
 } from '@/components/data-table'
+import { Button } from '@/components/ui/button'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
+import { useMediaQuery } from '@/hooks'
+
 import { safeJsonParse } from '../utils/json-parser'
 import {
   ModelPricingEditorPanel,
@@ -208,22 +210,25 @@ const ModelRatioVisualEditorComponent = forwardRef<
     const draftByName = new Map(draftRows.map((row) => [row.name, row]))
     const modelNames = new Set([...savedByName.keys(), ...draftByName.keys()])
 
-    return Array.from(modelNames)
-      .map((name) => {
+    return [...modelNames]
+      .flatMap((name) => {
         const saved = savedByName.get(name)
         const draft = draftByName.get(name)
         const displayed = saved ?? draft
+        if (!displayed) return []
         const savedSignature = getSnapshotSignature(saved)
         const draftSignature = getSnapshotSignature(draft)
 
-        return {
-          ...displayed!,
-          saved,
-          draft,
-          isDraftChanged: savedSignature !== draftSignature,
-          isDraftDeleted: Boolean(saved && !draft),
-          isDraftNew: Boolean(!saved && draft),
-        }
+        return [
+          {
+            ...displayed,
+            saved,
+            draft,
+            isDraftChanged: savedSignature !== draftSignature,
+            isDraftDeleted: Boolean(saved && !draft),
+            isDraftNew: Boolean(!saved && draft),
+          },
+        ]
       })
       .filter((row) => !row.isDraftDeleted)
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -498,7 +503,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         value: string | undefined
       ) => {
         if (!value || value === '') return
-        const parsed = parseFloat(value)
+        const parsed = Number.parseFloat(value)
         if (Number.isFinite(parsed)) target[name] = parsed
       }
 

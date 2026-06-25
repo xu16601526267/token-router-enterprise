@@ -18,10 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAuthStore } from '@/stores/auth-store'
-import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
-import { computeTimeRange } from '@/lib/time'
-import { cn } from '@/lib/utils'
+
 import { Skeleton } from '@/components/ui/skeleton'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import { useModelStatCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
@@ -34,6 +31,10 @@ import type {
   QuotaDataItem,
   DashboardFilters,
 } from '@/features/dashboard/types'
+import { formatCompactNumber, formatNumber, formatQuota } from '@/lib/format'
+import { computeTimeRange } from '@/lib/time'
+import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/stores/auth-store'
 
 interface LogStatCardsProps {
   filters?: DashboardFilters
@@ -88,24 +89,27 @@ export function LogStatCards(props: LogStatCardsProps) {
     const timeDiff = (timeRange.end_timestamp - timeRange.start_timestamp) / 60
     setTimeRangeMinutes(timeDiff)
 
-    getUserQuotaDates(buildQueryParams(timeRange, filters), isAdmin)
-      .then((res) => {
+    void (async () => {
+      try {
+        const res = await getUserQuotaDates(
+          buildQueryParams(timeRange, filters),
+          isAdmin
+        )
         if (abortController.signal.aborted) return
         const data = res?.data || []
         setStats(calculateDashboardStats(data))
         onDataUpdate?.(data, false)
-      })
-      .catch(() => {
+      } catch {
         if (abortController.signal.aborted) return
         setStats(null)
         setError(true)
         onDataUpdate?.([], false)
-      })
-      .finally(() => {
+      } finally {
         if (!abortController.signal.aborted) {
           setLoading(false)
         }
-      })
+      }
+    })()
 
     return () => {
       abortController.abort()
