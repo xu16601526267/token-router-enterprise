@@ -16,6 +16,8 @@ go.work.sum
 node_modules/
 /web/dist/
 /web/build/
+/web/default/dist/
+/web/classic/dist/
 .pnpm-store/
 npm-debug.log*
 yarn-debug.log*

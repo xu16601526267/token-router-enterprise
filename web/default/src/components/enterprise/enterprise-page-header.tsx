@@ -30,20 +30,19 @@ export function EnterprisePageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className='relative overflow-hidden rounded-2xl border bg-[linear-gradient(122deg,color-mix(in_oklch,var(--card)_98%,var(--primary)_2%)_0%,var(--card)_54%,color-mix(in_oklch,var(--card)_93%,var(--primary)_7%)_100%)] px-5 py-5 shadow-[0_14px_45px_rgb(15_23_42/0.045)] sm:px-6 sm:py-6'>
-      <div className='pointer-events-none absolute -top-28 right-[-5rem] size-64 rounded-full bg-primary/8 blur-3xl' />
-      <div className='pointer-events-none absolute right-[20%] -bottom-28 size-52 rounded-full bg-violet-500/8 blur-3xl' />
+    <div className='bg-card relative overflow-hidden rounded-2xl border px-5 py-5 shadow-[0_1px_2px_rgb(15_23_42/0.03),0_12px_36px_rgb(15_23_42/0.04)] sm:px-6 sm:py-6'>
+      <div className='absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--primary),color-mix(in_oklch,var(--primary)_40%,transparent),transparent)]' />
       <div className='relative flex flex-col justify-between gap-4 sm:flex-row sm:items-end'>
         <div className='min-w-0'>
           {eyebrow != null && (
-            <p className='mb-2 text-[11px] font-semibold tracking-[0.18em] text-primary uppercase'>
+            <p className='text-primary mb-2 text-[11px] font-semibold tracking-[0.18em] uppercase'>
               {eyebrow}
             </p>
           )}
-          <h1 className='text-2xl font-semibold tracking-[-0.035em] text-foreground sm:text-[28px]'>
+          <h1 className='text-foreground text-2xl font-semibold tracking-[-0.035em] sm:text-[28px]'>
             {title}
           </h1>
-          <p className='mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground'>
+          <p className='text-muted-foreground mt-1.5 max-w-2xl text-sm leading-6'>
             {description}
           </p>
         </div>

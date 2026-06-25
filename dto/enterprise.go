@@ -322,16 +322,18 @@ type EnterpriseUserSummary struct {
 }
 
 type EnterpriseUserItem struct {
-	Id          int    `json:"id"`
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-	Email       string `json:"email"`
-	Group       string `json:"group"`
-	Role        int    `json:"role"`
-	Status      int    `json:"status"`
-	APIKeyCount int64  `json:"api_key_count"`
-	UsedQuota   int    `json:"used_quota"`
-	LastLoginAt int64  `json:"last_login_at"`
+	Id           int    `json:"id"`
+	Username     string `json:"username"`
+	DisplayName  string `json:"display_name"`
+	Email        string `json:"email"`
+	Group        string `json:"group"`
+	Role         int    `json:"role"`
+	Status       int    `json:"status"`
+	APIKeyCount  int64  `json:"api_key_count"`
+	Quota        int    `json:"quota"`
+	UsedQuota    int    `json:"used_quota"`
+	RequestCount int    `json:"request_count"`
+	LastLoginAt  int64  `json:"last_login_at"`
 }
 
 type EnterpriseCountItem struct {

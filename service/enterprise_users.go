@@ -73,7 +73,8 @@ func GetEnterpriseUsers(limit int) (*dto.EnterpriseUsersData, error) {
 		items = append(items, dto.EnterpriseUserItem{
 			Id: user.Id, Username: user.Username, DisplayName: user.DisplayName,
 			Email: user.Email, Group: user.Group, Role: user.Role, Status: user.Status,
-			APIKeyCount: tokenCount[user.Id], UsedQuota: user.UsedQuota, LastLoginAt: user.LastLoginAt,
+			APIKeyCount: tokenCount[user.Id], Quota: user.Quota, UsedQuota: user.UsedQuota,
+			RequestCount: user.RequestCount, LastLoginAt: user.LastLoginAt,
 		})
 	}
 

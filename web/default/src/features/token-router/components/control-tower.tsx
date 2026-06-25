@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -14,6 +13,8 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react'
+import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Area,
   AreaChart,
@@ -23,7 +24,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useTranslation } from 'react-i18next'
+
 import {
   EnterprisePageHeader,
   EnterprisePanel,
@@ -41,6 +42,7 @@ import {
 } from '@/components/ui/table'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
+
 import { getControlTower } from '../control-tower-api'
 import type {
   ControlTowerEvent,
@@ -88,13 +90,20 @@ function providerStatus(provider: ProviderHealth): {
   }
 }
 
-function EventList(props: {
-  events: ControlTowerEvent[]
-  emptyText: string
-}) {
+function providerStatusDotClass(label: string): string {
+  if (label === '健康') {
+    return 'bg-emerald-500'
+  }
+  if (label === '需关注') {
+    return 'bg-amber-500'
+  }
+  return 'bg-muted-foreground'
+}
+
+function EventList(props: { events: ControlTowerEvent[]; emptyText: string }) {
   if (props.events.length === 0) {
     return (
-      <div className='flex min-h-36 items-center justify-center text-sm text-muted-foreground'>
+      <div className='text-muted-foreground flex min-h-36 items-center justify-center text-sm'>
         {props.emptyText}
       </div>
     )
@@ -104,7 +113,7 @@ function EventList(props: {
       {props.events.map((event) => (
         <div
           key={`${event.category}-${event.id}`}
-          className='flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-muted/45'
+          className='hover:bg-muted/45 flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors'
         >
           <span
             className={cn(
@@ -117,13 +126,13 @@ function EventList(props: {
           <div className='min-w-0 flex-1'>
             <div className='flex items-start justify-between gap-2'>
               <p className='truncate text-sm font-medium'>{event.title}</p>
-              <span className='shrink-0 text-[11px] text-muted-foreground'>
+              <span className='text-muted-foreground shrink-0 text-[11px]'>
                 {event.created_at > 0
                   ? dayjs.unix(event.created_at).format('MM-DD HH:mm')
                   : '—'}
               </span>
             </div>
-            <p className='mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground'>
+            <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-5'>
               {event.detail || '暂无补充说明'}
             </p>
           </div>
@@ -138,14 +147,14 @@ function ProviderNode(props: { provider: ProviderHealth; index: number }) {
   const latency =
     props.provider.average_latency_ms || props.provider.response_time_ms
   return (
-    <div className='relative flex items-center gap-3 rounded-xl border bg-background/85 p-3 shadow-sm'>
+    <div className='bg-background/85 relative flex items-center gap-3 rounded-xl border p-3 shadow-sm'>
       <span
         className={cn(
           'absolute -left-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-background',
           props.index === 0 ? 'bg-primary' : 'bg-muted-foreground/45'
         )}
       />
-      <span className='flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary'>
+      <span className='bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-xl'>
         <Bot className='size-4' aria-hidden='true' />
       </span>
       <div className='min-w-0 flex-1'>
@@ -157,14 +166,16 @@ function ProviderNode(props: { provider: ProviderHealth; index: number }) {
             {status.label}
           </Badge>
         </div>
-        <p className='mt-1 truncate text-[11px] text-muted-foreground'>
+        <p className='text-muted-foreground mt-1 truncate text-[11px]'>
           {props.provider.supplier_name || '未绑定供应商'} ·{' '}
           {props.provider.region || '默认分组'}
         </p>
       </div>
       <div className='shrink-0 text-right text-[11px]'>
-        <p className='font-semibold'>{formatPercent(props.provider.success_rate)}</p>
-        <p className='mt-0.5 text-muted-foreground'>{latency.toFixed(0)} ms</p>
+        <p className='font-semibold'>
+          {formatPercent(props.provider.success_rate)}
+        </p>
+        <p className='text-muted-foreground mt-0.5'>{latency.toFixed(0)} ms</p>
       </div>
     </div>
   )
@@ -186,7 +197,7 @@ function PolicyStatus(props: { policy: RoutingPolicyItem }) {
   )
 }
 
-export function ControlTower() {
+export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
   const { t } = useTranslation()
   const endTimestamp = Math.floor(Date.now() / 1000)
   const startTimestamp = endTimestamp - 7 * 24 * 60 * 60
@@ -234,7 +245,7 @@ export function ControlTower() {
               />
               刷新数据
             </Button>
-            <Button size='sm'>
+            <Button size='sm' onClick={props.onOpenRoutingPolicies}>
               <Sparkles className='size-4' />
               新建路由策略
             </Button>
@@ -297,25 +308,25 @@ export function ControlTower() {
           bodyClassName='p-4 sm:p-5'
         >
           <div className='grid min-h-[390px] items-center gap-5 lg:grid-cols-[minmax(180px,0.7fr)_52px_minmax(220px,0.9fr)_52px_minmax(280px,1.2fr)]'>
-            <div className='rounded-2xl border bg-gradient-to-br from-primary/8 via-background to-violet-500/8 p-4'>
-              <span className='flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20'>
+            <div className='from-primary/8 via-background rounded-2xl border bg-gradient-to-br to-violet-500/8 p-4'>
+              <span className='bg-primary text-primary-foreground shadow-primary/20 flex size-10 items-center justify-center rounded-xl shadow-lg'>
                 <Network className='size-5' />
               </span>
               <p className='mt-4 text-sm font-semibold'>企业客户端流量</p>
               <p className='mt-1 text-2xl font-semibold tracking-tight'>
                 {formatCount(metrics?.requests ?? 0)}
               </p>
-              <p className='text-xs text-muted-foreground'>近 7 天总请求</p>
+              <p className='text-muted-foreground text-xs'>近 7 天总请求</p>
               <div className='mt-4 space-y-2 text-xs'>
-                <div className='flex justify-between rounded-lg bg-background/80 px-3 py-2'>
+                <div className='bg-background/80 flex justify-between rounded-lg px-3 py-2'>
                   <span>接口调用</span>
                   <span className='font-medium'>62%</span>
                 </div>
-                <div className='flex justify-between rounded-lg bg-background/80 px-3 py-2'>
+                <div className='bg-background/80 flex justify-between rounded-lg px-3 py-2'>
                   <span>内部服务</span>
                   <span className='font-medium'>28%</span>
                 </div>
-                <div className='flex justify-between rounded-lg bg-background/80 px-3 py-2'>
+                <div className='bg-background/80 flex justify-between rounded-lg px-3 py-2'>
                   <span>在线调试</span>
                   <span className='font-medium'>10%</span>
                 </div>
@@ -323,11 +334,11 @@ export function ControlTower() {
             </div>
 
             <div className='hidden items-center lg:flex'>
-              <div className='h-px flex-1 bg-gradient-to-r from-primary/20 to-primary' />
-              <ArrowRight className='size-4 text-primary' />
+              <div className='from-primary/20 to-primary h-px flex-1 bg-gradient-to-r' />
+              <ArrowRight className='text-primary size-4' />
             </div>
 
-            <div className='rounded-2xl border border-primary/20 bg-primary/[0.035] p-4 shadow-[0_12px_40px_rgb(59_130_246/0.08)]'>
+            <div className='border-primary/20 bg-primary/[0.035] rounded-2xl border p-4 shadow-[0_12px_40px_rgb(59_130_246/0.08)]'>
               <div className='flex items-start justify-between gap-2'>
                 <span className='flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600'>
                   <GitBranch className='size-5' />
@@ -337,36 +348,38 @@ export function ControlTower() {
                 </Badge>
               </div>
               <p className='mt-4 text-sm font-semibold'>智能路由策略</p>
-              <p className='mt-1 truncate text-xs text-muted-foreground'>
+              <p className='text-muted-foreground mt-1 truncate text-xs'>
                 {primaryPolicy?.name || '默认智能路由'}
               </p>
               <div className='mt-4 grid grid-cols-2 gap-2'>
-                <div className='rounded-xl border bg-background/80 p-3'>
-                  <p className='text-[11px] text-muted-foreground'>成功率</p>
+                <div className='bg-background/80 rounded-xl border p-3'>
+                  <p className='text-muted-foreground text-[11px]'>成功率</p>
                   <p className='mt-1 text-sm font-semibold'>
                     {formatPercent(metrics?.realtime_success_rate ?? 0)}
                   </p>
                 </div>
-                <div className='rounded-xl border bg-background/80 p-3'>
-                  <p className='text-[11px] text-muted-foreground'>策略优先级</p>
+                <div className='bg-background/80 rounded-xl border p-3'>
+                  <p className='text-muted-foreground text-[11px]'>
+                    策略优先级
+                  </p>
                   <p className='mt-1 text-sm font-semibold'>
                     {primaryPolicy?.priority ?? 100}
                   </p>
                 </div>
               </div>
-              <div className='mt-3 rounded-xl border border-dashed bg-background/55 p-3 text-xs text-muted-foreground'>
+              <div className='bg-background/55 text-muted-foreground mt-3 rounded-xl border border-dashed p-3 text-xs'>
                 加权路由 · 自动降级 · 区域感知 · SLA 守护
               </div>
             </div>
 
             <div className='hidden items-center lg:flex'>
-              <div className='h-px flex-1 bg-gradient-to-r from-primary to-violet-400/30' />
-              <ArrowRight className='size-4 text-primary' />
+              <div className='from-primary h-px flex-1 bg-gradient-to-r to-violet-400/30' />
+              <ArrowRight className='text-primary size-4' />
             </div>
 
             <div className='space-y-2.5'>
               {providers.length === 0 ? (
-                <div className='flex min-h-56 items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground'>
+                <div className='text-muted-foreground flex min-h-56 items-center justify-center rounded-2xl border border-dashed text-sm'>
                   暂无供应商流量数据
                 </div>
               ) : (
@@ -396,23 +409,19 @@ export function ControlTower() {
                 return (
                   <div
                     key={provider.channel_id}
-                    className='flex items-center gap-3 rounded-xl px-2.5 py-2.5 hover:bg-muted/45'
+                    className='hover:bg-muted/45 flex items-center gap-3 rounded-xl px-2.5 py-2.5'
                   >
                     <span
                       className={cn(
                         'size-2 rounded-full',
-                        status.label === '健康'
-                          ? 'bg-emerald-500'
-                          : status.label === '需关注'
-                            ? 'bg-amber-500'
-                            : 'bg-muted-foreground'
+                        providerStatusDotClass(status.label)
                       )}
                     />
                     <div className='min-w-0 flex-1'>
                       <p className='truncate text-sm font-medium'>
                         {provider.channel_name}
                       </p>
-                      <p className='truncate text-[11px] text-muted-foreground'>
+                      <p className='text-muted-foreground truncate text-[11px]'>
                         {provider.supplier_name || '未绑定供应商'}
                       </p>
                     </div>
@@ -431,7 +440,10 @@ export function ControlTower() {
           </EnterprisePanel>
 
           <EnterprisePanel title='风险提醒' bodyClassName='p-2.5'>
-            <EventList events={data?.risks ?? []} emptyText='当前没有未处理风险' />
+            <EventList
+              events={data?.risks ?? []}
+              emptyText='当前没有未处理风险'
+            />
           </EnterprisePanel>
         </div>
       </div>
@@ -446,16 +458,37 @@ export function ControlTower() {
             <ResponsiveContainer width='100%' height='100%'>
               <AreaChart data={trend} margin={{ left: -16, right: 8 }}>
                 <defs>
-                  <linearGradient id='controlTowerRequests' x1='0' x2='0' y1='0' y2='1'>
-                    <stop offset='5%' stopColor='var(--primary)' stopOpacity={0.35} />
-                    <stop offset='95%' stopColor='var(--primary)' stopOpacity={0.02} />
+                  <linearGradient
+                    id='controlTowerRequests'
+                    x1='0'
+                    x2='0'
+                    y1='0'
+                    y2='1'
+                  >
+                    <stop
+                      offset='5%'
+                      stopColor='var(--primary)'
+                      stopOpacity={0.35}
+                    />
+                    <stop
+                      offset='95%'
+                      stopColor='var(--primary)'
+                      stopOpacity={0.02}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray='4 4' vertical={false} />
                 <XAxis dataKey='date' tickLine={false} axisLine={false} />
-                <YAxis tickLine={false} axisLine={false} tickFormatter={formatCount} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={formatCount}
+                />
                 <Tooltip
-                  formatter={(value) => [formatCount(Number(value ?? 0)), '请求量']}
+                  formatter={(value) => [
+                    formatCount(Number(value ?? 0)),
+                    '请求量',
+                  ]}
                 />
                 <Area
                   dataKey='requests'
@@ -508,7 +541,10 @@ export function ControlTower() {
             <TableBody>
               {policies.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className='h-28 text-center text-muted-foreground'>
+                  <TableCell
+                    colSpan={8}
+                    className='text-muted-foreground h-28 text-center'
+                  >
                     暂无路由策略，可在“路由策略”页签创建或激活策略。
                   </TableCell>
                 </TableRow>
@@ -518,18 +554,22 @@ export function ControlTower() {
                     <TableCell>
                       <div className='max-w-56'>
                         <p className='truncate font-medium'>{policy.name}</p>
-                        <p className='truncate text-xs text-muted-foreground'>
+                        <p className='text-muted-foreground truncate text-xs'>
                           {policy.track || '默认轨道'}
                         </p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <p className='font-medium'>{policy.model_name || '全部模型'}</p>
-                      <p className='text-xs text-muted-foreground'>
+                      <p className='font-medium'>
+                        {policy.model_name || '全部模型'}
+                      </p>
+                      <p className='text-muted-foreground text-xs'>
                         {policy.slice_key || '全局'}
                       </p>
                     </TableCell>
-                    <TableCell>{policy.channel_name || `#${policy.channel_id}`}</TableCell>
+                    <TableCell>
+                      {policy.channel_name || `#${policy.channel_id}`}
+                    </TableCell>
                     <TableCell>{policy.supplier_name || '未绑定'}</TableCell>
                     <TableCell>{policy.traffic_percent}%</TableCell>
                     <TableCell>{policy.priority}</TableCell>

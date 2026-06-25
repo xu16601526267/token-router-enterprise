@@ -1,5 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Download, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -25,6 +23,8 @@ import {
   type ReactNode,
   type SetStateAction,
 } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check, Download, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -7241,28 +7241,28 @@ export function TokenRouter() {
           <div className='flex h-full min-h-0 flex-col gap-4'>
             {activeTab !== 'control-tower' && (
               <div className='flex flex-wrap items-end gap-3'>
-              <Field className='w-full sm:w-auto'>
-                <FieldLabel htmlFor='token-router-start'>
-                  {t('Period Start')}
-                </FieldLabel>
-                <Input
-                  id='token-router-start'
-                  type='datetime-local'
-                  value={startInput}
-                  onChange={(event) => setStartInput(event.target.value)}
-                />
-              </Field>
-              <Field className='w-full sm:w-auto'>
-                <FieldLabel htmlFor='token-router-end'>
-                  {t('Period End')}
-                </FieldLabel>
-                <Input
-                  id='token-router-end'
-                  type='datetime-local'
-                  value={endInput}
-                  onChange={(event) => setEndInput(event.target.value)}
-                />
-              </Field>
+                <Field className='w-full sm:w-auto'>
+                  <FieldLabel htmlFor='token-router-start'>
+                    {t('Period Start')}
+                  </FieldLabel>
+                  <Input
+                    id='token-router-start'
+                    type='datetime-local'
+                    value={startInput}
+                    onChange={(event) => setStartInput(event.target.value)}
+                  />
+                </Field>
+                <Field className='w-full sm:w-auto'>
+                  <FieldLabel htmlFor='token-router-end'>
+                    {t('Period End')}
+                  </FieldLabel>
+                  <Input
+                    id='token-router-end'
+                    type='datetime-local'
+                    value={endInput}
+                    onChange={(event) => setEndInput(event.target.value)}
+                  />
+                </Field>
               </div>
             )}
 
@@ -7316,8 +7316,20 @@ export function TokenRouter() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value='control-tower' className='min-h-0 overflow-auto'>
-                <ControlTower />
+              <TabsContent
+                value='control-tower'
+                className='min-h-0 overflow-auto'
+              >
+                <ControlTower
+                  onOpenRoutingPolicies={() => {
+                    setActiveTab('routing')
+                    toast.info(
+                      t(
+                        'Select a recorded self-hosted execution source to activate a routing policy.'
+                      )
+                    )
+                  }}
+                />
               </TabsContent>
 
               <TabsContent value='overview' className='min-h-0 overflow-auto'>

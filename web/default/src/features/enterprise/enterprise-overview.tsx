@@ -47,13 +47,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+
 import {
   EnterprisePageHeader,
   EnterprisePanel,
   EnterpriseStatCard,
 } from '@/components/enterprise'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   formatCompactNumber,
   formatCurrencyUSD,
@@ -61,6 +62,7 @@ import {
   formatTokens,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
+
 import { getEnterpriseOverview } from './api'
 import type {
   EnterpriseOverviewData,
@@ -156,7 +158,7 @@ function RankingList({
 }) {
   if (items.length === 0) {
     return (
-      <div className='flex min-h-48 items-center justify-center text-sm text-muted-foreground'>
+      <div className='text-muted-foreground flex min-h-48 items-center justify-center text-sm'>
         当前时间范围内暂无统计数据
       </div>
     )
@@ -165,24 +167,29 @@ function RankingList({
   return (
     <div className='space-y-4'>
       {items.map((item, index) => (
-        <div key={`${item.name}-${index}`} className='space-y-2'>
+        <div
+          key={`${item.name}-${item.requests}-${item.tokens}-${item.quota}`}
+          className='space-y-2'
+        >
           <div className='flex items-center justify-between gap-3 text-xs'>
             <div className='flex min-w-0 items-center gap-2.5'>
-              <span className='flex size-6 shrink-0 items-center justify-center rounded-lg bg-muted text-[10px] font-semibold text-muted-foreground'>
+              <span className='bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold'>
                 {index + 1}
               </span>
-              <span className='truncate font-medium text-foreground'>
+              <span className='text-foreground truncate font-medium'>
                 {item.name}
               </span>
             </div>
-            <span className='shrink-0 font-semibold tabular-nums text-foreground/80'>
+            <span className='text-foreground/80 shrink-0 font-semibold tabular-nums'>
               {valueLabel(item)}
             </span>
           </div>
-          <div className='h-1.5 overflow-hidden rounded-full bg-muted'>
+          <div className='bg-muted h-1.5 overflow-hidden rounded-full'>
             <div
               className='h-full rounded-full bg-linear-to-r from-blue-500 to-violet-500'
-              style={{ width: `${Math.max(3, Math.min(100, item.share * 100))}%` }}
+              style={{
+                width: `${Math.max(3, Math.min(100, item.share * 100))}%`,
+              }}
             />
           </div>
         </div>
@@ -194,22 +201,27 @@ function RankingList({
 function InsightItem({ insight }: { insight: EnterpriseOverviewInsight }) {
   const meta = severityMeta(insight.severity)
   return (
-    <article className='rounded-xl border border-border/70 bg-background/60 p-3.5 transition-colors hover:border-primary/20 hover:bg-background'>
+    <article className='border-border/70 bg-background/60 hover:border-primary/20 hover:bg-background rounded-xl border p-3.5 transition-colors'>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <div className='flex items-center gap-2'>
             <span className={cn('size-1.5 shrink-0 rounded-full', meta.dot)} />
             <p className='truncate text-sm font-semibold'>{insight.title}</p>
           </div>
-          <p className='mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground'>
-            {insight.summary || insight.recommended_action || '等待运营团队确认处理方案'}
+          <p className='text-muted-foreground mt-1.5 line-clamp-2 text-xs leading-5'>
+            {insight.summary ||
+              insight.recommended_action ||
+              '等待运营团队确认处理方案'}
           </p>
         </div>
-        <Badge variant='outline' className={cn('shrink-0 text-[10px]', meta.className)}>
+        <Badge
+          variant='outline'
+          className={cn('shrink-0 text-[10px]', meta.className)}
+        >
           {meta.label}
         </Badge>
       </div>
-      <div className='mt-3 flex items-center justify-between gap-2 text-[10px] text-muted-foreground'>
+      <div className='text-muted-foreground mt-3 flex items-center justify-between gap-2 text-[10px]'>
         <span className='truncate'>{insight.model_name || '全局范围'}</span>
         <span className='shrink-0'>{formatDateTime(insight.generated_at)}</span>
       </div>
@@ -256,26 +268,29 @@ export function EnterpriseOverview() {
           <>
             <Badge
               variant='outline'
-              className='h-8 gap-1.5 rounded-lg bg-background/70 px-3 text-xs font-normal'
+              className='bg-background/70 h-8 gap-1.5 rounded-lg px-3 text-xs font-normal'
             >
               <span className='size-1.5 rounded-full bg-emerald-500' />
               生产环境
             </Badge>
             <Badge
               variant='outline'
-              className='h-8 rounded-lg bg-background/70 px-3 text-xs font-normal'
+              className='bg-background/70 h-8 rounded-lg px-3 text-xs font-normal'
             >
               近 7 天 · {dateRangeLabel}
             </Badge>
             <Button
               variant='outline'
               size='sm'
-              className='h-8 rounded-lg bg-background/70'
+              className='bg-background/70 h-8 rounded-lg'
               disabled={overviewQuery.isFetching}
               onClick={() => void overviewQuery.refetch()}
             >
               <RefreshCw
-                className={cn('size-3.5', overviewQuery.isFetching && 'animate-spin')}
+                className={cn(
+                  'size-3.5',
+                  overviewQuery.isFetching && 'animate-spin'
+                )}
               />
               刷新数据
             </Button>
@@ -337,7 +352,11 @@ export function EnterpriseOverview() {
           title='渠道健康度'
           value={formatPercentage(channelHealth)}
           helper={`${metrics.healthy_channels}/${metrics.total_channels} 个渠道可用`}
-          trend={metrics.low_balance_channels > 0 ? `${metrics.low_balance_channels} 个低余额` : '余额正常'}
+          trend={
+            metrics.low_balance_channels > 0
+              ? `${metrics.low_balance_channels} 个低余额`
+              : '余额正常'
+          }
           trendTone={metrics.low_balance_channels > 0 ? 'negative' : 'positive'}
           icon={Network}
           tone={metrics.low_balance_channels > 0 ? 'rose' : 'emerald'}
@@ -350,7 +369,7 @@ export function EnterpriseOverview() {
           title='请求与 Token 趋势'
           description='按天汇总实际网关调用，数据来自 quota_data 聚合表。'
           action={
-            <div className='flex items-center gap-3 text-[11px] text-muted-foreground'>
+            <div className='text-muted-foreground flex items-center gap-3 text-[11px]'>
               <span className='flex items-center gap-1.5'>
                 <span className='size-2 rounded-full bg-blue-500' /> 请求量
               </span>
@@ -363,18 +382,41 @@ export function EnterpriseOverview() {
         >
           {chartData.length > 0 ? (
             <ResponsiveContainer width='100%' height='100%'>
-              <AreaChart data={chartData} margin={{ top: 12, right: 14, left: 4, bottom: 4 }}>
+              <AreaChart
+                data={chartData}
+                margin={{ top: 12, right: 14, left: 4, bottom: 4 }}
+              >
                 <defs>
-                  <linearGradient id='enterpriseRequestsGradient' x1='0' y1='0' x2='0' y2='1'>
+                  <linearGradient
+                    id='enterpriseRequestsGradient'
+                    x1='0'
+                    y1='0'
+                    x2='0'
+                    y2='1'
+                  >
                     <stop offset='5%' stopColor='#3b82f6' stopOpacity={0.28} />
-                    <stop offset='95%' stopColor='#3b82f6' stopOpacity={0.015} />
+                    <stop
+                      offset='95%'
+                      stopColor='#3b82f6'
+                      stopOpacity={0.015}
+                    />
                   </linearGradient>
-                  <linearGradient id='enterpriseTokensGradient' x1='0' y1='0' x2='0' y2='1'>
+                  <linearGradient
+                    id='enterpriseTokensGradient'
+                    x1='0'
+                    y1='0'
+                    x2='0'
+                    y2='1'
+                  >
                     <stop offset='5%' stopColor='#8b5cf6' stopOpacity={0.18} />
                     <stop offset='95%' stopColor='#8b5cf6' stopOpacity={0.01} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} stroke='var(--border)' strokeOpacity={0.75} />
+                <CartesianGrid
+                  vertical={false}
+                  stroke='var(--border)'
+                  strokeOpacity={0.75}
+                />
                 <XAxis
                   dataKey='label'
                   axisLine={false}
@@ -438,9 +480,9 @@ export function EnterpriseOverview() {
             </ResponsiveContainer>
           ) : (
             <div className='flex h-full flex-col items-center justify-center text-center'>
-              <Activity className='mb-3 size-8 text-muted-foreground/40' />
+              <Activity className='text-muted-foreground/40 mb-3 size-8' />
               <p className='text-sm font-medium'>暂无趋势数据</p>
-              <p className='mt-1 text-xs text-muted-foreground'>
+              <p className='text-muted-foreground mt-1 text-xs'>
                 网关产生调用后，此处会自动展示真实请求趋势。
               </p>
             </div>
@@ -464,14 +506,16 @@ export function EnterpriseOverview() {
           bodyClassName='space-y-2.5'
         >
           {overview.insights.length > 0 ? (
-            overview.insights.slice(0, 4).map((insight) => (
-              <InsightItem key={insight.id} insight={insight} />
-            ))
+            overview.insights
+              .slice(0, 4)
+              .map((insight) => (
+                <InsightItem key={insight.id} insight={insight} />
+              ))
           ) : (
             <div className='flex min-h-56 flex-col items-center justify-center text-center'>
               <ShieldCheck className='mb-3 size-9 text-emerald-500/70' />
               <p className='text-sm font-medium'>暂无未处理风险</p>
-              <p className='mt-1 max-w-56 text-xs leading-5 text-muted-foreground'>
+              <p className='text-muted-foreground mt-1 max-w-56 text-xs leading-5'>
                 生成 Operating Insights 后，风险和建议会在这里集中呈现。
               </p>
             </div>
@@ -483,7 +527,7 @@ export function EnterpriseOverview() {
         <EnterprisePanel
           title='热门模型'
           description='按真实请求量排序'
-          action={<Boxes className='size-4 text-muted-foreground' />}
+          action={<Boxes className='text-muted-foreground size-4' />}
         >
           <RankingList
             items={overview.top_models}
@@ -494,7 +538,7 @@ export function EnterpriseOverview() {
         <EnterprisePanel
           title='客户 / 用户用量'
           description='按账户调用量排序'
-          action={<Building2 className='size-4 text-muted-foreground' />}
+          action={<Building2 className='text-muted-foreground size-4' />}
         >
           <RankingList
             items={overview.top_users}
@@ -535,12 +579,24 @@ export function EnterpriseOverview() {
           ].map((item) => {
             const Icon = item.icon
             return (
-              <div key={item.label} className='rounded-xl border bg-background/55 p-3.5'>
-                <span className={cn('flex size-8 items-center justify-center rounded-lg', item.tone)}>
+              <div
+                key={item.label}
+                className='bg-background/55 rounded-xl border p-3.5'
+              >
+                <span
+                  className={cn(
+                    'flex size-8 items-center justify-center rounded-lg',
+                    item.tone
+                  )}
+                >
                   <Icon className='size-4' />
                 </span>
-                <p className='mt-3 text-xl font-semibold tracking-tight'>{item.value}</p>
-                <p className='mt-0.5 text-[11px] text-muted-foreground'>{item.label}</p>
+                <p className='mt-3 text-xl font-semibold tracking-tight'>
+                  {item.value}
+                </p>
+                <p className='text-muted-foreground mt-0.5 text-[11px]'>
+                  {item.label}
+                </p>
               </div>
             )
           })}
@@ -551,9 +607,9 @@ export function EnterpriseOverview() {
           description='基于定价建议与额度口径聚合'
           bodyClassName='space-y-4'
         >
-          <div className='flex items-center justify-between rounded-xl border bg-background/55 p-3.5'>
+          <div className='bg-background/55 flex items-center justify-between rounded-xl border p-3.5'>
             <div>
-              <p className='text-[11px] text-muted-foreground'>预估毛利</p>
+              <p className='text-muted-foreground text-[11px]'>预估毛利</p>
               <p className='mt-1 text-xl font-semibold'>
                 {formatCurrencyUSD(metrics.estimated_gross_profit)}
               </p>
@@ -562,9 +618,9 @@ export function EnterpriseOverview() {
               <BadgeDollarSign className='size-4.5' />
             </span>
           </div>
-          <div className='flex items-center justify-between rounded-xl border bg-background/55 p-3.5'>
+          <div className='bg-background/55 flex items-center justify-between rounded-xl border p-3.5'>
             <div>
-              <p className='text-[11px] text-muted-foreground'>毛利率</p>
+              <p className='text-muted-foreground text-[11px]'>毛利率</p>
               <p className='mt-1 text-xl font-semibold'>
                 {formatPercentage(metrics.gross_margin_rate)}
               </p>
@@ -573,7 +629,7 @@ export function EnterpriseOverview() {
               <Gauge className='size-4.5' />
             </span>
           </div>
-          <div className='rounded-xl border border-dashed px-3.5 py-3 text-xs leading-5 text-muted-foreground'>
+          <div className='text-muted-foreground rounded-xl border border-dashed px-3.5 py-3 text-xs leading-5'>
             定价建议尚未生成时，毛利指标会显示为 0；不影响调用成本与用量统计。
           </div>
         </EnterprisePanel>
@@ -596,7 +652,7 @@ export function EnterpriseOverview() {
         bodyClassName='overflow-x-auto p-0'
       >
         <table className='w-full min-w-[760px] text-left text-xs'>
-          <thead className='border-b bg-muted/35 text-[11px] font-medium text-muted-foreground'>
+          <thead className='bg-muted/35 text-muted-foreground border-b text-[11px] font-medium'>
             <tr>
               <th className='px-5 py-3 font-medium'>渠道</th>
               <th className='px-4 py-3 font-medium'>分组</th>
@@ -607,28 +663,39 @@ export function EnterpriseOverview() {
               <th className='px-5 py-3 text-right font-medium'>状态</th>
             </tr>
           </thead>
-          <tbody className='divide-y divide-border/65'>
+          <tbody className='divide-border/65 divide-y'>
             {overview.channels.length > 0 ? (
               overview.channels.map((channel) => {
                 const modelCount = channel.models
                   ? channel.models.split(',').filter(Boolean).length
                   : 0
                 return (
-                  <tr key={channel.id} className='transition-colors hover:bg-muted/25'>
+                  <tr
+                    key={channel.id}
+                    className='hover:bg-muted/25 transition-colors'
+                  >
                     <td className='px-5 py-3.5'>
                       <div className='flex items-center gap-2.5'>
                         <span className='flex size-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600'>
                           <Network className='size-4' />
                         </span>
                         <div className='min-w-0'>
-                          <p className='max-w-56 truncate font-medium'>{channel.name}</p>
-                          <p className='text-[10px] text-muted-foreground'>ID {channel.id}</p>
+                          <p className='max-w-56 truncate font-medium'>
+                            {channel.name}
+                          </p>
+                          <p className='text-muted-foreground text-[10px]'>
+                            ID {channel.id}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    <td className='px-4 py-3.5 text-muted-foreground'>{channel.group || '默认分组'}</td>
+                    <td className='text-muted-foreground px-4 py-3.5'>
+                      {channel.group || '默认分组'}
+                    </td>
                     <td className='px-4 py-3.5 font-medium tabular-nums'>
-                      {channel.response_time > 0 ? `${channel.response_time} ms` : '-'}
+                      {channel.response_time > 0
+                        ? `${channel.response_time} ms`
+                        : '-'}
                     </td>
                     <td className='px-4 py-3.5 tabular-nums'>
                       {formatCurrencyUSD(channel.balance)}
@@ -636,7 +703,7 @@ export function EnterpriseOverview() {
                     <td className='px-4 py-3.5 tabular-nums'>
                       {formatCompactNumber(channel.used_quota)}
                     </td>
-                    <td className='px-4 py-3.5 text-muted-foreground'>
+                    <td className='text-muted-foreground px-4 py-3.5'>
                       {modelCount > 0 ? `${modelCount} 个模型` : '未配置'}
                     </td>
                     <td className='px-5 py-3.5 text-right'>
@@ -657,7 +724,10 @@ export function EnterpriseOverview() {
               })
             ) : (
               <tr>
-                <td colSpan={7} className='px-5 py-12 text-center text-sm text-muted-foreground'>
+                <td
+                  colSpan={7}
+                  className='text-muted-foreground px-5 py-12 text-center text-sm'
+                >
                   暂无渠道数据，请先在渠道与供应商中心完成上游接入。
                 </td>
               </tr>
@@ -684,7 +754,7 @@ export function EnterpriseOverview() {
             title: '查看用量明细',
             description: '追踪模型、客户、渠道与成本消耗',
             icon: WalletCards,
-            to: '/usage-logs/common' as const,
+            to: '/usage-logs' as const,
           },
           {
             title: '管理组织成员',
@@ -698,18 +768,20 @@ export function EnterpriseOverview() {
             <Link
               key={item.title}
               to={item.to}
-              className='group flex items-center gap-3 rounded-2xl border bg-card/90 p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md'
+              className='group bg-card/90 hover:border-primary/25 flex items-center gap-3 rounded-2xl border p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md'
             >
-              <span className='flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground'>
+              <span className='bg-primary/8 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors'>
                 <Icon className='size-4.5' />
               </span>
               <span className='min-w-0 flex-1'>
-                <span className='block truncate text-sm font-semibold'>{item.title}</span>
-                <span className='mt-0.5 block truncate text-[11px] text-muted-foreground'>
+                <span className='block truncate text-sm font-semibold'>
+                  {item.title}
+                </span>
+                <span className='text-muted-foreground mt-0.5 block truncate text-[11px]'>
                   {item.description}
                 </span>
               </span>
-              <ArrowRight className='size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary' />
+              <ArrowRight className='text-muted-foreground group-hover:text-primary size-4 shrink-0 transition-transform group-hover:translate-x-0.5' />
             </Link>
           )
         })}

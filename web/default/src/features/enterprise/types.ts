@@ -164,7 +164,9 @@ export type EnterpriseUserItem = {
   role: number
   status: number
   api_key_count: number
+  quota: number
   used_quota: number
+  request_count: number
   last_login_at: number
 }
 

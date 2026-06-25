@@ -33,6 +33,7 @@ import {
   UserRoundCheck,
   UsersRound,
 } from 'lucide-react'
+
 import {
   EnterprisePageHeader,
   EnterprisePanel,
@@ -53,6 +54,7 @@ import {
 import { formatLogQuota, formatNumber } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
+
 import { getEnterpriseUsers } from './api'
 import type { EnterpriseUserItem, EnterpriseUsersData } from './types'
 
@@ -141,7 +143,7 @@ function PermissionCell(props: { allowed: boolean; partial?: boolean }) {
     )
   }
   return (
-    <span className='mx-auto flex size-6 items-center justify-center rounded-lg bg-muted text-muted-foreground'>
+    <span className='bg-muted text-muted-foreground mx-auto flex size-6 items-center justify-center rounded-lg'>
       <CircleOff className='size-3.5' />
     </span>
   )
@@ -165,7 +167,9 @@ export function EnterpriseUsersGovernance(props: {
   const filteredUsers = useMemo(() => {
     const keyword = search.trim().toLowerCase()
     return data.users.filter((user) => {
-      if (activeGroup !== 'all' && (user.group || '默认分组') !== activeGroup) return false
+      if (activeGroup !== 'all' && (user.group || '默认分组') !== activeGroup) {
+        return false
+      }
       if (keyword === '') return true
       return [user.username, user.display_name, user.email, user.group]
         .join(' ')
@@ -174,11 +178,18 @@ export function EnterpriseUsersGovernance(props: {
     })
   }, [activeGroup, data.users, search])
   const selectedUser =
-    data.users.find((user) => user.id === selectedUserId) ?? filteredUsers[0] ?? null
+    data.users.find((user) => user.id === selectedUserId) ??
+    filteredUsers[0] ??
+    null
   const staleUsers = data.users.filter((user) => {
     if (user.last_login_at <= 0) return true
     return Date.now() / 1000 - user.last_login_at > 30 * 24 * 60 * 60
   }).length
+  const scrollToClassicUsers = () => {
+    document
+      .querySelector('#classic-users-management')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className='enterprise-dashboard space-y-4 pb-2 sm:space-y-5'>
@@ -194,7 +205,12 @@ export function EnterpriseUsersGovernance(props: {
               onClick={() => void usersQuery.refetch()}
               disabled={usersQuery.isFetching}
             >
-              <RefreshCw className={cn('size-4', usersQuery.isFetching && 'animate-spin')} />
+              <RefreshCw
+                className={cn(
+                  'size-4',
+                  usersQuery.isFetching && 'animate-spin'
+                )}
+              />
               刷新
             </Button>
             {props.actions}
@@ -214,7 +230,11 @@ export function EnterpriseUsersGovernance(props: {
         <EnterpriseStatCard
           title='活跃席位'
           value={formatNumber(summary.active_users)}
-          helper={summary.total_users > 0 ? `${Math.round((summary.active_users / summary.total_users) * 100)}% 使用率` : '暂无席位'}
+          helper={
+            summary.total_users > 0
+              ? `${Math.round((summary.active_users / summary.total_users) * 100)}% 使用率`
+              : '暂无席位'
+          }
           icon={UserRoundCheck}
           tone='emerald'
           loading={usersQuery.isLoading}
@@ -246,14 +266,20 @@ export function EnterpriseUsersGovernance(props: {
       </div>
 
       <div className='grid min-h-[680px] gap-4 xl:grid-cols-[240px_minmax(0,1fr)_330px]'>
-        <EnterprisePanel title='组织结构' description='按现有用户分组聚合' bodyClassName='p-3'>
+        <EnterprisePanel
+          title='组织结构'
+          description='按现有用户分组聚合'
+          bodyClassName='p-3'
+        >
           <div className='space-y-2'>
             <button
               type='button'
               onClick={() => setActiveGroup('all')}
               className={cn(
                 'flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition-colors',
-                activeGroup === 'all' ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted/60'
+                activeGroup === 'all'
+                  ? 'bg-primary/10 font-semibold text-primary'
+                  : 'hover:bg-muted/60'
               )}
             >
               <span className='flex items-center gap-2'>
@@ -269,28 +295,36 @@ export function EnterpriseUsersGovernance(props: {
                 onClick={() => setActiveGroup(group.name)}
                 className={cn(
                   'flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition-colors',
-                  activeGroup === group.name ? 'bg-primary/10 font-semibold text-primary' : 'hover:bg-muted/60'
+                  activeGroup === group.name
+                    ? 'bg-primary/10 font-semibold text-primary'
+                    : 'hover:bg-muted/60'
                 )}
               >
                 <span className='flex min-w-0 items-center gap-2'>
                   <ChevronRight className='size-3.5 shrink-0' />
                   <span className='truncate'>{group.name}</span>
                 </span>
-                <span className='tabular-nums text-muted-foreground'>{group.count}</span>
+                <span className='text-muted-foreground tabular-nums'>
+                  {group.count}
+                </span>
               </button>
             ))}
           </div>
-          <div className='mt-5 rounded-xl border border-dashed p-3 text-[11px] leading-5 text-muted-foreground'>
+          <div className='text-muted-foreground mt-5 rounded-xl border border-dashed p-3 text-[11px] leading-5'>
             当前兼容旧系统的用户分组字段。后续可直接扩展为多级组织树，而不会影响现有账号。
           </div>
         </EnterprisePanel>
 
         <EnterprisePanel
-          title={activeGroup === 'all' ? `全部成员 (${filteredUsers.length})` : `${activeGroup} (${filteredUsers.length})`}
+          title={
+            activeGroup === 'all'
+              ? `全部成员 (${filteredUsers.length})`
+              : `${activeGroup} (${filteredUsers.length})`
+          }
           description='选择成员后可在右侧查看权限与资产概况'
           action={
             <label className='relative block w-56 max-w-full'>
-              <Search className='pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground' />
+              <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2' />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -322,29 +356,51 @@ export function EnterpriseUsersGovernance(props: {
                     <TableRow
                       key={user.id}
                       onClick={() => setSelectedUserId(user.id)}
-                      className={cn('cursor-pointer hover:bg-muted/30', selected && 'bg-primary/5')}
+                      className={cn(
+                        'cursor-pointer hover:bg-muted/30',
+                        selected && 'bg-primary/5'
+                      )}
                     >
                       <TableCell>
                         <div className='flex items-center gap-3'>
                           <Avatar className='size-8'>
-                            <AvatarFallback className='bg-primary/10 text-[10px] font-semibold text-primary'>
+                            <AvatarFallback className='bg-primary/10 text-primary text-[10px] font-semibold'>
                               {initials(user)}
                             </AvatarFallback>
                           </Avatar>
                           <div className='min-w-0'>
-                            <p className='truncate text-xs font-semibold'>{user.display_name || user.username}</p>
-                            <p className='truncate text-[10px] text-muted-foreground'>{user.email || user.username}</p>
+                            <p className='truncate text-xs font-semibold'>
+                              {user.display_name || user.username}
+                            </p>
+                            <p className='text-muted-foreground truncate text-[10px]'>
+                              {user.email || user.username}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className='text-xs'>{user.group || '默认分组'}</TableCell>
-                      <TableCell>
-                        <Badge variant='outline' className={cn('text-[10px]', meta.className)}>{meta.label}</Badge>
+                      <TableCell className='text-xs'>
+                        {user.group || '默认分组'}
                       </TableCell>
-                      <TableCell className='text-right text-xs font-medium tabular-nums'>{user.api_key_count}</TableCell>
-                      <TableCell className='text-right text-xs tabular-nums'>{formatLogQuota(user.used_quota)}</TableCell>
-                      <TableCell className='text-xs text-muted-foreground'>{formatDateTime(user.last_login_at)}</TableCell>
-                      <TableCell><UserStatusBadge status={user.status} /></TableCell>
+                      <TableCell>
+                        <Badge
+                          variant='outline'
+                          className={cn('text-[10px]', meta.className)}
+                        >
+                          {meta.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className='text-right text-xs font-medium tabular-nums'>
+                        {user.api_key_count}
+                      </TableCell>
+                      <TableCell className='text-right text-xs tabular-nums'>
+                        {formatLogQuota(user.used_quota)}
+                      </TableCell>
+                      <TableCell className='text-muted-foreground text-xs'>
+                        {formatDateTime(user.last_login_at)}
+                      </TableCell>
+                      <TableCell>
+                        <UserStatusBadge status={user.status} />
+                      </TableCell>
                     </TableRow>
                   )
                 })}
@@ -352,7 +408,7 @@ export function EnterpriseUsersGovernance(props: {
             </Table>
           </div>
           {filteredUsers.length === 0 && (
-            <div className='flex min-h-72 items-center justify-center text-sm text-muted-foreground'>
+            <div className='text-muted-foreground flex min-h-72 items-center justify-center text-sm'>
               当前筛选条件下没有成员
             </div>
           )}
@@ -362,52 +418,83 @@ export function EnterpriseUsersGovernance(props: {
           <EnterprisePanel title='成员权限概览'>
             {selectedUser ? (
               <div>
-                <div className='flex items-center gap-3 border-b border-border/60 pb-4'>
+                <div className='border-border/60 flex items-center gap-3 border-b pb-4'>
                   <Avatar className='size-11'>
-                    <AvatarFallback className='bg-primary/10 text-xs font-semibold text-primary'>{initials(selectedUser)}</AvatarFallback>
+                    <AvatarFallback className='bg-primary/10 text-primary text-xs font-semibold'>
+                      {initials(selectedUser)}
+                    </AvatarFallback>
                   </Avatar>
                   <div className='min-w-0'>
-                    <p className='truncate text-sm font-semibold'>{selectedUser.display_name || selectedUser.username}</p>
-                    <p className='truncate text-xs text-muted-foreground'>{selectedUser.email || selectedUser.username}</p>
+                    <p className='truncate text-sm font-semibold'>
+                      {selectedUser.display_name || selectedUser.username}
+                    </p>
+                    <p className='text-muted-foreground truncate text-xs'>
+                      {selectedUser.email || selectedUser.username}
+                    </p>
                   </div>
                 </div>
                 <dl className='mt-4 grid grid-cols-2 gap-3 text-xs'>
-                  <div className='rounded-xl bg-muted/40 p-3'>
+                  <div className='bg-muted/40 rounded-xl p-3'>
                     <dt className='text-muted-foreground'>角色</dt>
-                    <dd className='mt-1 font-semibold'>{roleMeta(selectedUser.role).label}</dd>
+                    <dd className='mt-1 font-semibold'>
+                      {roleMeta(selectedUser.role).label}
+                    </dd>
                   </div>
-                  <div className='rounded-xl bg-muted/40 p-3'>
+                  <div className='bg-muted/40 rounded-xl p-3'>
                     <dt className='text-muted-foreground'>API Keys</dt>
-                    <dd className='mt-1 font-semibold'>{selectedUser.api_key_count}</dd>
+                    <dd className='mt-1 font-semibold'>
+                      {selectedUser.api_key_count}
+                    </dd>
                   </div>
-                  <div className='rounded-xl bg-muted/40 p-3'>
+                  <div className='bg-muted/40 rounded-xl p-3'>
                     <dt className='text-muted-foreground'>累计请求</dt>
-                    <dd className='mt-1 font-semibold'>{formatNumber(selectedUser.request_count)}</dd>
+                    <dd className='mt-1 font-semibold'>
+                      {formatNumber(selectedUser.request_count)}
+                    </dd>
                   </div>
-                  <div className='rounded-xl bg-muted/40 p-3'>
+                  <div className='bg-muted/40 rounded-xl p-3'>
                     <dt className='text-muted-foreground'>可用额度</dt>
-                    <dd className='mt-1 font-semibold'>{formatLogQuota(selectedUser.quota)}</dd>
+                    <dd className='mt-1 font-semibold'>
+                      {formatLogQuota(selectedUser.quota)}
+                    </dd>
                   </div>
                 </dl>
-                <Button variant='outline' className='mt-4 w-full' size='sm'>
+                <Button
+                  variant='outline'
+                  className='mt-4 w-full'
+                  size='sm'
+                  disabled={!props.classicTable}
+                  onClick={scrollToClassicUsers}
+                >
                   <UserCog className='size-4' />
                   在经典管理中编辑
                 </Button>
               </div>
             ) : (
-              <div className='flex min-h-52 items-center justify-center text-sm text-muted-foreground'>请选择成员</div>
+              <div className='text-muted-foreground flex min-h-52 items-center justify-center text-sm'>
+                请选择成员
+              </div>
             )}
           </EnterprisePanel>
 
-          <EnterprisePanel title='权限策略矩阵' description='沿用现有角色模型，避免破坏历史权限'>
+          <EnterprisePanel
+            title='权限策略矩阵'
+            description='沿用现有角色模型，避免破坏历史权限'
+          >
             <div className='overflow-hidden rounded-xl border'>
               <Table>
                 <TableHeader>
                   <TableRow className='bg-muted/35'>
                     <TableHead className='text-[10px]'>模块</TableHead>
-                    <TableHead className='text-center text-[10px]'>超级管理员</TableHead>
-                    <TableHead className='text-center text-[10px]'>管理员</TableHead>
-                    <TableHead className='text-center text-[10px]'>用户</TableHead>
+                    <TableHead className='text-center text-[10px]'>
+                      超级管理员
+                    </TableHead>
+                    <TableHead className='text-center text-[10px]'>
+                      管理员
+                    </TableHead>
+                    <TableHead className='text-center text-[10px]'>
+                      用户
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -420,10 +507,21 @@ export function EnterpriseUsersGovernance(props: {
                     ['系统设置', true, false, false],
                   ].map((row) => (
                     <TableRow key={String(row[0])}>
-                      <TableCell className='text-[10px] font-medium'>{row[0]}</TableCell>
-                      <TableCell><PermissionCell allowed={Boolean(row[1])} /></TableCell>
-                      <TableCell><PermissionCell allowed={Boolean(row[2])} partial={row[0] === '计费结算'} /></TableCell>
-                      <TableCell><PermissionCell allowed={Boolean(row[3])} /></TableCell>
+                      <TableCell className='text-[10px] font-medium'>
+                        {row[0]}
+                      </TableCell>
+                      <TableCell>
+                        <PermissionCell allowed={Boolean(row[1])} />
+                      </TableCell>
+                      <TableCell>
+                        <PermissionCell
+                          allowed={Boolean(row[2])}
+                          partial={row[0] === '计费结算'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <PermissionCell allowed={Boolean(row[3])} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -433,16 +531,30 @@ export function EnterpriseUsersGovernance(props: {
 
           <EnterprisePanel title='安全与合规'>
             <div className='space-y-3 text-xs'>
-              <div className='flex items-center justify-between rounded-xl bg-muted/35 p-3'>
-                <span className='flex items-center gap-2'><ShieldCheck className='size-4 text-violet-500' />高权限账号</span>
+              <div className='bg-muted/35 flex items-center justify-between rounded-xl p-3'>
+                <span className='flex items-center gap-2'>
+                  <ShieldCheck className='size-4 text-violet-500' />
+                  高权限账号
+                </span>
                 <Badge variant='outline'>{summary.admin_users}</Badge>
               </div>
-              <div className='flex items-center justify-between rounded-xl bg-muted/35 p-3'>
-                <span className='flex items-center gap-2'><Clock3 className='size-4 text-amber-500' />30 天未登录</span>
-                <Badge variant='outline' className={staleUsers > 0 ? 'text-amber-600' : ''}>{staleUsers}</Badge>
+              <div className='bg-muted/35 flex items-center justify-between rounded-xl p-3'>
+                <span className='flex items-center gap-2'>
+                  <Clock3 className='size-4 text-amber-500' />
+                  30 天未登录
+                </span>
+                <Badge
+                  variant='outline'
+                  className={staleUsers > 0 ? 'text-amber-600' : ''}
+                >
+                  {staleUsers}
+                </Badge>
               </div>
-              <div className='flex items-center justify-between rounded-xl bg-muted/35 p-3'>
-                <span className='flex items-center gap-2'><CircleOff className='size-4 text-slate-500' />停用账号</span>
+              <div className='bg-muted/35 flex items-center justify-between rounded-xl p-3'>
+                <span className='flex items-center gap-2'>
+                  <CircleOff className='size-4 text-slate-500' />
+                  停用账号
+                </span>
                 <Badge variant='outline'>{summary.disabled_users}</Badge>
               </div>
             </div>
@@ -452,6 +564,7 @@ export function EnterpriseUsersGovernance(props: {
 
       {props.classicTable && (
         <EnterprisePanel
+          id='classic-users-management'
           title='经典用户管理'
           description='保留原系统完整的新增、编辑、额度调整、启停和删除能力'
           bodyClassName='min-h-[540px] p-0'
