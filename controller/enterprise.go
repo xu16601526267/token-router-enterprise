@@ -278,7 +278,7 @@ func GetEnterpriseOverview(c *gin.Context) {
 
 	channelModels := make([]model.Channel, 0, 6)
 	_ = model.DB.Model(&model.Channel{}).
-		Select("id, name, status, response_time, balance, used_quota, models, `group`").
+		Select("id, name, status, response_time, balance, used_quota, models, " + model.CommonGroupColumn()).
 		Order("used_quota DESC").Limit(6).Find(&channelModels).Error
 	channels := make([]enterpriseOverviewChannelItem, 0, len(channelModels))
 	for _, channel := range channelModels {

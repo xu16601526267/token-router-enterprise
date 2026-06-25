@@ -48,9 +48,9 @@ func GetEnterpriseControlTower(startTimestamp int64, endTimestamp int64) (*dto.E
 	if model.LOG_DB != nil {
 		var rows []enterpriseChannelTraffic
 		err := model.LOG_DB.Model(&model.Log{}).
-			Select("channel AS channel_id, COUNT(*) AS requests, SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS success_count, COALESCE(AVG(CASE WHEN type = ? THEN use_time ELSE NULL END), 0) AS latency", model.LogTypeConsume, model.LogTypeConsume).
+			Select("channel_id, COUNT(*) AS requests, SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) AS success_count, COALESCE(AVG(CASE WHEN type = ? THEN use_time ELSE NULL END), 0) AS latency", model.LogTypeConsume, model.LogTypeConsume).
 			Where("created_at >= ? AND created_at <= ? AND type IN ?", startTimestamp, endTimestamp, []int{model.LogTypeConsume, model.LogTypeError}).
-			Group("channel").Scan(&rows).Error
+			Group("channel_id").Scan(&rows).Error
 		if err != nil {
 			return nil, err
 		}

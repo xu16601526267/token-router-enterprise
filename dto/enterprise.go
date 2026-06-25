@@ -267,10 +267,13 @@ type EnterpriseUsageMetrics struct {
 }
 
 type EnterpriseUsageTrendPoint struct {
-	Timestamp int64 `json:"timestamp"`
-	Requests  int64 `json:"requests"`
-	Errors    int64 `json:"errors"`
-	Quota     int64 `json:"quota"`
+	Timestamp        int64   `json:"timestamp"`
+	Requests         int64   `json:"requests"`
+	Errors           int64   `json:"errors"`
+	PromptTokens     int64   `json:"prompt_tokens"`
+	CompletionTokens int64   `json:"completion_tokens"`
+	Quota            int64   `json:"quota"`
+	AverageLatencyMs float64 `json:"average_latency_ms"`
 }
 
 type EnterpriseUsageBreakdownItem struct {

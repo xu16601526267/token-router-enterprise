@@ -24,6 +24,29 @@ export async function getEnterpriseApiKeys(
   return response.data
 }
 
+export async function exportEnterpriseApiKeys(
+  params: EnterpriseApiKeyQuery
+): Promise<void> {
+  const response = await api.get('/api/enterprise/api-keys/export', {
+    params,
+    responseType: 'blob',
+    skipBusinessError: true,
+    disableDuplicate: true,
+  })
+  const disposition = String(response.headers['content-disposition'] ?? '')
+  const filenameMatch = disposition.match(/filename="?([^";]+)"?/i)
+  const filename = filenameMatch?.[1] ?? 'enterprise-api-keys.csv'
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 export async function getEnterpriseApiKeyUsers(): Promise<
   EnterpriseApiResponse<EnterpriseApiKeyUser[]>
 > {

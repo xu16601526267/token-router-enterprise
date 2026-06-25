@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
@@ -69,7 +69,7 @@ import {
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { getEnterpriseBilling } from './api'
+import { exportEnterpriseBilling, getEnterpriseBilling } from './api'
 import type { EnterpriseBillingData, EnterpriseSettlementItem } from './types'
 
 type CsvValue = boolean | null | number | string | undefined
@@ -291,6 +291,7 @@ export function EnterpriseBillingCenter(props: {
   classicContent?: ReactNode
 }) {
   const navigate = useNavigate()
+  const [exportingBilling, setExportingBilling] = useState(false)
   const range = useMemo(() => {
     const end = Math.floor(Date.now() / 1000)
     return { start: end - 30 * 24 * 60 * 60, end }
@@ -322,72 +323,19 @@ export function EnterpriseBillingCenter(props: {
       ? metrics.successful_top_up_amount /
         (metrics.successful_top_up_amount + metrics.pending_top_up_amount)
       : 0
-  const exportBillingCsv = () => {
-    downloadCsv(
-      `enterprise-billing-${formatFileDate(range.start)}-${formatFileDate(range.end)}.csv`,
-      [
-        ['指标', '值'],
-        ['活跃订阅', metrics.active_subscriptions],
-        ['企业可用额度', metrics.total_balance_quota],
-        ['企业已用额度', metrics.total_used_quota],
-        ['本期应收额度', metrics.period_sell_quota],
-        ['本期应付额度', metrics.period_cost_quota],
-        ['本期毛利额度', metrics.period_gross_profit_quota],
-        ['本期毛利率', formatPercent(metrics.gross_margin_rate)],
-        ['成功充值金额', metrics.successful_top_up_amount],
-        ['待处理充值金额', metrics.pending_top_up_amount],
-        ['待确认结算单', metrics.draft_settlements],
-        [],
-        [
-          '结算单ID',
-          '周期开始',
-          '周期结束',
-          '对象类型',
-          '对象ID',
-          '对象名称',
-          '应收额度',
-          '应付额度',
-          '毛利额度',
-          '请求数',
-          '状态',
-        ],
-        ...data.settlements.map((item) => [
-          item.id,
-          formatDate(item.period_start),
-          formatDate(item.period_end),
-          item.subject_type === 'supplier' ? '供应商' : '客户',
-          item.subject_id,
-          item.subject_name,
-          item.total_sell_quota,
-          item.total_cost_quota,
-          item.gross_profit_quota,
-          item.total_requests,
-          item.status,
-        ]),
-        [],
-        [
-          '充值ID',
-          '用户ID',
-          '用户名',
-          '金额',
-          '支付方式',
-          '支付平台',
-          '状态',
-          '创建时间',
-        ],
-        ...data.recent_topups.map((topup) => [
-          topup.id,
-          topup.user_id,
-          topup.username,
-          topup.money,
-          topup.payment_method,
-          topup.payment_provider,
-          topup.status,
-          formatDate(topup.create_time),
-        ]),
-      ]
-    )
-    toast.success('账单数据已导出')
+  const exportBillingCsv = async () => {
+    setExportingBilling(true)
+    try {
+      await exportEnterpriseBilling({
+        start_timestamp: range.start,
+        end_timestamp: range.end,
+      })
+      toast.success('账单数据已导出')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '导出失败')
+    } finally {
+      setExportingBilling(false)
+    }
   }
   const openSettlementWorkbench = () => {
     toast.info('已进入 Token Router，请打开 Settlements 页签生成或复核结算单')
@@ -739,10 +687,11 @@ export function EnterpriseBillingCenter(props: {
               <Button
                 variant='outline'
                 className='h-auto flex-col gap-2 py-3'
-                onClick={exportBillingCsv}
+                onClick={() => void exportBillingCsv()}
+                disabled={exportingBilling}
               >
                 <Download className='size-4 text-blue-500' />
-                <span className='text-xs'>导出账单</span>
+                <span className='text-xs'>{exportingBilling ? '导出中' : '导出账单'}</span>
               </Button>
               <Button
                 variant='outline'

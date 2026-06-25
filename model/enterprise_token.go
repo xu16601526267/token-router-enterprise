@@ -59,7 +59,7 @@ func applyEnterpriseTokenFilters(query *gorm.DB, filters EnterpriseTokenFilters)
 		query = query.Where("tokens.user_id = ?", filters.UserId)
 	}
 	if filters.Group != "" {
-		query = query.Where("tokens.group = ?", strings.TrimSpace(filters.Group))
+		query = query.Where(CommonGroupColumnForTable("tokens")+" = ?", strings.TrimSpace(filters.Group))
 	}
 	switch filters.Status {
 	case common.TokenStatusEnabled:
@@ -91,7 +91,7 @@ func SearchEnterpriseTokens(filters EnterpriseTokenFilters, offset int, limit in
 		return nil, 0, err
 	}
 	var records []EnterpriseTokenRecord
-	err := base.Select("tokens.*, users.username AS username, users.display_name AS display_name, users.email AS email, users.`group` AS user_group, users.role AS user_role").
+	err := base.Select("tokens.*, users.username AS username, users.display_name AS display_name, users.email AS email, " + CommonGroupColumnForTable("users") + " AS user_group, users.role AS user_role").
 		Order("tokens.id DESC").Offset(offset).Limit(limit).Scan(&records).Error
 	if err != nil {
 		return nil, 0, err
@@ -103,7 +103,7 @@ func GetEnterpriseTokenByID(id int) (*EnterpriseTokenRecord, error) {
 	var record EnterpriseTokenRecord
 	err := DB.Model(&Token{}).
 		Joins("LEFT JOIN users ON users.id = tokens.user_id").
-		Select("tokens.*, users.username AS username, users.display_name AS display_name, users.email AS email, users.`group` AS user_group, users.role AS user_role").
+		Select("tokens.*, users.username AS username, users.display_name AS display_name, users.email AS email, "+CommonGroupColumnForTable("users")+" AS user_group, users.role AS user_role").
 		Where("tokens.id = ?", id).First(&record).Error
 	if err != nil {
 		return nil, err

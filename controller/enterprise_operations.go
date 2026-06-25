@@ -20,8 +20,11 @@ package controller
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -70,6 +73,21 @@ func enterpriseCheckTokenPermission(c *gin.Context, tokenId int) (*model.Enterpr
 		return nil, false
 	}
 	return record, true
+}
+
+func enterpriseCSVFilename(prefix string, startTimestamp int64, endTimestamp int64) string {
+	format := func(timestamp int64) string {
+		if timestamp <= 0 {
+			return "unknown"
+		}
+		return time.Unix(timestamp, 0).Format("20060102")
+	}
+	return fmt.Sprintf("%s-%s-%s.csv", prefix, format(startTimestamp), format(endTimestamp))
+}
+
+func writeEnterpriseCSV(c *gin.Context, filename string, body []byte) {
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Data(http.StatusOK, "text/csv; charset=utf-8", body)
 }
 
 func GetEnterpriseControlTower(c *gin.Context) {
@@ -129,6 +147,23 @@ func GetEnterpriseAPIKeys(c *gin.Context) {
 	common.ApiSuccess(c, dto.EnterpriseAPIKeyPage{
 		Items: items, Total: total, Page: page, PageSize: pageSize, Summary: summary,
 	})
+}
+
+func ExportEnterpriseAPIKeys(c *gin.Context) {
+	status, _ := strconv.Atoi(c.Query("status"))
+	userId, _ := strconv.Atoi(c.Query("user_id"))
+	filters := model.EnterpriseTokenFilters{
+		Keyword: strings.TrimSpace(c.Query("keyword")), Status: status,
+		UserId: userId, Group: strings.TrimSpace(c.Query("group")),
+		ManagerId: c.GetInt("id"), ManagerRole: c.GetInt("role"),
+		RestrictByManagerRole: true,
+	}
+	body, err := service.BuildEnterpriseAPIKeysCSV(filters)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	writeEnterpriseCSV(c, fmt.Sprintf("enterprise-api-keys-%d.csv", time.Now().Unix()), body)
 }
 
 func GetEnterpriseAPIKeyUsers(c *gin.Context) {
@@ -226,9 +261,19 @@ func GetEnterpriseUsageAnalytics(c *gin.Context) {
 	common.ApiSuccess(c, data)
 }
 
+func ExportEnterpriseUsageAnalytics(c *gin.Context) {
+	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
+	body, err := service.BuildEnterpriseUsageAnalyticsCSV(startTimestamp, endTimestamp)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	writeEnterpriseCSV(c, enterpriseCSVFilename("enterprise-usage", startTimestamp, endTimestamp), body)
+}
+
 func GetEnterpriseUsers(c *gin.Context) {
 	limit := enterprisePositiveInt(c, "limit", 250, 1000)
-	data, err := service.GetEnterpriseUsers(limit)
+	data, err := service.GetEnterpriseUsers(limit, c.GetInt("id"), c.GetInt("role"))
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -244,4 +289,14 @@ func GetEnterpriseBilling(c *gin.Context) {
 		return
 	}
 	common.ApiSuccess(c, data)
+}
+
+func ExportEnterpriseBilling(c *gin.Context) {
+	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
+	body, err := service.BuildEnterpriseBillingCSV(startTimestamp, endTimestamp)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	writeEnterpriseCSV(c, enterpriseCSVFilename("enterprise-billing", startTimestamp, endTimestamp), body)
 }

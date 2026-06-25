@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
@@ -13,7 +13,7 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Area,
@@ -42,7 +42,14 @@ import {
 } from '@/components/ui/table'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
+import {
+  acknowledgeOperatingInsight,
+  disableSupplyRoutingPolicy,
+  dismissOperatingInsight,
+  updateSupplyActionPlanStatus,
+} from '../api'
 import { getControlTower } from '../control-tower-api'
 import type {
   ControlTowerEvent,
@@ -100,7 +107,11 @@ function providerStatusDotClass(label: string): string {
   return 'bg-muted-foreground'
 }
 
-function EventList(props: { events: ControlTowerEvent[]; emptyText: string }) {
+function EventList(props: {
+  events: ControlTowerEvent[]
+  emptyText: string
+  renderAction?: (event: ControlTowerEvent) => ReactNode
+}) {
   if (props.events.length === 0) {
     return (
       <div className='text-muted-foreground flex min-h-36 items-center justify-center text-sm'>
@@ -110,34 +121,38 @@ function EventList(props: { events: ControlTowerEvent[]; emptyText: string }) {
   }
   return (
     <div className='space-y-1'>
-      {props.events.map((event) => (
-        <div
-          key={`${event.category}-${event.id}`}
-          className='hover:bg-muted/45 flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors'
-        >
-          <span
-            className={cn(
-              'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg',
-              eventTone(event.severity)
-            )}
+      {props.events.map((event) => {
+        const action = props.renderAction?.(event)
+        return (
+          <div
+            key={`${event.category}-${event.id}`}
+            className='hover:bg-muted/45 flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors'
           >
-            <AlertTriangle className='size-3.5' aria-hidden='true' />
-          </span>
-          <div className='min-w-0 flex-1'>
-            <div className='flex items-start justify-between gap-2'>
-              <p className='truncate text-sm font-medium'>{event.title}</p>
-              <span className='text-muted-foreground shrink-0 text-[11px]'>
-                {event.created_at > 0
-                  ? dayjs.unix(event.created_at).format('MM-DD HH:mm')
-                  : '—'}
-              </span>
+            <span
+              className={cn(
+                'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg',
+                eventTone(event.severity)
+              )}
+            >
+              <AlertTriangle className='size-3.5' aria-hidden='true' />
+            </span>
+            <div className='min-w-0 flex-1'>
+              <div className='flex items-start justify-between gap-2'>
+                <p className='truncate text-sm font-medium'>{event.title}</p>
+                <span className='text-muted-foreground shrink-0 text-[11px]'>
+                  {event.created_at > 0
+                    ? dayjs.unix(event.created_at).format('MM-DD HH:mm')
+                    : '—'}
+                </span>
+              </div>
+              <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-5'>
+                {event.detail || '暂无补充说明'}
+              </p>
+              {action && <div className='mt-2 flex flex-wrap gap-1.5'>{action}</div>}
             </div>
-            <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-5'>
-              {event.detail || '暂无补充说明'}
-            </p>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -199,6 +214,7 @@ function PolicyStatus(props: { policy: RoutingPolicyItem }) {
 
 export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const endTimestamp = Math.floor(Date.now() / 1000)
   const startTimestamp = endTimestamp - 7 * 24 * 60 * 60
   const query = useQuery({
@@ -225,6 +241,98 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
     ...item,
     date: dayjs.unix(item.timestamp).format('MM-DD'),
   }))
+  const invalidateControlTower = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['enterprise-control-tower'] }),
+      queryClient.invalidateQueries({
+        queryKey: ['token-router', 'operating-insights'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['token-router', 'supply-action-plans'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['token-router', 'supply-routing-policies'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['token-router', 'routing-source-executions'],
+      }),
+    ])
+  }
+  const acknowledgeRisk = useMutation({
+    mutationFn: async (id: number) => {
+      const result = await acknowledgeOperatingInsight(id, {
+        review_note: 'acknowledged from enterprise control tower',
+      })
+      if (!result.success) {
+        throw new Error(result.message || '确认风险失败')
+      }
+      return result
+    },
+    onSuccess: async () => {
+      toast.success('风险已确认')
+      await invalidateControlTower()
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '请求失败')
+    },
+  })
+  const dismissRisk = useMutation({
+    mutationFn: async (id: number) => {
+      const result = await dismissOperatingInsight(id, {
+        review_note: 'dismissed from enterprise control tower',
+      })
+      if (!result.success) {
+        throw new Error(result.message || '忽略风险失败')
+      }
+      return result
+    },
+    onSuccess: async () => {
+      toast.success('风险已忽略')
+      await invalidateControlTower()
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '请求失败')
+    },
+  })
+  const updateActionStatus = useMutation({
+    mutationFn: async (event: ControlTowerEvent) => {
+      const nextStatus =
+        event.status === 'in_progress' ? 'completed' : 'in_progress'
+      const result = await updateSupplyActionPlanStatus(event.id, {
+        status: nextStatus,
+        operator_note: `updated from enterprise control tower: ${nextStatus}`,
+      })
+      if (!result.success) {
+        throw new Error(result.message || '更新待执行动作失败')
+      }
+      return result
+    },
+    onSuccess: async () => {
+      toast.success('待执行动作已更新')
+      await invalidateControlTower()
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '请求失败')
+    },
+  })
+  const disablePolicy = useMutation({
+    mutationFn: async (id: number) => {
+      const result = await disableSupplyRoutingPolicy(id, {
+        operator_note: 'disabled from enterprise control tower',
+      })
+      if (!result.success) {
+        throw new Error(result.message || '停用路由策略失败')
+      }
+      return result
+    },
+    onSuccess: async () => {
+      toast.success('路由策略已停用')
+      await invalidateControlTower()
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : '请求失败')
+    },
+  })
 
   return (
     <div className='flex flex-col gap-4 pb-5'>
@@ -443,6 +551,26 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
             <EventList
               events={data?.risks ?? []}
               emptyText='当前没有未处理风险'
+              renderAction={(event) => (
+                <>
+                  <Button
+                    size='xs'
+                    variant='outline'
+                    disabled={acknowledgeRisk.isPending || dismissRisk.isPending}
+                    onClick={() => acknowledgeRisk.mutate(event.id)}
+                  >
+                    确认
+                  </Button>
+                  <Button
+                    size='xs'
+                    variant='ghost'
+                    disabled={acknowledgeRisk.isPending || dismissRisk.isPending}
+                    onClick={() => dismissRisk.mutate(event.id)}
+                  >
+                    忽略
+                  </Button>
+                </>
+              )}
             />
           </EnterprisePanel>
         </div>
@@ -507,12 +635,34 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
             <EventList
               events={data?.recent_changes ?? []}
               emptyText='暂无策略变更记录'
+              renderAction={(event) =>
+                event.status === 'active' ? (
+                  <Button
+                    size='xs'
+                    variant='outline'
+                    disabled={disablePolicy.isPending}
+                    onClick={() => disablePolicy.mutate(event.id)}
+                  >
+                    停用策略
+                  </Button>
+                ) : null
+              }
             />
           </EnterprisePanel>
           <EnterprisePanel title='待执行动作' bodyClassName='p-2.5'>
             <EventList
               events={data?.pending_actions ?? []}
               emptyText='当前没有待执行动作'
+              renderAction={(event) => (
+                <Button
+                  size='xs'
+                  variant='outline'
+                  disabled={updateActionStatus.isPending}
+                  onClick={() => updateActionStatus.mutate(event)}
+                >
+                  {event.status === 'in_progress' ? '标记完成' : '开始执行'}
+                </Button>
+              )}
             />
           </EnterprisePanel>
         </div>

@@ -27,6 +27,7 @@ import {
   Clock3,
   Coins,
   DatabaseZap,
+  Download,
   Filter,
   Gauge,
   RefreshCw,
@@ -48,6 +49,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { toast } from 'sonner'
 import {
   EnterprisePageHeader,
   EnterprisePanel,
@@ -73,7 +75,7 @@ import {
   formatTokens,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { getEnterpriseUsageAnalytics } from './api'
+import { exportEnterpriseUsageAnalytics, getEnterpriseUsageAnalytics } from './api'
 import type {
   EnterpriseUsageAnalyticsData,
   EnterpriseUsageBreakdownItem,
@@ -275,6 +277,7 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
   const [search, setSearch] = useState('')
   const [modelFilter, setModelFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [exportingUsage, setExportingUsage] = useState(false)
   const range = useMemo(() => {
     const end = Math.floor(Date.now() / 1000)
     return { start: end - 7 * 24 * 60 * 60, end }
@@ -355,6 +358,20 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
   }, [metrics.average_latency_ms, metrics.cache_hit_rate, metrics.error_rate, metrics.total_requests])
 
   const dateRangeLabel = `${formatDate(usage.range.start_timestamp || range.start)} - ${formatDate(usage.range.end_timestamp || range.end)}`
+  const exportUsageCsv = async () => {
+    setExportingUsage(true)
+    try {
+      await exportEnterpriseUsageAnalytics({
+        start_timestamp: range.start,
+        end_timestamp: range.end,
+      })
+      toast.success('用量明细已导出')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '导出失败')
+    } finally {
+      setExportingUsage(false)
+    }
+  }
 
   return (
     <div className='enterprise-dashboard space-y-4 pb-2 sm:space-y-5'>
@@ -367,6 +384,15 @@ export function EnterpriseUsageAnalytics(props: { classicContent?: ReactNode }) 
             <Badge variant='outline' className='h-8 rounded-lg bg-background/70 px-3 text-xs font-normal'>
               {dateRangeLabel}
             </Badge>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => void exportUsageCsv()}
+              disabled={exportingUsage || usageQuery.isFetching}
+            >
+              <Download className='size-4' />
+              {exportingUsage ? '导出中' : '导出明细'}
+            </Button>
             <Button
               variant='outline'
               size='sm'

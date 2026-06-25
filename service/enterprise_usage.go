@@ -29,6 +29,7 @@ import (
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type enterpriseUsageAggregate struct {
@@ -57,15 +58,17 @@ func enterpriseQuotaCurrency(quota int64) float64 {
 }
 
 func enterpriseUsageBreakdown(db *gorm.DB, column string, startTimestamp int64, endTimestamp int64, totalQuota int64) ([]dto.EnterpriseUsageBreakdownItem, error) {
-	allowed := map[string]bool{"model_name": true, "username": true, "group": true}
-	if !allowed[column] {
+	allowed := map[string]string{"model_name": "model_name", "username": "username", "group": model.LogGroupColumn()}
+	sqlColumn, ok := allowed[column]
+	if !ok {
 		return nil, fmt.Errorf("unsupported enterprise usage breakdown: %s", column)
 	}
 	var rows []enterpriseUsageBreakdownRow
 	err := db.Model(&model.Log{}).
-		Select(column+" AS name, COALESCE(SUM(quota), 0) AS quota").
+		Select(sqlColumn+" AS name, COALESCE(SUM(quota), 0) AS quota").
 		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, model.LogTypeConsume).
-		Group(column).Order("quota DESC").Limit(12).Scan(&rows).Error
+		Clauses(clause.GroupBy{Columns: []clause.Column{{Name: sqlColumn, Raw: true}}}).
+		Order("quota DESC").Limit(12).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -93,9 +96,9 @@ func enterpriseUsageBreakdown(db *gorm.DB, column string, startTimestamp int64, 
 func enterpriseUsageChannelBreakdown(db *gorm.DB, startTimestamp int64, endTimestamp int64, totalQuota int64) ([]dto.EnterpriseUsageBreakdownItem, error) {
 	var rows []enterpriseUsageChannelRow
 	err := db.Model(&model.Log{}).
-		Select("channel AS channel_id, COALESCE(SUM(quota), 0) AS quota").
+		Select("channel_id, COALESCE(SUM(quota), 0) AS quota").
 		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, model.LogTypeConsume).
-		Group("channel").Order("quota DESC").Limit(12).Scan(&rows).Error
+		Group("channel_id").Order("quota DESC").Limit(12).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -184,14 +187,25 @@ func GetEnterpriseUsageAnalytics(startTimestamp int64, endTimestamp int64) (*dto
 		data.Metrics.CacheHitRate = float64(cacheAggregate.Hits) / float64(cacheAggregate.Total)
 	}
 
-	type trendValue struct{ requests, errors, quota int64 }
+	type trendValue struct {
+		requests         int64
+		errors           int64
+		promptTokens     int64
+		completionTokens int64
+		quota            int64
+		latencyMs        int64
+		latencyRequests  int64
+	}
 	trendMap := make(map[int64]trendValue)
 	var trendRows []struct {
-		CreatedAt int64
-		Type      int
-		Quota     int
+		CreatedAt        int64
+		Type             int
+		PromptTokens     int
+		CompletionTokens int
+		Quota            int
+		UseTime          int
 	}
-	if err := model.LOG_DB.Model(&model.Log{}).Select("created_at", "type", "quota").
+	if err := model.LOG_DB.Model(&model.Log{}).Select("created_at", "type", "prompt_tokens", "completion_tokens", "quota", "use_time").
 		Where("created_at >= ? AND created_at <= ? AND type IN ?", startTimestamp, endTimestamp, []int{model.LogTypeConsume, model.LogTypeError}).
 		Find(&trendRows).Error; err != nil {
 		return nil, err
@@ -204,13 +218,23 @@ func GetEnterpriseUsageAnalytics(startTimestamp int64, endTimestamp int64) (*dto
 		if row.Type == model.LogTypeError {
 			value.errors++
 		} else {
+			value.promptTokens += int64(row.PromptTokens)
+			value.completionTokens += int64(row.CompletionTokens)
 			value.quota += int64(row.Quota)
+			value.latencyMs += int64(row.UseTime * 1000)
+			value.latencyRequests++
 		}
 		trendMap[bucket] = value
 	}
 	for timestamp, value := range trendMap {
+		averageLatencyMs := 0.0
+		if value.latencyRequests > 0 {
+			averageLatencyMs = float64(value.latencyMs) / float64(value.latencyRequests)
+		}
 		data.Trend = append(data.Trend, dto.EnterpriseUsageTrendPoint{
-			Timestamp: timestamp, Requests: value.requests, Errors: value.errors, Quota: value.quota,
+			Timestamp: timestamp, Requests: value.requests, Errors: value.errors,
+			PromptTokens: value.promptTokens, CompletionTokens: value.completionTokens,
+			Quota: value.quota, AverageLatencyMs: averageLatencyMs,
 		})
 	}
 	sort.Slice(data.Trend, func(i, j int) bool { return data.Trend[i].Timestamp < data.Trend[j].Timestamp })
@@ -250,9 +274,9 @@ func GetEnterpriseUsageAnalytics(startTimestamp int64, endTimestamp int64) (*dto
 		}
 	}
 	for _, log := range recent {
-		status := "成功"
+		status := "success"
 		if log.Type == model.LogTypeError {
-			status = "失败"
+			status = "error"
 		}
 		data.RecentLogs = append(data.RecentLogs, dto.EnterpriseUsageLogItem{
 			Id: log.Id, RequestId: log.RequestId, CreatedAt: log.CreatedAt,

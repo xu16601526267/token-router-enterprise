@@ -26,6 +26,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type enterpriseUserTokenCount struct {
@@ -49,19 +51,34 @@ func enterpriseRoleLabel(role int) string {
 	}
 }
 
-func GetEnterpriseUsers(limit int) (*dto.EnterpriseUsersData, error) {
+func enterpriseScopedUserQuery(managerId int, managerRole int) *gorm.DB {
+	query := model.DB.Model(&model.User{})
+	if managerRole < common.RoleRootUser {
+		query = query.Where("role < ? OR id = ?", managerRole, managerId)
+	}
+	return query
+}
+
+func GetEnterpriseUsers(limit int, managerId int, managerRole int) (*dto.EnterpriseUsersData, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 250
 	}
 	var users []model.User
-	if err := model.DB.Omit("password").Order("role DESC, status DESC, last_login_at DESC, id DESC").Limit(limit).Find(&users).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).
+		Omit("password").Order("role DESC, status DESC, last_login_at DESC, id DESC").Limit(limit).Find(&users).Error; err != nil {
 		return nil, err
+	}
+	visibleUserIds := make([]int, 0, len(users))
+	for _, user := range users {
+		visibleUserIds = append(visibleUserIds, user.Id)
 	}
 
 	var tokenRows []enterpriseUserTokenCount
-	if err := model.DB.Model(&model.Token{}).
-		Select("user_id, COUNT(*) AS count").Group("user_id").Scan(&tokenRows).Error; err != nil {
-		return nil, err
+	if len(visibleUserIds) > 0 {
+		if err := model.DB.Model(&model.Token{}).
+			Select("user_id, COUNT(*) AS count").Where("user_id IN ?", visibleUserIds).Group("user_id").Scan(&tokenRows).Error; err != nil {
+			return nil, err
+		}
 	}
 	tokenCount := make(map[int]int64, len(tokenRows))
 	for _, row := range tokenRows {
@@ -79,36 +96,41 @@ func GetEnterpriseUsers(limit int) (*dto.EnterpriseUsersData, error) {
 	}
 
 	summary := dto.EnterpriseUserSummary{}
-	if err := model.DB.Model(&model.User{}).Count(&summary.TotalUsers).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).Count(&summary.TotalUsers).Error; err != nil {
 		return nil, err
 	}
-	if err := model.DB.Model(&model.User{}).Where("status = ?", common.UserStatusEnabled).Count(&summary.ActiveUsers).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).Where("status = ?", common.UserStatusEnabled).Count(&summary.ActiveUsers).Error; err != nil {
 		return nil, err
 	}
-	if err := model.DB.Model(&model.User{}).Where("role >= ?", common.RoleAdminUser).Count(&summary.AdminUsers).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).Where("role >= ?", common.RoleAdminUser).Count(&summary.AdminUsers).Error; err != nil {
 		return nil, err
 	}
-	if err := model.DB.Model(&model.User{}).Where("status = ?", common.UserStatusDisabled).Count(&summary.DisabledUsers).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).Where("status = ?", common.UserStatusDisabled).Count(&summary.DisabledUsers).Error; err != nil {
 		return nil, err
 	}
 	now := time.Now().Unix()
-	if err := model.DB.Model(&model.Token{}).
-		Where("status = ? AND (expired_time = -1 OR expired_time > ?) AND (unlimited_quota = ? OR remain_quota > 0)", common.TokenStatusEnabled, now, true).
-		Count(&summary.ActiveAPIKeys).Error; err != nil {
-		return nil, err
-	}
-	if err := model.DB.Model(&model.User{}).Distinct("`group`").Count(&summary.Groups).Error; err != nil {
-		// PostgreSQL does not accept backticks, retry with GORM's plain column.
-		if retryErr := model.DB.Model(&model.User{}).Distinct("group").Count(&summary.Groups).Error; retryErr != nil {
-			return nil, retryErr
+	if len(visibleUserIds) > 0 {
+		if err := model.DB.Model(&model.Token{}).
+			Where("user_id IN ?", visibleUserIds).
+			Where("status = ? AND (expired_time = -1 OR expired_time > ?) AND (unlimited_quota = ? OR remain_quota > 0)", common.TokenStatusEnabled, now, true).
+			Count(&summary.ActiveAPIKeys).Error; err != nil {
+			return nil, err
 		}
 	}
+	groupColumn := model.CommonGroupColumn()
+	var groupSummary struct {
+		Count int64
+	}
+	if err := enterpriseScopedUserQuery(managerId, managerRole).Select("COUNT(DISTINCT " + groupColumn + ") AS count").Scan(&groupSummary).Error; err != nil {
+		return nil, err
+	}
+	summary.Groups = groupSummary.Count
 
 	var roleRows []struct {
 		Role  int
 		Count int64
 	}
-	if err := model.DB.Model(&model.User{}).Select("role, COUNT(*) AS count").Group("role").Order("role DESC").Scan(&roleRows).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).Select("role, COUNT(*) AS count").Group("role").Order("role DESC").Scan(&roleRows).Error; err != nil {
 		return nil, err
 	}
 	roleCounts := make([]dto.EnterpriseCountItem, 0, len(roleRows))
@@ -116,14 +138,11 @@ func GetEnterpriseUsers(limit int) (*dto.EnterpriseUsersData, error) {
 		roleCounts = append(roleCounts, dto.EnterpriseCountItem{Name: enterpriseRoleLabel(row.Role), Count: row.Count})
 	}
 
-	// Let GORM quote the physical group column by selecting into a stable alias.
-	groupColumn := "`group`"
-	if common.UsingPostgreSQL {
-		groupColumn = `"group"`
-	}
 	var groupRows []enterpriseNamedCount
-	if err := model.DB.Model(&model.User{}).
-		Select(groupColumn + " AS name, COUNT(*) AS count").Group(groupColumn).Order("count DESC").Scan(&groupRows).Error; err != nil {
+	if err := enterpriseScopedUserQuery(managerId, managerRole).
+		Select(groupColumn + " AS name, COUNT(*) AS count").
+		Clauses(clause.GroupBy{Columns: []clause.Column{{Name: groupColumn, Raw: true}}}).
+		Order("count DESC").Scan(&groupRows).Error; err != nil {
 		return nil, err
 	}
 	groupCounts := make([]dto.EnterpriseCountItem, 0, len(groupRows))

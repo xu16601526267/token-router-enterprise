@@ -328,14 +328,17 @@ func SetApiRouter(router *gin.Engine) {
 			enterpriseRoute.GET("/channels", controller.GetEnterpriseChannels)
 			enterpriseRoute.GET("/channels/:id", controller.GetEnterpriseChannelDetail)
 			enterpriseRoute.GET("/api-keys", controller.GetEnterpriseAPIKeys)
+			enterpriseRoute.GET("/api-keys/export", controller.ExportEnterpriseAPIKeys)
 			enterpriseRoute.GET("/api-keys/users", controller.GetEnterpriseAPIKeyUsers)
 			enterpriseRoute.POST("/api-keys", controller.CreateEnterpriseAPIKey)
 			enterpriseRoute.PUT("/api-keys/:id", controller.UpdateEnterpriseAPIKey)
 			enterpriseRoute.POST("/api-keys/:id/rotate", controller.RotateEnterpriseAPIKey)
 			enterpriseRoute.DELETE("/api-keys/:id", controller.DeleteEnterpriseAPIKey)
 			enterpriseRoute.GET("/usage-analytics", controller.GetEnterpriseUsageAnalytics)
+			enterpriseRoute.GET("/usage-analytics/export", controller.ExportEnterpriseUsageAnalytics)
 			enterpriseRoute.GET("/users", controller.GetEnterpriseUsers)
 			enterpriseRoute.GET("/billing", controller.GetEnterpriseBilling)
+			enterpriseRoute.GET("/billing/export", controller.ExportEnterpriseBilling)
 		}
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())

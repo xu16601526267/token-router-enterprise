@@ -19,36 +19,86 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 import type {
   EnterpriseApiResponse,
+  EnterpriseBillingData,
   EnterpriseOverviewData,
+  EnterpriseUsageAnalyticsData,
+  EnterpriseUsersData,
 } from './types'
 
-export async function getEnterpriseOverview(params: {
+type EnterpriseRangeParams = {
   start_timestamp: number
   end_timestamp: number
-}): Promise<EnterpriseApiResponse<EnterpriseOverviewData>> {
+}
+
+async function downloadEnterpriseCsv(
+  path: string,
+  params: Record<string, number | string | undefined>,
+  fallbackFilename: string
+): Promise<void> {
+  const response = await api.get(path, {
+    params,
+    responseType: 'blob',
+    skipBusinessError: true,
+    disableDuplicate: true,
+  })
+  const disposition = String(response.headers['content-disposition'] ?? '')
+  const filenameMatch = disposition.match(/filename="?([^";]+)"?/i)
+  const filename = filenameMatch?.[1] ?? fallbackFilename
+  const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export async function getEnterpriseOverview(
+  params: EnterpriseRangeParams
+): Promise<EnterpriseApiResponse<EnterpriseOverviewData>> {
   const res = await api.get('/api/enterprise/overview', { params })
   return res.data
 }
 
-export async function getEnterpriseUsageAnalytics(params: {
-  start_timestamp: number
-  end_timestamp: number
-}): Promise<import('./types').EnterpriseApiResponse<import('./types').EnterpriseUsageAnalyticsData>> {
+export async function getEnterpriseUsageAnalytics(
+  params: EnterpriseRangeParams
+): Promise<EnterpriseApiResponse<EnterpriseUsageAnalyticsData>> {
   const res = await api.get('/api/enterprise/usage-analytics', { params })
   return res.data
 }
 
 export async function getEnterpriseUsers(params: {
   limit?: number
-} = {}): Promise<import('./types').EnterpriseApiResponse<import('./types').EnterpriseUsersData>> {
+} = {}): Promise<EnterpriseApiResponse<EnterpriseUsersData>> {
   const res = await api.get('/api/enterprise/users', { params })
   return res.data
 }
 
-export async function getEnterpriseBilling(params: {
-  start_timestamp: number
-  end_timestamp: number
-}): Promise<import('./types').EnterpriseApiResponse<import('./types').EnterpriseBillingData>> {
+export async function getEnterpriseBilling(
+  params: EnterpriseRangeParams
+): Promise<EnterpriseApiResponse<EnterpriseBillingData>> {
   const res = await api.get('/api/enterprise/billing', { params })
   return res.data
+}
+
+export async function exportEnterpriseUsageAnalytics(
+  params: EnterpriseRangeParams
+): Promise<void> {
+  await downloadEnterpriseCsv(
+    '/api/enterprise/usage-analytics/export',
+    params,
+    'enterprise-usage.csv'
+  )
+}
+
+export async function exportEnterpriseBilling(
+  params: EnterpriseRangeParams
+): Promise<void> {
+  await downloadEnterpriseCsv(
+    '/api/enterprise/billing/export',
+    params,
+    'enterprise-billing.csv'
+  )
 }

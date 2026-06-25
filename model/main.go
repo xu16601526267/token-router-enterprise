@@ -27,17 +27,10 @@ var logGroupCol string
 
 func initCol() {
 	// init common column names
-	if common.UsingPostgreSQL {
-		commonGroupCol = `"group"`
-		commonKeyCol = `"key"`
-		commonTrueVal = "true"
-		commonFalseVal = "false"
-	} else {
-		commonGroupCol = "`group`"
-		commonKeyCol = "`key`"
-		commonTrueVal = "1"
-		commonFalseVal = "0"
-	}
+	commonGroupCol = CommonGroupColumn()
+	commonKeyCol = commonKeyColumn()
+	commonTrueVal = commonTrueValue()
+	commonFalseVal = commonFalseValue()
 	if os.Getenv("LOG_SQL_DSN") != "" {
 		switch common.LogSqlType {
 		case common.DatabaseTypePostgreSQL:
@@ -59,6 +52,55 @@ func initCol() {
 	}
 	// log sql type and database type
 	//common.SysLog("Using Log SQL Type: " + common.LogSqlType)
+}
+
+func commonKeyColumn() string {
+	if common.UsingPostgreSQL {
+		return `"key"`
+	}
+	return "`key`"
+}
+
+func commonTrueValue() string {
+	if common.UsingPostgreSQL {
+		return "true"
+	}
+	return "1"
+}
+
+func commonFalseValue() string {
+	if common.UsingPostgreSQL {
+		return "false"
+	}
+	return "0"
+}
+
+func qualifySQLColumn(tableName string, column string) string {
+	if strings.TrimSpace(tableName) == "" {
+		return column
+	}
+	return tableName + "." + column
+}
+
+func CommonGroupColumn() string {
+	if common.UsingPostgreSQL {
+		return `"group"`
+	}
+	return "`group`"
+}
+
+func CommonGroupColumnForTable(tableName string) string {
+	return qualifySQLColumn(tableName, CommonGroupColumn())
+}
+
+func LogGroupColumn() string {
+	if os.Getenv("LOG_SQL_DSN") != "" {
+		if common.LogSqlType == common.DatabaseTypePostgreSQL {
+			return `"group"`
+		}
+		return CommonGroupColumn()
+	}
+	return CommonGroupColumn()
 }
 
 var DB *gorm.DB

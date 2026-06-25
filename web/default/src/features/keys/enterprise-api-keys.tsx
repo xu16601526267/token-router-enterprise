@@ -5,6 +5,7 @@ import {
   CalendarClock,
   Check,
   Copy,
+  Download,
   Edit3,
   KeyRound,
   MoreHorizontal,
@@ -54,6 +55,7 @@ import { cn } from '@/lib/utils'
 import {
   createEnterpriseApiKey,
   deleteEnterpriseApiKey,
+  exportEnterpriseApiKeys,
   getEnterpriseApiKeys,
   getEnterpriseApiKeyUsers,
   rotateEnterpriseApiKey,
@@ -408,6 +410,7 @@ export function EnterpriseApiKeys() {
   const [formOpen, setFormOpen] = useState(false)
   const [secret, setSecret] = useState<EnterpriseApiKeySecret | null>(null)
   const [confirmAction, setConfirmAction] = useState<'rotate' | 'delete' | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const params = useMemo(
     () => ({
@@ -438,6 +441,17 @@ export function EnterpriseApiKeys() {
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['enterprise-api-keys'] })
+  }
+  const exportKeys = async () => {
+    setExporting(true)
+    try {
+      await exportEnterpriseApiKeys(params)
+      toast.success('企业密钥清单已导出')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '导出失败')
+    } finally {
+      setExporting(false)
+    }
   }
   const saveMutation = useMutation({
     mutationFn: async (input: EnterpriseApiKeyInput) => {
@@ -501,6 +515,15 @@ export function EnterpriseApiKeys() {
             description='面向企业客户统一发放、轮换和审计 API Key，并管理额度、模型范围、IP 白名单与路由分组。'
             actions={
               <>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => void exportKeys()}
+                  disabled={exporting || keysQuery.isFetching}
+                >
+                  <Download className='size-4' />
+                  {exporting ? '导出中' : '导出'}
+                </Button>
                 <Button
                   variant='outline'
                   size='sm'

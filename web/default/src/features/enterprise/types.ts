@@ -115,7 +115,10 @@ export type EnterpriseUsageTrendPoint = {
   timestamp: number
   requests: number
   errors: number
+  prompt_tokens: number
+  completion_tokens: number
   quota: number
+  average_latency_ms: number
 }
 
 export type EnterpriseUsageBreakdownItem = {
