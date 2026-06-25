@@ -1,0 +1,61 @@
+{
+  "agent_key": "aima2:gb10-process-smoke-review",
+  "hostname": "aima2",
+  "runtime_ref": "process-smoke:/tmp/token-router-gb10-process-smoke-20260623142209-2472155",
+  "version": "dev",
+  "status": "ok",
+  "started_at": 1782195757,
+  "finished_at": 1782195757,
+  "review": {
+    "status": "ok",
+    "period_start": 1782192157,
+    "period_end": 1782195757,
+    "target_period_start": 0,
+    "target_period_end": 0,
+    "model_name": "gpt-test",
+    "user_id": 2,
+    "total_generated": 12,
+    "steps": [
+      {
+        "name": "supplier_scorecards",
+        "path": "/api/supplier_scorecards/generate",
+        "count": 3
+      },
+      {
+        "name": "supplier_posture_recommendations",
+        "path": "/api/supplier_posture_recommendations/generate",
+        "count": 3
+      },
+      {
+        "name": "traffic_profiles",
+        "path": "/api/traffic_profiles/generate",
+        "count": 1
+      },
+      {
+        "name": "traffic_forecasts",
+        "path": "/api/traffic_forecasts/generate",
+        "count": 1
+      },
+      {
+        "name": "pricing_recommendations",
+        "path": "/api/pricing_recommendations/generate",
+        "count": 1
+      },
+      {
+        "name": "supply_decisions",
+        "path": "/api/supply_decisions/generate",
+        "count": 1
+      },
+      {
+        "name": "supply_expansion_opportunities",
+        "path": "/api/supply_expansion_opportunities/generate",
+        "count": 1
+      },
+      {
+        "name": "operating_insights",
+        "path": "/api/operating_insights/generate",
+        "count": 1
+      }
+    ]
+  }
+}

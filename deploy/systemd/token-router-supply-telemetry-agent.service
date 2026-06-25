@@ -1,0 +1,24 @@
+[Unit]
+Description=Token Router supply telemetry resident agent
+Documentation=file:/opt/token-router/deploy/systemd/README.md
+After=network-online.target token-router-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=token-router
+Group=token-router
+WorkingDirectory=/var/lib/token-router
+EnvironmentFile=/etc/token-router/token-router.env
+ExecStart=/bin/sh -c 'exec /opt/token-router/bin/token-router-supply telemetry agent --api "$TOKEN_ROUTER_API_BASE" --admin-token "$TOKEN_ROUTER_ADMIN_TOKEN" --agent-key "$TOKEN_ROUTER_TELEMETRY_AGENT_KEY" --hostname "$TOKEN_ROUTER_HOSTNAME" --runtime-ref systemd:token-router-supply-telemetry-agent.service --version "$TOKEN_ROUTER_DEPLOY_VERSION" --interval "$TOKEN_ROUTER_TELEMETRY_INTERVAL" --min-collected "$TOKEN_ROUTER_TELEMETRY_MIN_COLLECTED" --supplier-id "$TOKEN_ROUTER_TELEMETRY_SUPPLIER_ID" --channel-id "$TOKEN_ROUTER_TELEMETRY_CHANNEL_ID" --supply-node "$TOKEN_ROUTER_TELEMETRY_SUPPLY_NODE" --model "$TOKEN_ROUTER_TELEMETRY_MODEL"'
+Restart=always
+RestartSec=15s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/token-router /var/log/token-router /run/token-router
+
+[Install]
+WantedBy=multi-user.target

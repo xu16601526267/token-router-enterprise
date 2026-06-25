@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Token Router operations review refresh on a schedule
+Documentation=file:/opt/token-router/deploy/systemd/README.md
+
+[Timer]
+OnBootSec=3m
+OnUnitActiveSec=15m
+AccuracySec=1m
+Unit=token-router-supply-review-once.service
+
+[Install]
+WantedBy=timers.target

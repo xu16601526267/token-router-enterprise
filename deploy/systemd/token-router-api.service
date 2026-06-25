@@ -1,0 +1,27 @@
+[Unit]
+Description=Token Router API-only server
+Documentation=file:/opt/token-router/deploy/systemd/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=token-router
+Group=token-router
+WorkingDirectory=/var/lib/token-router
+EnvironmentFile=/etc/token-router/token-router.env
+StateDirectory=token-router
+LogsDirectory=token-router
+RuntimeDirectory=token-router
+ExecStart=/opt/token-router/bin/token-router-api
+Restart=always
+RestartSec=5s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/token-router /var/log/token-router /run/token-router
+
+[Install]
+WantedBy=multi-user.target

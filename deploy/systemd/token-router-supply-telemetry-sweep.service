@@ -1,0 +1,18 @@
+[Unit]
+Description=Token Router supply telemetry one-shot sweep
+Documentation=file:/opt/token-router/deploy/systemd/README.md
+After=network-online.target token-router-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=token-router
+Group=token-router
+WorkingDirectory=/var/lib/token-router
+EnvironmentFile=/etc/token-router/token-router.env
+ExecStart=/bin/sh -c 'set -eu; args=""; if [ "$TOKEN_ROUTER_TELEMETRY_FAIL_ON_SKIP" = "true" ]; then args="--fail-on-skip"; fi; exec /opt/token-router/bin/token-router-supply telemetry sweep --api "$TOKEN_ROUTER_API_BASE" --admin-token "$TOKEN_ROUTER_ADMIN_TOKEN" --min-collected "$TOKEN_ROUTER_TELEMETRY_MIN_COLLECTED" --supplier-id "$TOKEN_ROUTER_TELEMETRY_SUPPLIER_ID" --channel-id "$TOKEN_ROUTER_TELEMETRY_CHANNEL_ID" --supply-node "$TOKEN_ROUTER_TELEMETRY_SUPPLY_NODE" --model "$TOKEN_ROUTER_TELEMETRY_MODEL" $args'
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/token-router /var/log/token-router /run/token-router

@@ -1,0 +1,11 @@
+status=ok
+root_dir=/tmp/token-router-adr0085-smoke-src
+run_dir=/tmp/token-router-gb10-process-smoke-20260623142209-2472155
+db_path=/tmp/token-router-gb10-process-smoke-20260623142209-2472155/token-router.db
+api_base=http://127.0.0.1:43000
+supply_base=http://127.0.0.1:44000
+model=gpt-test
+session_id=session-process-e2e
+node_name=aima2
+demand_log=/tmp/token-router-gb10-process-smoke-20260623142209-2472155/logs/demand-sim.log
+review_log=/tmp/token-router-gb10-process-smoke-20260623142209-2472155/logs/review-agent.json

@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Token Router supply telemetry sweep on a schedule
+Documentation=file:/opt/token-router/deploy/systemd/README.md
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=5m
+AccuracySec=30s
+Unit=token-router-supply-telemetry-sweep.service
+
+[Install]
+WantedBy=timers.target

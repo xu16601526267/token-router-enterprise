@@ -1,0 +1,24 @@
+[Unit]
+Description=Token Router operations review resident agent
+Documentation=file:/opt/token-router/deploy/systemd/README.md
+After=network-online.target token-router-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=token-router
+Group=token-router
+WorkingDirectory=/var/lib/token-router
+EnvironmentFile=/etc/token-router/token-router.env
+ExecStart=/bin/sh -c 'exec /opt/token-router/bin/token-router-supply review agent --api "$TOKEN_ROUTER_API_BASE" --admin-token "$TOKEN_ROUTER_ADMIN_TOKEN" --agent-key "$TOKEN_ROUTER_REVIEW_AGENT_KEY" --hostname "$TOKEN_ROUTER_HOSTNAME" --runtime-ref systemd:token-router-supply-review-agent.service --version "$TOKEN_ROUTER_DEPLOY_VERSION" --interval "$TOKEN_ROUTER_REVIEW_INTERVAL" --min-generated "$TOKEN_ROUTER_REVIEW_MIN_GENERATED" --supplier-id "$TOKEN_ROUTER_REVIEW_SUPPLIER_ID" --model "$TOKEN_ROUTER_REVIEW_MODEL" --sla-tier "$TOKEN_ROUTER_REVIEW_SLA_TIER" --user-id "$TOKEN_ROUTER_REVIEW_USER_ID"'
+Restart=always
+RestartSec=15s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/token-router /var/log/token-router /run/token-router
+
+[Install]
+WantedBy=multi-user.target
