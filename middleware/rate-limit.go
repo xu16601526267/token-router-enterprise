@@ -96,9 +96,30 @@ func GlobalWebRateLimit() func(c *gin.Context) {
 
 func GlobalAPIRateLimit() func(c *gin.Context) {
 	if common.GlobalApiRateLimitEnable {
-		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		limit := rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+		return func(c *gin.Context) {
+			if isDownstreamTokenAccountingEndpoint(c) {
+				c.Next()
+				return
+			}
+			limit(c)
+		}
 	}
 	return defNext
+}
+
+func isDownstreamTokenAccountingEndpoint(c *gin.Context) bool {
+	path := c.FullPath()
+	if path == "" && c.Request != nil && c.Request.URL != nil {
+		path = c.Request.URL.Path
+	}
+
+	switch path {
+	case "/api/log/token", "/api/usage/token", "/api/usage/token/":
+		return true
+	default:
+		return false
+	}
 }
 
 func CriticalRateLimit() func(c *gin.Context) {

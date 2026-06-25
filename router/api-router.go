@@ -283,7 +283,7 @@ func SetApiRouter(router *gin.Engine) {
 		}
 
 		usageRoute := apiRouter.Group("/usage")
-		usageRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
+		usageRoute.Use(middleware.CORS())
 		{
 			tokenUsageRoute := usageRoute.Group("/token")
 			tokenUsageRoute.Use(middleware.TokenAuthReadOnly())
@@ -343,10 +343,7 @@ func SetApiRouter(router *gin.Engine) {
 			enterpriseRoute.POST("/billing/settlements/generate", controller.GenerateEnterpriseBillingSettlement)
 		}
 
-		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
-		{
-			logRoute.GET("/token", middleware.TokenAuthReadOnly(), controller.GetLogByKey)
-		}
+		logRoute.GET("/token", middleware.CORS(), middleware.TokenAuthReadOnly(), controller.GetLogByKey)
 		groupRoute := apiRouter.Group("/group")
 		groupRoute.Use(middleware.AdminAuth())
 		{
