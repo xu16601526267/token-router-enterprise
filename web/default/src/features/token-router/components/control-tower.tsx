@@ -20,23 +20,26 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
-  Bot,
+  CalendarClock,
   CheckCircle2,
   Clock3,
+  Download,
+  FileText,
   GitBranch,
+  MoreHorizontal,
   Network,
   RefreshCw,
   Route,
   ShieldCheck,
-  Sparkles,
+  SlidersHorizontal,
+  Target,
   Zap,
+  type LucideIcon,
 } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   Area,
   AreaChart,
-  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -44,13 +47,10 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
-import {
-  EnterprisePageHeader,
-  EnterprisePanel,
-  EnterpriseStatCard,
-} from '@/components/enterprise'
+import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -70,10 +70,24 @@ import {
 } from '../api'
 import { getControlTower } from '../control-tower-api'
 import type {
+  ControlTowerData,
   ControlTowerEvent,
   ProviderHealth,
   RoutingPolicyItem,
 } from '../control-tower-types'
+
+type RangeState = {
+  startTimestamp: number
+  endTimestamp: number
+  startInput: string
+  endInput: string
+}
+
+const RANGE_PRESETS = [
+  { key: '7d', label: '近 7 天', days: 7 },
+  { key: '30d', label: '近 30 天', days: 30 },
+  { key: 'month', label: '本月', days: 0 },
+] as const
 
 function formatCount(value: number): string {
   return new Intl.NumberFormat('zh-CN', { notation: 'compact' }).format(value)
@@ -83,91 +97,300 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`
 }
 
+function formatLatency(value: number): string {
+  if (value <= 0) {
+    return '0 ms'
+  }
+  if (value < 10) {
+    return `${value.toFixed(2)} ms`
+  }
+  return `${value.toFixed(0)} ms`
+}
+
+function formatInputValue(timestamp: number): string {
+  return dayjs.unix(timestamp).format('YYYY-MM-DD')
+}
+
+function createDefaultRange(): RangeState {
+  const endTimestamp = dayjs().endOf('day').unix()
+  const startTimestamp = dayjs().subtract(1, 'month').startOf('day').unix()
+  return {
+    startTimestamp,
+    endTimestamp,
+    startInput: formatInputValue(startTimestamp),
+    endInput: formatInputValue(endTimestamp),
+  }
+}
+
+function createPresetRange(days: number): RangeState {
+  const now = dayjs()
+  const endTimestamp = now.endOf('day').unix()
+  const startTimestamp =
+    days > 0
+      ? now
+          .subtract(days - 1, 'day')
+          .startOf('day')
+          .unix()
+      : now.startOf('month').unix()
+  return {
+    startTimestamp,
+    endTimestamp,
+    startInput: formatInputValue(startTimestamp),
+    endInput: formatInputValue(endTimestamp),
+  }
+}
+
+function parseDateInput(value: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null
+  }
+  const parsed = dayjs(value)
+  if (!parsed.isValid()) {
+    return null
+  }
+  return parsed.unix()
+}
+
+function csvEscape(value: string | number): string {
+  const text = String(value ?? '')
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replaceAll('"', '""')}"`
+  }
+  return text
+}
+
+function exportControlTowerCsv(data: ControlTowerData | undefined) {
+  if (!data) {
+    toast.error('暂无可导出的控制塔数据')
+    return
+  }
+
+  const rows: Array<Array<string | number>> = [
+    ['section', 'name', 'metric', 'value', 'status'],
+    ['metrics', 'requests', 'requests', data.metrics.requests, ''],
+    ['metrics', 'tokens', 'tokens', data.metrics.tokens, ''],
+    [
+      'metrics',
+      'success_rate',
+      'success_rate',
+      formatPercent(data.metrics.realtime_success_rate),
+      '',
+    ],
+    [
+      'metrics',
+      'average_latency',
+      'latency_ms',
+      data.metrics.average_latency_ms.toFixed(2),
+      '',
+    ],
+  ]
+
+  data.provider_health.forEach((provider) => {
+    rows.push([
+      'provider',
+      provider.channel_name,
+      provider.supplier_name || '未绑定供应商',
+      provider.requests,
+      provider.status === 1 ? 'enabled' : 'disabled',
+    ])
+  })
+  data.policies.forEach((policy) => {
+    rows.push([
+      'policy',
+      policy.name,
+      policy.model_name || '全部模型',
+      policy.traffic_percent,
+      policy.status,
+    ])
+  })
+  data.pending_actions.forEach((event) => {
+    rows.push([
+      'action',
+      event.title,
+      event.category,
+      event.detail,
+      event.status,
+    ])
+  })
+  data.risks.forEach((event) => {
+    rows.push(['risk', event.title, event.severity, event.detail, event.status])
+  })
+
+  const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: 'text/csv;charset=utf-8;',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `token-router-control-tower-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(url)
+  toast.success('控制塔数据已导出')
+}
+
 function eventTone(severity: string): string {
   if (severity === 'action' || severity === 'high' || severity === 'P1') {
-    return 'bg-rose-500/10 text-rose-600 dark:text-rose-300'
+    return 'bg-rose-50 text-rose-600 ring-1 ring-rose-100'
   }
   if (severity === 'watch' || severity === 'medium' || severity === 'P2') {
-    return 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
+    return 'bg-amber-50 text-amber-600 ring-1 ring-amber-100'
   }
-  return 'bg-blue-500/10 text-blue-600 dark:text-blue-300'
+  return 'bg-blue-50 text-blue-600 ring-1 ring-blue-100'
 }
 
 function providerStatus(provider: ProviderHealth): {
   label: string
   className: string
+  dotClassName: string
 } {
   if (provider.status !== 1) {
     return {
       label: '已停用',
-      className: 'bg-muted text-muted-foreground',
+      className: 'bg-slate-100 text-slate-500',
+      dotClassName: 'bg-slate-300',
     }
   }
   if (provider.success_rate > 0 && provider.success_rate < 0.98) {
     return {
       label: '需关注',
-      className: 'bg-amber-500/10 text-amber-600 dark:text-amber-300',
+      className: 'bg-amber-50 text-amber-600',
+      dotClassName: 'bg-amber-400',
     }
   }
   return {
-    label: '健康',
-    className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
+    label: '健康良好',
+    className: 'bg-emerald-50 text-emerald-600',
+    dotClassName: 'bg-emerald-500',
   }
 }
 
-function providerStatusDotClass(label: string): string {
-  if (label === '健康') {
-    return 'bg-emerald-500'
+function policyStatus(policy: RoutingPolicyItem): {
+  label: string
+  className: string
+} {
+  if (policy.status === 'active') {
+    return {
+      label: '运行中',
+      className: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+    }
   }
-  if (label === '需关注') {
-    return 'bg-amber-500'
+  return {
+    label: '未启用',
+    className: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
   }
-  return 'bg-muted-foreground'
+}
+
+function approvalStatus(policy: RoutingPolicyItem): {
+  label: string
+  className: string
+} {
+  if (policy.status === 'active') {
+    return {
+      label: '已通过',
+      className: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+    }
+  }
+  return {
+    label: '待审批',
+    className: 'bg-amber-50 text-amber-600 ring-1 ring-amber-100',
+  }
+}
+
+function MetricTile(props: {
+  title: string
+  value: string
+  helper: string
+  icon: LucideIcon
+  tone: 'blue' | 'emerald' | 'violet' | 'orange' | 'rose'
+  loading?: boolean
+}) {
+  const toneClass = {
+    blue: 'bg-blue-50 text-blue-600 ring-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+    violet: 'bg-violet-50 text-violet-600 ring-violet-100',
+    orange: 'bg-orange-50 text-orange-600 ring-orange-100',
+    rose: 'bg-rose-50 text-rose-600 ring-rose-100',
+  }[props.tone]
+  const Icon = props.icon
+
+  return (
+    <div className='rounded-md border border-slate-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+      <div className='flex items-start gap-2.5'>
+        <span
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+            toneClass
+          )}
+        >
+          <Icon className='size-4' aria-hidden='true' />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center justify-between gap-2'>
+            <p className='truncate text-[12px] font-medium text-slate-600'>
+              {props.title}
+            </p>
+            <ArrowRight className='size-3.5 shrink-0 text-slate-400' />
+          </div>
+          <p className='mt-1 text-[22px] leading-6 font-semibold tracking-normal text-slate-950'>
+            {props.loading ? '...' : props.value}
+          </p>
+          <p className='mt-1 text-[11px] text-slate-500'>{props.helper}</p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function EventList(props: {
   events: ControlTowerEvent[]
   emptyText: string
+  maxItems?: number
   renderAction?: (event: ControlTowerEvent) => ReactNode
 }) {
-  if (props.events.length === 0) {
+  const events = props.events.slice(0, props.maxItems ?? 4)
+  if (events.length === 0) {
     return (
-      <div className='text-muted-foreground flex min-h-36 items-center justify-center text-sm'>
+      <div className='flex min-h-20 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-500'>
         {props.emptyText}
       </div>
     )
   }
   return (
     <div className='space-y-1'>
-      {props.events.map((event) => {
+      {events.map((event) => {
         const action = props.renderAction?.(event)
         return (
           <div
             key={`${event.category}-${event.id}`}
-            className='hover:bg-muted/45 flex items-start gap-3 rounded-md px-2.5 py-2.5 transition-colors'
+            className='flex items-start gap-2 rounded-md px-1.5 py-1.5 transition-colors hover:bg-slate-50'
           >
             <span
               className={cn(
-                'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md',
+                'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full',
                 eventTone(event.severity)
               )}
             >
-              <AlertTriangle className='size-3.5' aria-hidden='true' />
+              <AlertTriangle className='size-3' aria-hidden='true' />
             </span>
             <div className='min-w-0 flex-1'>
               <div className='flex items-start justify-between gap-2'>
-                <p className='truncate text-sm font-medium'>{event.title}</p>
-                <span className='text-muted-foreground shrink-0 text-[11px]'>
+                <p className='truncate text-xs font-semibold text-slate-900'>
+                  {event.title}
+                </p>
+                <span className='shrink-0 text-[10px] text-slate-400'>
                   {event.created_at > 0
                     ? dayjs.unix(event.created_at).format('MM-DD HH:mm')
-                    : '—'}
+                    : '-'}
                 </span>
               </div>
-              <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-5'>
+              <p className='mt-0.5 line-clamp-1 text-[11px] text-slate-500'>
                 {event.detail || '暂无补充说明'}
               </p>
               {action && (
-                <div className='mt-2 flex flex-wrap gap-1.5'>{action}</div>
+                <div className='mt-1 flex flex-wrap gap-1.5'>{action}</div>
               )}
             </div>
           </div>
@@ -177,58 +400,157 @@ function EventList(props: {
   )
 }
 
-function ProviderNode(props: { provider: ProviderHealth; index: number }) {
+function HealthRow(props: { provider: ProviderHealth; requestTotal: number }) {
   const status = providerStatus(props.provider)
-  const latency =
-    props.provider.average_latency_ms || props.provider.response_time_ms
+  const trafficShare =
+    props.requestTotal > 0 ? props.provider.requests / props.requestTotal : 0
   return (
-    <div className='bg-background/85 relative flex items-center gap-3 rounded-md border p-3 shadow-sm'>
-      <span
-        className={cn(
-          'absolute -left-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-background',
-          props.index === 0 ? 'bg-primary' : 'bg-muted-foreground/45'
-        )}
-      />
-      <span className='bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-md'>
-        <Bot className='size-4' aria-hidden='true' />
-      </span>
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-2'>
-          <p className='truncate text-sm font-semibold'>
+    <div className='grid grid-cols-[minmax(0,1fr)_58px_58px] items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-slate-50'>
+      <div className='flex min-w-0 items-center gap-2'>
+        <span className={cn('size-1.5 rounded-full', status.dotClassName)} />
+        <div className='min-w-0'>
+          <p className='truncate text-xs font-semibold text-slate-900'>
+            {props.provider.supplier_name || props.provider.channel_name}
+          </p>
+          <p className='truncate text-[10px] text-slate-500'>
             {props.provider.channel_name}
           </p>
-          <Badge className={cn('border-0', status.className)}>
-            {status.label}
-          </Badge>
         </div>
-        <p className='text-muted-foreground mt-1 truncate text-[11px]'>
-          {props.provider.supplier_name || '未绑定供应商'} ·{' '}
-          {props.provider.region || '默认分组'}
-        </p>
       </div>
-      <div className='shrink-0 text-right text-[11px]'>
-        <p className='font-semibold'>
-          {formatPercent(props.provider.success_rate)}
-        </p>
-        <p className='text-muted-foreground mt-0.5'>{latency.toFixed(0)} ms</p>
+      <div className='text-right text-[11px] font-medium text-slate-700'>
+        {formatPercent(props.provider.success_rate)}
+      </div>
+      <div className='text-right text-[11px] text-slate-500'>
+        {trafficShare > 0
+          ? formatPercent(trafficShare)
+          : formatCount(props.provider.requests)}
       </div>
     </div>
   )
 }
 
-function PolicyStatus(props: { policy: RoutingPolicyItem }) {
-  const active = props.policy.status === 'active'
+function ProviderRouteNode(props: {
+  provider: ProviderHealth
+  requestTotal: number
+  index: number
+}) {
+  const status = providerStatus(props.provider)
+  const trafficShare =
+    props.requestTotal > 0 ? props.provider.requests / props.requestTotal : 0
+  const latency =
+    props.provider.average_latency_ms || props.provider.response_time_ms
+
   return (
-    <Badge
-      className={cn(
-        'border-0',
-        active
-          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-          : 'bg-muted text-muted-foreground'
-      )}
-    >
-      {active ? '运行中' : '已停用'}
-    </Badge>
+    <div className='rounded-md border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
+      <div className='flex items-center justify-between gap-2'>
+        <div className='flex min-w-0 items-center gap-2'>
+          <span
+            className={cn(
+              'flex size-6 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold',
+              props.index === 0
+                ? 'bg-blue-50 text-blue-600'
+                : 'bg-slate-100 text-slate-500'
+            )}
+          >
+            {props.index === 0 ? '主' : '备'}
+          </span>
+          <p className='truncate text-xs font-semibold text-slate-900'>
+            {props.provider.channel_name}
+          </p>
+        </div>
+        <Badge
+          className={cn('h-4 rounded px-1.5 text-[10px]', status.className)}
+        >
+          {status.label}
+        </Badge>
+      </div>
+      <div className='mt-2 grid grid-cols-3 gap-1 text-[11px]'>
+        <div>
+          <p className='text-slate-400'>流量</p>
+          <p className='font-semibold text-slate-800'>
+            {trafficShare > 0 ? formatPercent(trafficShare) : '0%'}
+          </p>
+        </div>
+        <div>
+          <p className='text-slate-400'>成功率</p>
+          <p className='font-semibold text-slate-800'>
+            {formatPercent(props.provider.success_rate)}
+          </p>
+        </div>
+        <div>
+          <p className='text-slate-400'>延迟</p>
+          <p className='font-semibold text-slate-800'>
+            {formatLatency(latency)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RuleItem(props: { icon: LucideIcon; title: string; detail: string }) {
+  const Icon = props.icon
+  return (
+    <div className='flex gap-2 border-b border-slate-100 px-2.5 py-2 last:border-b-0'>
+      <span className='mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+        <Icon className='size-3.5' aria-hidden='true' />
+      </span>
+      <div className='min-w-0'>
+        <p className='text-xs font-semibold text-slate-900'>{props.title}</p>
+        <p className='mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500'>
+          {props.detail}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function TrendMiniChart(props: {
+  trend: Array<{ date: string; requests: number; success_rate: number }>
+}) {
+  if (props.trend.length === 0) {
+    return (
+      <div className='flex h-12 items-center justify-center rounded-md bg-slate-50 text-[11px] text-slate-400'>
+        暂无趋势
+      </div>
+    )
+  }
+  return (
+    <div className='h-12'>
+      <ResponsiveContainer
+        width='100%'
+        height='100%'
+        initialDimension={{ width: 260, height: 48 }}
+      >
+        <AreaChart data={props.trend} margin={{ left: 0, right: 0, top: 4 }}>
+          <defs>
+            <linearGradient
+              id='controlTowerMiniTrend'
+              x1='0'
+              x2='0'
+              y1='0'
+              y2='1'
+            >
+              <stop offset='5%' stopColor='#2563eb' stopOpacity={0.22} />
+              <stop offset='95%' stopColor='#2563eb' stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey='date' hide />
+          <YAxis hide />
+          <Tooltip
+            formatter={(value) => [formatCount(Number(value ?? 0)), '请求量']}
+            labelFormatter={(label) => `日期 ${label}`}
+          />
+          <Area
+            dataKey='requests'
+            type='monotone'
+            stroke='#2563eb'
+            strokeWidth={1.8}
+            fill='url(#controlTowerMiniTrend)'
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
@@ -236,21 +558,24 @@ export function ControlTower(props: {
   nav?: ReactNode
   onOpenRoutingPolicies?: () => void
 }) {
-  const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const endTimestamp = Math.floor(Date.now() / 1000)
-  const startTimestamp = endTimestamp - 7 * 24 * 60 * 60
+  const [range, setRange] = useState<RangeState>(() => createDefaultRange())
   const query = useQuery({
-    queryKey: ['enterprise-control-tower', startTimestamp, endTimestamp],
+    queryKey: [
+      'enterprise-control-tower',
+      range.startTimestamp,
+      range.endTimestamp,
+    ],
     queryFn: () =>
       getControlTower({
-        start_timestamp: startTimestamp,
-        end_timestamp: endTimestamp,
+        start_timestamp: range.startTimestamp,
+        end_timestamp: range.endTimestamp,
       }),
     refetchInterval: 60_000,
   })
   const data = query.data?.data
   const metrics = data?.metrics
+  const requestTotal = metrics?.requests ?? 0
   const providers = useMemo(
     () =>
       [...(data?.provider_health ?? [])]
@@ -259,11 +584,17 @@ export function ControlTower(props: {
     [data?.provider_health]
   )
   const policies = data?.policies ?? []
-  const primaryPolicy = policies.find((item) => item.status === 'active')
+  const primaryPolicy =
+    policies.find((policy) => policy.status === 'active') ?? policies[0]
+  const backupProvider = providers[1]
   const trend = (data?.trend ?? []).map((item) => ({
     ...item,
     date: dayjs.unix(item.timestamp).format('MM-DD'),
   }))
+  const rangeText = `${dayjs.unix(range.startTimestamp).format('YYYY-MM-DD')} ~ ${dayjs
+    .unix(range.endTimestamp)
+    .format('YYYY-MM-DD')}`
+
   const invalidateControlTower = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['enterprise-control-tower'] }),
@@ -357,70 +688,153 @@ export function ControlTower(props: {
     },
   })
 
+  const updateRangeInput = (field: 'start' | 'end', value: string) => {
+    setRange((previous) => {
+      const parsed = parseDateInput(value)
+      if (parsed == null) {
+        return field === 'start'
+          ? { ...previous, startInput: value }
+          : { ...previous, endInput: value }
+      }
+      if (field === 'start') {
+        const startOfDay = dayjs.unix(parsed).startOf('day').unix()
+        return {
+          ...previous,
+          startInput: value,
+          startTimestamp: Math.min(startOfDay, previous.endTimestamp - 60),
+        }
+      }
+      const endOfDay = dayjs.unix(parsed).endOf('day').unix()
+      return {
+        ...previous,
+        endInput: value,
+        endTimestamp: Math.max(endOfDay, previous.startTimestamp + 60),
+      }
+    })
+  }
+
   return (
-    <div className='flex flex-col gap-3 pb-5'>
+    <div className='flex flex-col gap-2 pb-4'>
       <EnterprisePageHeader
-        eyebrow='企业级路由治理'
         title='Token Router 控制塔'
-        description='统一观测实时流量、供应商健康、SLA、路由策略和待执行动作。原有 Token Router 能力完整保留。'
+        description='路由策略、流量分配、SLA 与执行治理'
         actions={
-          <>
+          <div className='flex flex-wrap items-center justify-end gap-2'>
+            <div className='flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
+              <CalendarClock className='size-3.5 text-slate-500' />
+              <Input
+                type='text'
+                aria-label='开始时间'
+                placeholder='YYYY-MM-DD'
+                value={range.startInput}
+                onChange={(event) =>
+                  updateRangeInput('start', event.target.value)
+                }
+                className='h-6 w-[96px] rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+              />
+              <span className='text-[11px] text-slate-400'>~</span>
+              <Input
+                type='text'
+                aria-label='结束时间'
+                placeholder='YYYY-MM-DD'
+                value={range.endInput}
+                onChange={(event) =>
+                  updateRangeInput('end', event.target.value)
+                }
+                className='h-6 w-[96px] rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+              />
+            </div>
+            <div className='flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
+              {RANGE_PRESETS.map((preset) => (
+                <Button
+                  key={preset.key}
+                  variant='ghost'
+                  size='xs'
+                  className='rounded-none border-r border-slate-100 last:border-r-0'
+                  onClick={() => setRange(createPresetRange(preset.days))}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
             <Button
               variant='outline'
               size='sm'
+              onClick={props.onOpenRoutingPolicies}
+              disabled={props.onOpenRoutingPolicies == null}
+            >
+              <FileText className='size-3.5' />
+              策略模板
+            </Button>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => exportControlTowerCsv(data)}
+            >
+              <Download className='size-3.5' />
+              导出
+            </Button>
+            <Button
+              variant='outline'
+              size='icon-sm'
+              aria-label='刷新控制塔数据'
               onClick={() => query.refetch()}
               disabled={query.isFetching}
             >
               <RefreshCw
-                className={cn('size-4', query.isFetching && 'animate-spin')}
+                className={cn('size-3.5', query.isFetching && 'animate-spin')}
               />
-              刷新数据
             </Button>
-            <Button size='sm' onClick={props.onOpenRoutingPolicies}>
-              <Sparkles className='size-4' />
-              新建路由策略
+            <Button variant='outline' size='icon-sm' aria-label='更多操作'>
+              <MoreHorizontal className='size-3.5' />
             </Button>
-          </>
+          </div>
         }
       />
 
-      <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5'>
-        <EnterpriseStatCard
+      {query.isError && (
+        <div className='rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700'>
+          控制塔数据加载失败，请刷新后重试。
+        </div>
+      )}
+
+      <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5'>
+        <MetricTile
           title='活跃路由策略'
           value={formatCount(metrics?.active_policies ?? 0)}
-          helper='已生效策略'
+          helper={`统计范围 ${rangeText}`}
           icon={Route}
           tone='blue'
           loading={query.isLoading}
         />
-        <EnterpriseStatCard
+        <MetricTile
           title='实时成功率'
           value={formatPercent(metrics?.realtime_success_rate ?? 0)}
-          helper='近 7 天请求'
+          helper='按请求日志聚合'
           icon={ShieldCheck}
           tone='emerald'
           loading={query.isLoading}
         />
-        <EnterpriseStatCard
+        <MetricTile
           title='平均延迟'
-          value={`${(metrics?.average_latency_ms ?? 0).toFixed(0)} ms`}
+          value={formatLatency(metrics?.average_latency_ms ?? 0)}
           helper='成功请求平均值'
           icon={Clock3}
           tone='violet'
           loading={query.isLoading}
         />
-        <EnterpriseStatCard
+        <MetricTile
           title='自动切换次数'
           value={formatCount(metrics?.automatic_switches ?? 0)}
-          helper='本统计周期'
+          helper='策略激活记录'
           icon={Zap}
-          tone='amber'
+          tone='orange'
           loading={query.isLoading}
         />
-        <EnterpriseStatCard
-          title='待审批事项'
+        <MetricTile
+          title='待审批策略'
           value={formatCount(metrics?.pending_approvals ?? 0)}
-          helper='定价、供应商与决策'
+          helper='定价、评估与决策'
           icon={CheckCircle2}
           tone='rose'
           loading={query.isLoading}
@@ -429,153 +843,410 @@ export function ControlTower(props: {
 
       {props.nav != null && <div className='min-w-0'>{props.nav}</div>}
 
-      <div className='grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]'>
-        <EnterprisePanel
-          title='路由拓扑与实时流量'
-          description='请求从租户入口经过策略匹配，再分配至健康的供应商与渠道。'
-          action={
-            <Badge variant='outline'>
-              {formatCount(metrics?.requests ?? 0)} 请求
-            </Badge>
-          }
-          bodyClassName='p-4 sm:p-4'
-        >
-          <div className='grid min-h-[360px] items-center gap-3 lg:grid-cols-[minmax(180px,0.7fr)_44px_minmax(220px,0.9fr)_44px_minmax(280px,1.2fr)]'>
-            <div className='bg-background rounded-md border p-3'>
-              <span className='bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-md'>
-                <Network className='size-5' />
-              </span>
-              <p className='mt-3 text-sm font-semibold'>企业客户端流量</p>
-              <p className='mt-1 text-xl font-semibold tabular-nums'>
-                {formatCount(metrics?.requests ?? 0)}
-              </p>
-              <p className='text-muted-foreground text-xs'>近 7 天总请求</p>
-              <div className='mt-3 space-y-2 text-xs'>
-                <div className='bg-background/80 flex justify-between rounded-md px-3 py-2'>
-                  <span>接口调用</span>
-                  <span className='font-medium'>62%</span>
-                </div>
-                <div className='bg-background/80 flex justify-between rounded-md px-3 py-2'>
-                  <span>内部服务</span>
-                  <span className='font-medium'>28%</span>
-                </div>
-                <div className='bg-background/80 flex justify-between rounded-md px-3 py-2'>
-                  <span>在线调试</span>
-                  <span className='font-medium'>10%</span>
-                </div>
-              </div>
-            </div>
-
-            <div className='hidden items-center lg:flex'>
-              <div className='bg-primary/35 h-px flex-1' />
-              <ArrowRight className='text-primary size-4' />
-            </div>
-
-            <div className='border-primary/20 bg-primary/[0.035] rounded-md border p-3'>
-              <div className='flex items-start justify-between gap-2'>
-                <span className='flex size-9 items-center justify-center rounded-md bg-violet-500/10 text-violet-600'>
-                  <GitBranch className='size-5' />
+      <div className='grid grid-cols-1 items-stretch gap-2 xl:grid-cols-[minmax(0,1fr)_360px]'>
+        <div className='grid min-w-0 gap-2'>
+          <EnterprisePanel
+            title='路由拓扑与流量路径'
+            description='请求从租户入口进入策略匹配，再按健康、区域、SLA 与权重分配到渠道。'
+            action={
+              <div className='flex items-center gap-2 text-[11px] text-slate-500'>
+                <span className='inline-flex items-center gap-1'>
+                  <span className='size-1.5 rounded-full bg-blue-500' />
+                  实时流量
                 </span>
-                <Badge className='border-0 bg-emerald-500/10 text-emerald-600'>
-                  运行中
-                </Badge>
+                <span className='inline-flex items-center gap-1'>
+                  <span className='size-1.5 rounded-full bg-emerald-500' />
+                  健康良好
+                </span>
+                <span className='inline-flex items-center gap-1'>
+                  <span className='size-1.5 rounded-full bg-amber-400' />
+                  需关注
+                </span>
               </div>
-              <p className='mt-3 text-sm font-semibold'>智能路由策略</p>
-              <p className='text-muted-foreground mt-1 truncate text-xs'>
-                {primaryPolicy?.name || '默认智能路由'}
-              </p>
-              <div className='mt-4 grid grid-cols-2 gap-2'>
-                <div className='bg-background/80 rounded-md border p-3'>
-                  <p className='text-muted-foreground text-[11px]'>成功率</p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {formatPercent(metrics?.realtime_success_rate ?? 0)}
+            }
+            bodyClassName='p-3'
+          >
+            <div className='grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(286px,0.72fr)]'>
+              <div className='grid min-h-[286px] gap-2 sm:grid-cols-[164px_1fr_1.2fr]'>
+                <div className='self-center rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
+                  <div className='flex items-center gap-2'>
+                    <span className='flex size-7 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+                      <Network className='size-4' />
+                    </span>
+                    <div>
+                      <p className='text-xs font-semibold text-slate-900'>
+                        客户请求流量
+                      </p>
+                      <p className='text-[11px] text-slate-500'>API / 控制台</p>
+                    </div>
+                  </div>
+                  <p className='mt-3 text-2xl leading-7 font-semibold text-slate-950'>
+                    {formatCount(metrics?.requests ?? 0)}
                   </p>
+                  <div className='mt-2 grid grid-cols-2 gap-1 text-[11px]'>
+                    <div className='rounded bg-slate-50 px-2 py-1.5'>
+                      <p className='text-slate-400'>Tokens</p>
+                      <p className='font-semibold text-slate-800'>
+                        {formatCount(metrics?.tokens ?? 0)}
+                      </p>
+                    </div>
+                    <div className='rounded bg-slate-50 px-2 py-1.5'>
+                      <p className='text-slate-400'>成功率</p>
+                      <p className='font-semibold text-slate-800'>
+                        {formatPercent(metrics?.realtime_success_rate ?? 0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className='mt-2'>
+                    <TrendMiniChart trend={trend} />
+                  </div>
                 </div>
-                <div className='bg-background/80 rounded-md border p-3'>
-                  <p className='text-muted-foreground text-[11px]'>
-                    策略优先级
-                  </p>
-                  <p className='mt-1 text-sm font-semibold'>
-                    {primaryPolicy?.priority ?? 100}
-                  </p>
+
+                <div className='relative flex items-center justify-center px-1'>
+                  <div className='hidden h-px flex-1 border-t border-dashed border-emerald-400 sm:block' />
+                  <div className='w-full rounded-md border border-blue-100 bg-blue-50/60 p-3 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
+                    <div className='flex items-start justify-between gap-2'>
+                      <span className='flex size-7 items-center justify-center rounded-md bg-blue-600 text-white'>
+                        <GitBranch className='size-4' />
+                      </span>
+                      <Badge className='h-5 rounded bg-emerald-50 px-2 text-[10px] text-emerald-600 ring-1 ring-emerald-100'>
+                        运行中
+                      </Badge>
+                    </div>
+                    <p className='mt-2 truncate text-xs font-semibold text-slate-900'>
+                      智能路由策略
+                    </p>
+                    <p className='mt-0.5 truncate text-[11px] text-slate-500'>
+                      {primaryPolicy?.name || '暂无活跃策略'}
+                    </p>
+                    <div className='mt-3 grid grid-cols-2 gap-1.5 text-[11px]'>
+                      <div className='rounded border border-blue-100 bg-white/80 px-2 py-1.5'>
+                        <p className='text-slate-400'>命中率</p>
+                        <p className='font-semibold text-slate-800'>
+                          {primaryPolicy
+                            ? `${primaryPolicy.traffic_percent}%`
+                            : '0%'}
+                        </p>
+                      </div>
+                      <div className='rounded border border-blue-100 bg-white/80 px-2 py-1.5'>
+                        <p className='text-slate-400'>成功率</p>
+                        <p className='font-semibold text-slate-800'>
+                          {formatPercent(metrics?.realtime_success_rate ?? 0)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className='mt-2 rounded border border-slate-200 bg-white/80 px-2 py-1.5 text-[11px] text-slate-500'>
+                      优先级 {primaryPolicy?.priority ?? '-'} ·{' '}
+                      {primaryPolicy?.track || '默认轨道'}
+                    </div>
+                  </div>
+                  <div className='hidden h-px flex-1 border-t border-dashed border-blue-400 sm:block' />
+                </div>
+
+                <div className='space-y-2 self-center'>
+                  {providers.length === 0 ? (
+                    <div className='flex min-h-36 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500'>
+                      暂无供应商流量数据
+                    </div>
+                  ) : (
+                    providers.map((provider, index) => (
+                      <ProviderRouteNode
+                        key={provider.channel_id}
+                        provider={provider}
+                        requestTotal={requestTotal}
+                        index={index}
+                      />
+                    ))
+                  )}
+                  <div className='rounded-md border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-500'>
+                    全局兜底策略：
+                    {backupProvider?.channel_name || '未配置备用路由'}
+                  </div>
                 </div>
               </div>
-              <div className='bg-background/55 text-muted-foreground mt-3 rounded-md border border-dashed p-3 text-xs'>
-                加权路由 · 自动降级 · 区域感知 · SLA 守护
+
+              <div className='rounded-md border border-slate-200 bg-white'>
+                <div className='flex items-center justify-between border-b border-slate-100 px-3 py-2'>
+                  <div>
+                    <p className='text-xs font-semibold text-slate-900'>
+                      路由规则
+                    </p>
+                    <p className='text-[11px] text-slate-500'>
+                      {primaryPolicy?.name || '当前无策略'}
+                    </p>
+                  </div>
+                  <Button
+                    variant='ghost'
+                    size='xs'
+                    onClick={props.onOpenRoutingPolicies}
+                    disabled={props.onOpenRoutingPolicies == null}
+                  >
+                    编辑策略
+                  </Button>
+                </div>
+                <RuleItem
+                  icon={SlidersHorizontal}
+                  title='加权路由'
+                  detail={
+                    primaryPolicy
+                      ? `${primaryPolicy.channel_name || '默认渠道'} · 流量 ${primaryPolicy.traffic_percent}% · ${primaryPolicy.model_name || '全部模型'}`
+                      : '暂无可用策略，请在路由策略页签创建。'
+                  }
+                />
+                <RuleItem
+                  icon={Zap}
+                  title='降级策略'
+                  detail={`待执行动作 ${data?.pending_actions.length ?? 0} 条，异常风险 ${data?.risks.length ?? 0} 条。`}
+                />
+                <RuleItem
+                  icon={Target}
+                  title='区域感知'
+                  detail={
+                    providers
+                      .map((provider) => provider.region)
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .join(' / ') || '当前渠道未配置区域分组。'
+                  }
+                />
+                <RuleItem
+                  icon={ShieldCheck}
+                  title='SLA 阈值'
+                  detail={`当前成功率 ${formatPercent(metrics?.realtime_success_rate ?? 0)}，平均延迟 ${formatLatency(metrics?.average_latency_ms ?? 0)}。`}
+                />
               </div>
             </div>
-
-            <div className='hidden items-center lg:flex'>
-              <div className='bg-primary/35 h-px flex-1' />
-              <ArrowRight className='text-primary size-4' />
+            <div className='mt-2 flex items-center justify-between text-[11px] text-slate-500'>
+              <span>
+                最后更新时间：
+                {data?.generated_at
+                  ? dayjs.unix(data.generated_at).format('HH:mm:ss')
+                  : '-'}
+              </span>
+              <button
+                type='button'
+                className='font-medium text-blue-600 hover:underline'
+                onClick={props.onOpenRoutingPolicies}
+              >
+                查看策略拓扑
+              </button>
             </div>
+          </EnterprisePanel>
 
-            <div className='space-y-2.5'>
+          <EnterprisePanel
+            title='活跃路由策略'
+            description={`共 ${policies.length} 条策略，当前展示前 8 条`}
+            bodyClassName='p-0'
+          >
+            <Table className='text-xs [&_td]:h-9 [&_td]:py-1.5 [&_td]:text-xs [&_td_*]:text-xs [&_th]:h-8 [&_th]:text-xs [&_th_*]:text-xs'>
+              <TableHeader className='bg-slate-50'>
+                <TableRow>
+                  <TableHead>策略名</TableHead>
+                  <TableHead>作用对象</TableHead>
+                  <TableHead>命中率</TableHead>
+                  <TableHead>当前主路由</TableHead>
+                  <TableHead>备用路由</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>审批状态</TableHead>
+                  <TableHead>更新时间</TableHead>
+                  <TableHead className='text-right'>操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {policies.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={9}
+                      className='h-24 text-center text-xs text-slate-500'
+                    >
+                      暂无路由策略，可在“路由策略”页签创建或激活策略。
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  policies.slice(0, 8).map((policy, index) => {
+                    const status = policyStatus(policy)
+                    const approval = approvalStatus(policy)
+                    return (
+                      <TableRow key={policy.id}>
+                        <TableCell>
+                          <div className='max-w-[190px]'>
+                            <p className='truncate font-semibold text-slate-900'>
+                              {policy.name}
+                            </p>
+                            <p className='truncate text-[11px] text-slate-500'>
+                              {policy.track || '默认轨道'}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className='font-medium text-slate-800'>
+                            {policy.model_name || '全部模型'}
+                          </p>
+                          <p className='text-[11px] text-slate-500'>
+                            {policy.slice_key || '全局'}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <span className='font-semibold text-slate-900'>
+                            {policy.traffic_percent}%
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {policy.channel_name || `#${policy.channel_id}`}
+                        </TableCell>
+                        <TableCell>
+                          {providers[index + 1]?.channel_name ||
+                            backupProvider?.channel_name ||
+                            '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              'h-5 rounded px-2 text-[10px]',
+                              status.className
+                            )}
+                          >
+                            {status.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={cn(
+                              'h-5 rounded px-2 text-[10px]',
+                              approval.className
+                            )}
+                          >
+                            {approval.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {policy.updated_at > 0
+                            ? dayjs
+                                .unix(policy.updated_at)
+                                .format('MM-DD HH:mm')
+                            : '-'}
+                        </TableCell>
+                        <TableCell className='text-right'>
+                          <Button
+                            variant='ghost'
+                            size='xs'
+                            disabled={
+                              policy.status !== 'active' ||
+                              disablePolicy.isPending
+                            }
+                            onClick={() => disablePolicy.mutate(policy.id)}
+                          >
+                            停用
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </EnterprisePanel>
+        </div>
+
+        <aside className='grid h-full min-w-0 content-start gap-2'>
+          <EnterprisePanel
+            title='实时健康状态'
+            description='按当前请求量排序'
+            action={
+              <Button variant='ghost' size='xs' onClick={() => query.refetch()}>
+                查看全部
+              </Button>
+            }
+            bodyClassName='p-2.5'
+          >
+            <div className='space-y-0.5'>
               {providers.length === 0 ? (
-                <div className='text-muted-foreground flex min-h-56 items-center justify-center rounded-md border border-dashed text-sm'>
-                  暂无供应商流量数据
+                <div className='rounded-md border border-dashed border-slate-200 bg-slate-50/60 py-6 text-center text-xs text-slate-500'>
+                  暂无健康数据
                 </div>
               ) : (
-                providers.map((provider, index) => (
-                  <ProviderNode
+                providers.map((provider) => (
+                  <HealthRow
                     key={provider.channel_id}
                     provider={provider}
-                    index={index}
+                    requestTotal={requestTotal}
                   />
                 ))
               )}
             </div>
-          </div>
-        </EnterprisePanel>
-
-        <div className='grid gap-3'>
-          <EnterprisePanel
-            title='实时健康状态'
-            description='按当前请求量排序的主要渠道。'
-            bodyClassName='p-3'
-          >
-            <div className='space-y-1'>
-              {providers.map((provider) => {
-                const status = providerStatus(provider)
-                const latency =
-                  provider.average_latency_ms || provider.response_time_ms
-                return (
-                  <div
-                    key={provider.channel_id}
-                    className='hover:bg-muted/45 flex items-center gap-3 rounded-md px-2.5 py-2.5'
-                  >
-                    <span
-                      className={cn(
-                        'size-2 rounded-full',
-                        providerStatusDotClass(status.label)
-                      )}
-                    />
-                    <div className='min-w-0 flex-1'>
-                      <p className='truncate text-sm font-medium'>
-                        {provider.channel_name}
-                      </p>
-                      <p className='text-muted-foreground truncate text-[11px]'>
-                        {provider.supplier_name || '未绑定供应商'}
-                      </p>
-                    </div>
-                    <div className='text-right text-xs'>
-                      <p className='font-semibold'>
-                        {formatPercent(provider.success_rate)}
-                      </p>
-                      <p className='text-muted-foreground'>
-                        {latency.toFixed(0)} ms
-                      </p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
           </EnterprisePanel>
 
-          <EnterprisePanel title='风险提醒' bodyClassName='p-2.5'>
+          <EnterprisePanel
+            title='最近策略变更'
+            action={
+              <Button
+                variant='ghost'
+                size='xs'
+                onClick={props.onOpenRoutingPolicies}
+              >
+                查看全部
+              </Button>
+            }
+            bodyClassName='p-2'
+          >
+            <EventList
+              events={data?.recent_changes ?? []}
+              emptyText='暂无策略变更记录'
+              maxItems={3}
+              renderAction={(event) =>
+                event.status === 'active' ? (
+                  <Button
+                    size='xs'
+                    variant='outline'
+                    disabled={disablePolicy.isPending}
+                    onClick={() => disablePolicy.mutate(event.id)}
+                  >
+                    停用
+                  </Button>
+                ) : null
+              }
+            />
+          </EnterprisePanel>
+
+          <EnterprisePanel
+            title='待执行动作'
+            action={
+              <Badge className='h-5 rounded bg-rose-600 px-2 text-white'>
+                {data?.pending_actions.length ?? 0}
+              </Badge>
+            }
+            bodyClassName='p-2'
+          >
+            <EventList
+              events={data?.pending_actions ?? []}
+              emptyText='当前没有待执行动作'
+              maxItems={3}
+              renderAction={(event) => (
+                <Button
+                  size='xs'
+                  variant='outline'
+                  disabled={updateActionStatus.isPending}
+                  onClick={() => updateActionStatus.mutate(event)}
+                >
+                  {event.status === 'in_progress' ? '标记完成' : '开始执行'}
+                </Button>
+              )}
+            />
+          </EnterprisePanel>
+
+          <EnterprisePanel
+            title='风险提醒'
+            action={
+              <Button variant='ghost' size='xs'>
+                查看全部
+              </Button>
+            }
+            bodyClassName='p-2'
+          >
             <EventList
               events={data?.risks ?? []}
               emptyText='当前没有未处理风险'
+              maxItems={3}
               renderAction={(event) => (
                 <>
                   <Button
@@ -602,177 +1273,8 @@ export function ControlTower(props: {
               )}
             />
           </EnterprisePanel>
-        </div>
+        </aside>
       </div>
-
-      <div className='grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)]'>
-        <EnterprisePanel
-          title='请求与路由趋势'
-          description='展示近 7 天请求量，辅助判断流量波动与扩容窗口。'
-          action={<Badge variant='outline'>自动刷新 60 秒</Badge>}
-        >
-          <div className='h-72'>
-            <ResponsiveContainer
-              width='100%'
-              height='100%'
-              initialDimension={{ width: 720, height: 288 }}
-            >
-              <AreaChart data={trend} margin={{ left: -16, right: 8 }}>
-                <defs>
-                  <linearGradient
-                    id='controlTowerRequests'
-                    x1='0'
-                    x2='0'
-                    y1='0'
-                    y2='1'
-                  >
-                    <stop
-                      offset='5%'
-                      stopColor='var(--primary)'
-                      stopOpacity={0.35}
-                    />
-                    <stop
-                      offset='95%'
-                      stopColor='var(--primary)'
-                      stopOpacity={0.02}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray='4 4' vertical={false} />
-                <XAxis dataKey='date' tickLine={false} axisLine={false} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={formatCount}
-                />
-                <Tooltip
-                  formatter={(value) => [
-                    formatCount(Number(value ?? 0)),
-                    '请求量',
-                  ]}
-                />
-                <Area
-                  dataKey='requests'
-                  type='monotone'
-                  stroke='var(--primary)'
-                  strokeWidth={2.5}
-                  fill='url(#controlTowerRequests)'
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </EnterprisePanel>
-
-        <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-1'>
-          <EnterprisePanel title='最近策略变更' bodyClassName='p-2.5'>
-            <EventList
-              events={data?.recent_changes ?? []}
-              emptyText='暂无策略变更记录'
-              renderAction={(event) =>
-                event.status === 'active' ? (
-                  <Button
-                    size='xs'
-                    variant='outline'
-                    disabled={disablePolicy.isPending}
-                    onClick={() => disablePolicy.mutate(event.id)}
-                  >
-                    停用策略
-                  </Button>
-                ) : null
-              }
-            />
-          </EnterprisePanel>
-          <EnterprisePanel title='待执行动作' bodyClassName='p-2.5'>
-            <EventList
-              events={data?.pending_actions ?? []}
-              emptyText='当前没有待执行动作'
-              renderAction={(event) => (
-                <Button
-                  size='xs'
-                  variant='outline'
-                  disabled={updateActionStatus.isPending}
-                  onClick={() => updateActionStatus.mutate(event)}
-                >
-                  {event.status === 'in_progress' ? '标记完成' : '开始执行'}
-                </Button>
-              )}
-            />
-          </EnterprisePanel>
-        </div>
-      </div>
-
-      <EnterprisePanel
-        title='活跃路由策略'
-        description='与原有策略、决策、SLA 和执行记录兼容，仍可在下方其他页签中进行深度治理。'
-        action={<Badge variant='outline'>{policies.length} 条策略</Badge>}
-        bodyClassName='p-0'
-      >
-        <div className='overflow-x-auto'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>策略名称</TableHead>
-                <TableHead>模型 / 切片</TableHead>
-                <TableHead>主渠道</TableHead>
-                <TableHead>供应商</TableHead>
-                <TableHead>流量占比</TableHead>
-                <TableHead>优先级</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>更新时间</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {policies.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className='text-muted-foreground h-28 text-center'
-                  >
-                    暂无路由策略，可在“路由策略”页签创建或激活策略。
-                  </TableCell>
-                </TableRow>
-              ) : (
-                policies.slice(0, 10).map((policy) => (
-                  <TableRow key={policy.id}>
-                    <TableCell>
-                      <div className='max-w-56'>
-                        <p className='truncate font-medium'>{policy.name}</p>
-                        <p className='text-muted-foreground truncate text-xs'>
-                          {policy.track || '默认轨道'}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <p className='font-medium'>
-                        {policy.model_name || '全部模型'}
-                      </p>
-                      <p className='text-muted-foreground text-xs'>
-                        {policy.slice_key || '全局'}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      {policy.channel_name || `#${policy.channel_id}`}
-                    </TableCell>
-                    <TableCell>{policy.supplier_name || '未绑定'}</TableCell>
-                    <TableCell>{policy.traffic_percent}%</TableCell>
-                    <TableCell>{policy.priority}</TableCell>
-                    <TableCell>
-                      <PolicyStatus policy={policy} />
-                    </TableCell>
-                    <TableCell>
-                      {policy.updated_at > 0
-                        ? dayjs.unix(policy.updated_at).format('MM-DD HH:mm')
-                        : '—'}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </EnterprisePanel>
-
-      <p className='sr-only'>{t('Overview')}</p>
     </div>
   )
 }
