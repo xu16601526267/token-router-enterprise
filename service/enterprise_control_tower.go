@@ -96,6 +96,7 @@ func GetEnterpriseControlTower(startTimestamp int64, endTimestamp int64) (*dto.E
 	}
 
 	policyItems := make([]dto.EnterpriseRoutingPolicyItem, 0, len(policies))
+	hasActivePolicy := false
 	for _, policy := range policies {
 		if policy == nil {
 			continue
@@ -118,9 +119,53 @@ func GetEnterpriseControlTower(startTimestamp int64, endTimestamp int64) (*dto.E
 		})
 		if policy.Status == model.SupplyRoutingPolicyStatusActive {
 			metrics.ActivePolicies++
+			hasActivePolicy = true
 		}
 		if policy.ActivatedAt >= startTimestamp && policy.ActivatedAt <= endTimestamp {
 			metrics.AutomaticSwitches++
+		}
+	}
+	if !hasActivePolicy {
+		runtimeProviders := make([]dto.EnterpriseProviderHealth, 0, len(providerHealth))
+		for _, provider := range providerHealth {
+			if provider.Status == common.ChannelStatusEnabled {
+				runtimeProviders = append(runtimeProviders, provider)
+			}
+		}
+		sort.Slice(runtimeProviders, func(i, j int) bool {
+			if runtimeProviders[i].Requests == runtimeProviders[j].Requests {
+				return runtimeProviders[i].ChannelId < runtimeProviders[j].ChannelId
+			}
+			return runtimeProviders[i].Requests > runtimeProviders[j].Requests
+		})
+		if len(runtimeProviders) > 0 {
+			primary := runtimeProviders[0]
+			modelName := strings.TrimSpace(primary.Models)
+			if comma := strings.Index(modelName, ","); comma >= 0 {
+				modelName = strings.TrimSpace(modelName[:comma])
+			}
+			if modelName == "" {
+				modelName = "全部模型"
+			}
+			trafficPercent := 100
+			if metrics.Requests > 0 && primary.Requests > 0 {
+				trafficPercent = int(float64(primary.Requests) / float64(metrics.Requests) * 100)
+				if trafficPercent < 1 {
+					trafficPercent = 1
+				}
+			}
+			now := common.GetTimestamp()
+			policyItems = append(policyItems, dto.EnterpriseRoutingPolicyItem{
+				Id: 0, Name: "默认渠道路由池", SliceKey: "global",
+				ModelName: modelName, SlaTier: "default", Track: "runtime",
+				ActionType: "runtime_pool", Status: model.SupplyRoutingPolicyStatusActive,
+				SupplierId: primary.SupplierId, SupplierName: primary.SupplierName,
+				ChannelId: primary.ChannelId, ChannelName: primary.ChannelName,
+				Priority: 1, TrafficPercent: trafficPercent,
+				EffectiveFrom: startTimestamp, EffectiveTo: endTimestamp,
+				UpdatedAt: now, Reason: "由当前启用渠道和请求日志实时派生",
+			})
+			metrics.ActivePolicies = 1
 		}
 	}
 
@@ -159,6 +204,14 @@ func GetEnterpriseControlTower(startTimestamp int64, endTimestamp int64) (*dto.E
 		recentChanges = append(recentChanges, dto.EnterpriseControlTowerEvent{
 			Id: policy.Id, Title: "路由策略已更新", Detail: fmt.Sprintf("%s · %s · 流量 %d%%", policy.ModelName, policy.Track, policy.TrafficPercent),
 			Category: "routing_policy", Severity: "info", Status: policy.Status, CreatedAt: policy.UpdatedAt,
+		})
+	}
+	if len(recentChanges) == 0 && len(policyItems) > 0 && policyItems[0].Id == 0 {
+		policy := policyItems[0]
+		recentChanges = append(recentChanges, dto.EnterpriseControlTowerEvent{
+			Id: policy.Id, Title: "默认路由池运行中",
+			Detail:   fmt.Sprintf("%s · %s · 流量 %d%%", policy.ModelName, policy.ChannelName, policy.TrafficPercent),
+			Category: "runtime_pool", Severity: "info", Status: policy.Status, CreatedAt: policy.UpdatedAt,
 		})
 	}
 

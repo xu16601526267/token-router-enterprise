@@ -295,8 +295,11 @@ function EventList(props: {
   const events = props.events.slice(0, props.maxItems ?? 4)
   if (events.length === 0) {
     return (
-      <div className='flex min-h-20 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-500'>
-        {props.emptyText}
+      <div className='flex min-h-12 items-center gap-2 rounded-md border border-slate-200 bg-slate-50/65 px-2.5 text-xs text-slate-500'>
+        <span className='flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100'>
+          <CheckCircle2 className='size-3' aria-hidden='true' />
+        </span>
+        <span className='truncate'>{props.emptyText}</span>
       </div>
     )
   }
@@ -497,6 +500,110 @@ function TrendMiniChart(props: {
   )
 }
 
+function firstModelName(models: string): string {
+  const text = models.trim()
+  if (!text) {
+    return '全部模型'
+  }
+  return text.split(',')[0]?.trim() || text
+}
+
+function buildRuntimePolicies(
+  providers: ProviderHealth[],
+  requestTotal: number,
+  generatedAt: number,
+  range: { start: number; end: number }
+): RoutingPolicyItem[] {
+  const activeProviders = providers.filter((provider) => provider.status === 1)
+  if (activeProviders.length === 0) {
+    return []
+  }
+  const primary = activeProviders[0]
+  const trafficPercent =
+    requestTotal > 0 && primary.requests > 0
+      ? Math.max(1, Math.round((primary.requests / requestTotal) * 100))
+      : 100
+  return [
+    {
+      id: 0,
+      name: '默认渠道路由池',
+      slice_key: 'global',
+      model_name: firstModelName(primary.models || ''),
+      sla_tier: 'default',
+      track: 'runtime',
+      action_type: 'runtime_pool',
+      status: 'active',
+      supplier_id: primary.supplier_id,
+      supplier_name: primary.supplier_name,
+      channel_id: primary.channel_id,
+      channel_name: primary.channel_name,
+      priority: 1,
+      traffic_percent: trafficPercent,
+      effective_from: range.start,
+      effective_to: range.end,
+      updated_at: generatedAt,
+      reason: '由当前启用渠道和请求日志实时派生',
+    },
+  ]
+}
+
+function TopologyConnectors(props: { providerCount: number }) {
+  const targets = [86, 142, 198, 254].slice(0, Math.max(props.providerCount, 1))
+  const strokeForIndex = (index: number): string => {
+    if (index === 0) {
+      return '#22c55e'
+    }
+    if (index === 1) {
+      return '#3b82f6'
+    }
+    return '#94a3b8'
+  }
+  return (
+    <svg
+      className='pointer-events-none absolute inset-0 z-0 hidden h-full w-full sm:block'
+      viewBox='0 0 1000 320'
+      preserveAspectRatio='none'
+      aria-hidden='true'
+    >
+      {targets.map((target, index) => (
+        <path
+          key={target}
+          d={`M520 160 C610 ${160 + (target - 160) * 0.3} 640 ${target} 720 ${target}`}
+          fill='none'
+          stroke={strokeForIndex(index)}
+          strokeDasharray={index === 0 ? undefined : '7 7'}
+          strokeLinecap='round'
+          strokeWidth={index === 0 ? '2.2' : '1.8'}
+        />
+      ))}
+    </svg>
+  )
+}
+
+function buildRecentChanges(
+  events: ControlTowerEvent[] | undefined,
+  primaryPolicy: RoutingPolicyItem | undefined
+): ControlTowerEvent[] {
+  if (events && events.length > 0) {
+    return events
+  }
+  if (!primaryPolicy) {
+    return []
+  }
+  const isRuntimePolicy = primaryPolicy.id === 0
+  return [
+    {
+      id: primaryPolicy.id,
+      title: isRuntimePolicy ? '默认路由池运行中' : '路由策略已更新',
+      detail: `${primaryPolicy.model_name || '全部模型'} · ${primaryPolicy.channel_name || '默认渠道'} · 流量 ${primaryPolicy.traffic_percent}%`,
+      category: isRuntimePolicy ? 'runtime_pool' : 'routing_policy',
+      severity: 'info',
+      status: primaryPolicy.status,
+      created_at: primaryPolicy.updated_at,
+    },
+  ]
+}
+
 export function ControlTower(props: {
   nav?: ReactNode
   onOpenRoutingPolicies?: () => void
@@ -522,10 +629,29 @@ export function ControlTower(props: {
         .slice(0, 4),
     [data?.provider_health]
   )
-  const policies = data?.policies ?? []
+  const rawPolicies = data?.policies ?? []
+  const hasActiveRawPolicy = rawPolicies.some(
+    (policy) => policy.status === 'active'
+  )
+  const runtimePolicies = useMemo(
+    () =>
+      buildRuntimePolicies(providers, requestTotal, data?.generated_at ?? 0, {
+        start: range.start,
+        end: range.end,
+      }),
+    [data?.generated_at, providers, range.end, range.start, requestTotal]
+  )
+  const policies = hasActiveRawPolicy
+    ? rawPolicies
+    : [...runtimePolicies, ...rawPolicies]
   const primaryPolicy =
     policies.find((policy) => policy.status === 'active') ?? policies[0]
   const backupProvider = providers[1]
+  const activePolicyCount = Math.max(
+    metrics?.active_policies ?? 0,
+    policies.filter((policy) => policy.status === 'active').length
+  )
+  const recentChanges = buildRecentChanges(data?.recent_changes, primaryPolicy)
   const trend = (data?.trend ?? []).map((item) => ({
     ...item,
     date: dayjs.unix(item.timestamp).format('MM-DD'),
@@ -674,8 +800,8 @@ export function ControlTower(props: {
       <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5'>
         <MetricTile
           title='活跃路由策略'
-          value={formatCount(metrics?.active_policies ?? 0)}
-          helper={rangeLabel}
+          value={formatCount(activePolicyCount)}
+          helper={hasActiveRawPolicy ? rangeLabel : '默认路由池'}
           icon={Route}
           tone='blue'
           loading={query.isLoading}
@@ -740,8 +866,9 @@ export function ControlTower(props: {
             bodyClassName='p-3'
           >
             <div className='grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(286px,0.72fr)]'>
-              <div className='grid min-h-[286px] gap-2 sm:grid-cols-[164px_1fr_1.2fr]'>
-                <div className='self-center rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
+              <div className='relative grid min-h-[300px] gap-2 overflow-hidden sm:grid-cols-[164px_1fr_1.2fr]'>
+                <TopologyConnectors providerCount={providers.length} />
+                <div className='relative z-10 self-center rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
                   <div className='flex items-center gap-2'>
                     <span className='flex size-7 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
                       <Network className='size-4' />
@@ -775,7 +902,7 @@ export function ControlTower(props: {
                   </div>
                 </div>
 
-                <div className='relative flex items-center justify-center px-1'>
+                <div className='relative z-10 flex items-center justify-center px-1'>
                   <div className='hidden h-px flex-1 border-t border-dashed border-emerald-400 sm:block' />
                   <div className='w-full rounded-md border border-blue-100 bg-blue-50/60 p-3 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
                     <div className='flex items-start justify-between gap-2'>
@@ -816,7 +943,7 @@ export function ControlTower(props: {
                   <div className='hidden h-px flex-1 border-t border-dashed border-blue-400 sm:block' />
                 </div>
 
-                <div className='space-y-2 self-center'>
+                <div className='relative z-10 space-y-2 self-center'>
                   {providers.length === 0 ? (
                     <div className='flex min-h-36 items-center justify-center rounded-md border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500'>
                       暂无供应商流量数据
@@ -940,7 +1067,7 @@ export function ControlTower(props: {
                     const status = policyStatus(policy)
                     const approval = approvalStatus(policy)
                     return (
-                      <TableRow key={policy.id}>
+                      <TableRow key={policy.id || `runtime-${policy.channel_id}`}>
                         <TableCell>
                           <div className='max-w-[190px]'>
                             <p className='truncate font-semibold text-slate-900'>
@@ -1004,6 +1131,7 @@ export function ControlTower(props: {
                             variant='ghost'
                             size='xs'
                             disabled={
+                              policy.id <= 0 ||
                               policy.status !== 'active' ||
                               disablePolicy.isPending
                             }
@@ -1065,11 +1193,11 @@ export function ControlTower(props: {
             bodyClassName='p-2'
           >
             <EventList
-              events={data?.recent_changes ?? []}
+              events={recentChanges}
               emptyText='暂无策略变更记录'
               maxItems={3}
               renderAction={(event) =>
-                event.status === 'active' ? (
+                event.status === 'active' && event.id > 0 ? (
                   <Button
                     size='xs'
                     variant='outline'
