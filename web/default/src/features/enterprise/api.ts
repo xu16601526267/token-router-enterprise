@@ -25,6 +25,15 @@ import type {
   EnterpriseSettlementItem,
   EnterpriseUsageAnalyticsData,
   EnterpriseUsersData,
+  PlatformTenant,
+  PlatformTenant360,
+  PlatformTenantBillingConfigInput,
+  PlatformTenantCreateInput,
+  TenantBillingConfig,
+  TenantCreditAccount,
+  TenantModelPolicy,
+  TenantModelPolicyInput,
+  TenantStatus,
 } from './types'
 
 type EnterpriseRangeParams = {
@@ -133,6 +142,73 @@ export async function generateEnterpriseSettlement(
 ): Promise<EnterpriseApiResponse<EnterpriseSettlementItem>> {
   const res = await api.post(
     '/api/enterprise/billing/settlements/generate',
+    payload
+  )
+  return res.data
+}
+
+export async function getPlatformTenants(
+  params: {
+    status?: TenantStatus | string
+  } = {}
+): Promise<EnterpriseApiResponse<PlatformTenant[]>> {
+  const res = await api.get('/api/platform/tenants/', { params })
+  return res.data
+}
+
+export async function getPlatformTenant360(
+  tenantId: number
+): Promise<EnterpriseApiResponse<PlatformTenant360>> {
+  const res = await api.get(`/api/platform/tenants/${tenantId}`)
+  return res.data
+}
+
+export async function createPlatformTenant(
+  payload: PlatformTenantCreateInput
+): Promise<EnterpriseApiResponse<PlatformTenant>> {
+  const res = await api.post('/api/platform/tenants/', payload)
+  return res.data
+}
+
+export async function updatePlatformTenantStatus(
+  tenantId: number,
+  status: TenantStatus
+): Promise<EnterpriseApiResponse<boolean>> {
+  const res = await api.patch(`/api/platform/tenants/${tenantId}/status`, {
+    status,
+  })
+  return res.data
+}
+
+export async function updatePlatformTenantBillingConfig(
+  tenantId: number,
+  payload: PlatformTenantBillingConfigInput
+): Promise<
+  EnterpriseApiResponse<{
+    billing_config: TenantBillingConfig
+    credit_account: TenantCreditAccount
+  }>
+> {
+  const res = await api.put(
+    `/api/platform/tenants/${tenantId}/billing_config`,
+    payload
+  )
+  return res.data
+}
+
+export async function getPlatformTenantModelPolicies(
+  tenantId: number
+): Promise<EnterpriseApiResponse<TenantModelPolicy[]>> {
+  const res = await api.get(`/api/platform/tenants/${tenantId}/model_policies`)
+  return res.data
+}
+
+export async function upsertPlatformTenantModelPolicy(
+  tenantId: number,
+  payload: TenantModelPolicyInput
+): Promise<EnterpriseApiResponse<TenantModelPolicy>> {
+  const res = await api.post(
+    `/api/platform/tenants/${tenantId}/model_policies`,
     payload
   )
   return res.data

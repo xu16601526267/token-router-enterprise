@@ -22,6 +22,7 @@ import {
   BarChart3,
   Bot,
   Box,
+  Building2,
   FileText,
   FlaskConical,
   KeyRound,
@@ -148,6 +149,11 @@ export function useSidebarData(): SidebarData {
             title: '企业总览',
             url: '/dashboard/overview',
             icon: LayoutDashboard,
+          },
+          {
+            title: 'B端客户',
+            url: '/tenants',
+            icon: Building2,
           },
           {
             title: '模型经营分析',

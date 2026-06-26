@@ -155,6 +155,16 @@ For commercial licensing, please contact support@quantumnous.com
   .enterprise-overview .recharts-cartesian-axis-tick-value {
     font-size: 11px;
   }
+
+  [data-slot='dialog-content'],
+  [data-slot='sheet-content'] {
+    border-radius: 6px;
+  }
+
+  [data-slot='dialog-footer'] {
+    border-bottom-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+  }
 }
 
 @layer utilities {

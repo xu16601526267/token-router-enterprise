@@ -246,3 +246,105 @@ export type EnterpriseBillingData = {
   settlements: EnterpriseSettlementItem[]
   recent_topups: EnterpriseTopUpItem[]
 }
+
+export type TenantStatus = 'active' | 'suspended' | 'disabled'
+
+export type TenantBillingMode = 'prepaid' | 'postpaid' | 'mixed'
+
+export type PlatformTenant = {
+  id: number
+  name: string
+  type: string
+  status: TenantStatus | string
+  industry: string
+  owner_user_id: number
+  brand_config: string
+  domain: string
+  contract_no: string
+  created_at: number
+  updated_at: number
+}
+
+export type TenantBillingConfig = {
+  id: number
+  tenant_id: number
+  billing_mode: TenantBillingMode | string
+  billing_cycle: string
+  statement_day: number
+  payment_terms: number
+  credit_limit: number
+  over_credit_policy: string
+  created_at: number
+  updated_at: number
+}
+
+export type TenantCreditAccount = {
+  id: number
+  tenant_id: number
+  credit_limit: number
+  unbilled_amount: number
+  billed_unpaid_amount: number
+  overdue_amount: number
+  available_credit: number
+  status: string
+  created_at: number
+  updated_at: number
+}
+
+export type PlatformTenant360 = {
+  tenant: PlatformTenant
+  billing_config: TenantBillingConfig | null
+  credit_account: TenantCreditAccount | null
+  members: number
+  end_customers: number
+  apps: number
+  api_keys: number
+  usage_ledger_count: number
+}
+
+export type PlatformTenantCreateInput = {
+  name: string
+  type: string
+  industry?: string
+  owner_user_id?: number
+  brand_config?: string
+  domain?: string
+  contract_no?: string
+  billing_mode: TenantBillingMode
+  credit_limit?: number
+  statement_day?: number
+  payment_terms?: number
+}
+
+export type PlatformTenantBillingConfigInput = {
+  billing_mode: TenantBillingMode
+  billing_cycle: string
+  statement_day: number
+  payment_terms: number
+  credit_limit: number
+  over_credit_policy: string
+}
+
+export type TenantModelPolicy = {
+  id: number
+  tenant_id: number
+  model_id: number
+  model_name: string
+  visible: boolean
+  price_plan_id: number
+  rate_limit: string
+  alias: string
+  enabled: boolean
+  created_at: number
+  updated_at: number
+}
+
+export type TenantModelPolicyInput = {
+  model_id?: number
+  model_name: string
+  visible: boolean
+  price_plan_id?: number
+  rate_limit?: string
+  alias?: string
+  enabled: boolean
+}
