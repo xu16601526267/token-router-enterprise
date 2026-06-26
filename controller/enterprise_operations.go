@@ -101,16 +101,17 @@ func writeEnterpriseCSV(c *gin.Context, filename string, body []byte) {
 func enterpriseUsageFiltersFromQuery(c *gin.Context) service.EnterpriseUsageFilters {
 	channelId, _ := strconv.Atoi(c.Query("channel_id"))
 	return service.EnterpriseUsageFilters{
-		Keyword:   strings.TrimSpace(c.Query("keyword")),
-		ModelName: strings.TrimSpace(c.Query("model_name")),
-		Username:  strings.TrimSpace(c.Query("username")),
-		Group:     strings.TrimSpace(c.Query("group")),
-		Status:    strings.TrimSpace(c.Query("status")),
-		ChannelId: channelId,
-		Page:      enterprisePositiveInt(c, "page", 1, 1000000),
-		PageSize:  enterprisePositiveInt(c, "page_size", 50, 500),
-		SortBy:    strings.TrimSpace(c.Query("sort_by")),
-		SortOrder: strings.TrimSpace(c.Query("sort_order")),
+		Keyword:         strings.TrimSpace(c.Query("keyword")),
+		ModelName:       strings.TrimSpace(c.Query("model_name")),
+		Username:        strings.TrimSpace(c.Query("username")),
+		Group:           strings.TrimSpace(c.Query("group")),
+		Status:          strings.TrimSpace(c.Query("status")),
+		ChannelId:       channelId,
+		Page:            enterprisePositiveInt(c, "page", 1, 1000000),
+		PageSize:        enterprisePositiveInt(c, "page_size", 50, 500),
+		SortBy:          strings.TrimSpace(c.Query("sort_by")),
+		SortOrder:       strings.TrimSpace(c.Query("sort_order")),
+		TimeGranularity: strings.TrimSpace(c.Query("time_granularity")),
 	}
 }
 

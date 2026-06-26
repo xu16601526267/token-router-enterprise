@@ -51,16 +51,17 @@ type enterpriseUsageChannelRow struct {
 }
 
 type EnterpriseUsageFilters struct {
-	Keyword   string
-	ModelName string
-	Username  string
-	Group     string
-	Status    string
-	ChannelId int
-	Page      int
-	PageSize  int
-	SortBy    string
-	SortOrder string
+	Keyword         string
+	ModelName       string
+	Username        string
+	Group           string
+	Status          string
+	ChannelId       int
+	Page            int
+	PageSize        int
+	SortBy          string
+	SortOrder       string
+	TimeGranularity string
 }
 
 func normalizeEnterprisePage(page int, pageSize int, defaultPageSize int, maxPageSize int) (int, int) {
@@ -86,6 +87,23 @@ func enterpriseQuotaCurrency(quota int64) float64 {
 		return 0
 	}
 	return float64(quota) / common.QuotaPerUnit
+}
+
+func enterpriseUsageTrendBucket(timestamp int64, granularity string) int64 {
+	bucketTime := time.Unix(timestamp, 0).UTC()
+	switch strings.TrimSpace(granularity) {
+	case "hour":
+		return time.Date(bucketTime.Year(), bucketTime.Month(), bucketTime.Day(), bucketTime.Hour(), 0, 0, 0, time.UTC).Unix()
+	case "week":
+		weekday := int(bucketTime.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		weekStart := bucketTime.AddDate(0, 0, -(weekday - 1))
+		return time.Date(weekStart.Year(), weekStart.Month(), weekStart.Day(), 0, 0, 0, 0, time.UTC).Unix()
+	default:
+		return time.Date(bucketTime.Year(), bucketTime.Month(), bucketTime.Day(), 0, 0, 0, 0, time.UTC).Unix()
+	}
 }
 
 func enterpriseUsageLogQuery(db *gorm.DB, startTimestamp int64, endTimestamp int64, filters EnterpriseUsageFilters, logTypes []int) *gorm.DB {
@@ -194,7 +212,7 @@ func enterpriseUsageChannelBreakdown(db *gorm.DB, startTimestamp int64, endTimes
 			share = float64(row.Quota) / float64(totalQuota)
 		}
 		items = append(items, dto.EnterpriseUsageBreakdownItem{
-			Name: name, Quota: row.Quota, Cost: enterpriseQuotaCurrency(row.Quota), Share: share,
+			Id: row.ChannelId, Name: name, Quota: row.Quota, Cost: enterpriseQuotaCurrency(row.Quota), Share: share,
 		})
 	}
 	return items, nil
@@ -281,8 +299,7 @@ func GetEnterpriseUsageAnalyticsWithFilters(startTimestamp int64, endTimestamp i
 		return nil, err
 	}
 	for _, row := range trendRows {
-		stamp := time.Unix(row.CreatedAt, 0).UTC()
-		bucket := time.Date(stamp.Year(), stamp.Month(), stamp.Day(), 0, 0, 0, 0, time.UTC).Unix()
+		bucket := enterpriseUsageTrendBucket(row.CreatedAt, filters.TimeGranularity)
 		value := trendMap[bucket]
 		value.requests++
 		if row.Type == model.LogTypeError {

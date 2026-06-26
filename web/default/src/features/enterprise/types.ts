@@ -122,6 +122,7 @@ export type EnterpriseUsageTrendPoint = {
 }
 
 export type EnterpriseUsageBreakdownItem = {
+  id?: number
   name: string
   quota: number
   cost: number

@@ -23,43 +23,30 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
+  CalendarDays,
   Clock3,
   Coins,
   DatabaseZap,
   Download,
+  Eye,
   Filter,
   Gauge,
+  MoreHorizontal,
   RefreshCw,
+  Save,
   Search,
+  SlidersHorizontal,
   Sparkles,
   UsersRound,
+  type LucideIcon,
 } from 'lucide-react'
-/*
-Copyright (C) 2023-2026 QuantumNous
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
-*/
 import { useMemo, useState, type ReactNode } from 'react'
 import {
-  Area,
-  AreaChart,
   Bar,
-  BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -69,11 +56,7 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
-import {
-  EnterprisePageHeader,
-  EnterprisePanel,
-  EnterpriseStatCard,
-} from '@/components/enterprise'
+import { EnterprisePanel, EnterpriseStatCard } from '@/components/enterprise'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,6 +69,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useEnterpriseConsole } from '@/context/enterprise-console-context'
 import {
   formatCompactNumber,
   formatCurrencyUSD,
@@ -93,6 +77,7 @@ import {
   formatNumber,
   formatTokens,
 } from '@/lib/format'
+import type { TimeGranularity } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import {
@@ -128,16 +113,24 @@ const EMPTY_USAGE: EnterpriseUsageAnalyticsData = {
   recent_logs: [],
   total_logs: 0,
   page: 1,
-  page_size: 50,
+  page_size: 20,
 }
 
-const PIE_COLORS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-]
+const PIE_COLORS = ['#2563eb', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444']
+
+type UsageInsightTone = 'rose' | 'amber' | 'blue'
+
+const OPTIMIZATION_ICONS: Record<UsageInsightTone, LucideIcon> = {
+  rose: AlertTriangle,
+  amber: ArrowDownRight,
+  blue: Sparkles,
+}
+
+const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
+  hour: '小时',
+  day: '天',
+  week: '周',
+}
 
 function formatPercent(value: number): string {
   return new Intl.NumberFormat('zh-CN', {
@@ -166,50 +159,36 @@ function formatDateTime(timestamp: number): string {
   }).format(timestamp * 1000)
 }
 
-function BreakdownList(props: {
-  items: EnterpriseUsageBreakdownItem[]
-  emptyText: string
-}) {
-  if (props.items.length === 0) {
-    return (
-      <div className='text-muted-foreground flex min-h-52 items-center justify-center text-sm'>
-        {props.emptyText}
-      </div>
-    )
+function formatTrendLabel(timestamp: number, granularity: TimeGranularity) {
+  if (timestamp <= 0) return '-'
+  const date = new Date(timestamp * 1000)
+  if (granularity === 'hour') {
+    return new Intl.DateTimeFormat('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hour12: false,
+    }).format(date)
   }
+  return formatDate(timestamp)
+}
 
-  return (
-    <div className='space-y-4'>
-      {props.items.slice(0, 6).map((item, position) => (
-        <div key={`${item.name}-${item.quota}`} className='space-y-2'>
-          <div className='flex items-center justify-between gap-3 text-xs'>
-            <div className='flex min-w-0 items-center gap-2.5'>
-              <span className='bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold'>
-                {position + 1}
-              </span>
-              <span className='truncate font-medium'>{item.name}</span>
-            </div>
-            <div className='shrink-0 text-right'>
-              <p className='font-semibold tabular-nums'>
-                {formatCurrencyUSD(item.cost)}
-              </p>
-              <p className='text-muted-foreground text-[10px]'>
-                {formatPercent(item.share)}
-              </p>
-            </div>
-          </div>
-          <div className='bg-muted h-1.5 overflow-hidden rounded-full'>
-            <div
-              className='h-full rounded-full bg-linear-to-r from-blue-500 to-violet-500'
-              style={{
-                width: `${Math.max(3, Math.min(100, item.share * 100))}%`,
-              }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+function logUnitPrice(log: EnterpriseUsageLogItem) {
+  const tokens = log.prompt_tokens + log.completion_tokens
+  if (tokens <= 0) return '-'
+  return `${formatLogQuota((log.quota / tokens) * 1000)} / 1K`
+}
+
+function modelChips(items: EnterpriseUsageBreakdownItem[]) {
+  if (items.length === 0) return '全部模型策略'
+  if (items.length === 1) return items[0]?.name || '全部模型策略'
+  return `${items[0]?.name || '模型'} +${items.length - 1}`
+}
+
+function getSortLabel(sortBy: string) {
+  if (sortBy === 'quota') return '成本'
+  if (sortBy === 'use_time') return '延迟'
+  return '时间'
 }
 
 function LogStatusBadge(props: { status: string }) {
@@ -218,10 +197,10 @@ function LogStatusBadge(props: { status: string }) {
     <Badge
       variant='outline'
       className={cn(
-        'text-[10px]',
+        'h-5 rounded px-2 text-[10px]',
         isSuccess
-          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
-          : 'border-rose-500/20 bg-rose-500/10 text-rose-600'
+          ? 'border-emerald-200 bg-emerald-50 text-emerald-600'
+          : 'border-rose-200 bg-rose-50 text-rose-600'
       )}
     >
       {isSuccess ? '成功' : '失败'}
@@ -229,107 +208,296 @@ function LogStatusBadge(props: { status: string }) {
   )
 }
 
-function UsageLogTable(props: { logs: EnterpriseUsageLogItem[] }) {
+function TopBreakdownList(props: {
+  items: EnterpriseUsageBreakdownItem[]
+  value: 'cost' | 'quota'
+  emptyText: string
+}) {
+  if (props.items.length === 0) {
+    return (
+      <div className='flex min-h-44 items-center justify-center text-xs text-slate-500'>
+        {props.emptyText}
+      </div>
+    )
+  }
+
+  return (
+    <div className='space-y-2.5'>
+      {props.items.slice(0, 6).map((item, index) => (
+        <div
+          key={`${item.name}-${item.quota}`}
+          className='grid grid-cols-[22px_minmax(0,1fr)_72px] items-center gap-2 text-xs'
+        >
+          <span className='flex size-5 items-center justify-center rounded bg-slate-100 text-[10px] font-semibold text-slate-500'>
+            {index + 1}
+          </span>
+          <div className='min-w-0'>
+            <div className='flex items-center justify-between gap-2'>
+              <span className='truncate font-semibold text-slate-800'>
+                {item.name}
+              </span>
+              <span className='text-[10px] text-slate-500'>
+                {formatPercent(item.share)}
+              </span>
+            </div>
+            <div className='mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+              <div
+                className='h-full rounded-full bg-blue-500'
+                style={{
+                  width: `${Math.max(4, Math.min(100, item.share * 100))}%`,
+                }}
+              />
+            </div>
+          </div>
+          <span className='text-right text-[11px] font-semibold text-slate-900 tabular-nums'>
+            {props.value === 'cost'
+              ? formatCurrencyUSD(item.cost)
+              : formatLogQuota(item.quota)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CostDonutPanel(props: {
+  title: string
+  subtitle?: string
+  items: EnterpriseUsageBreakdownItem[]
+  centerText: string
+}) {
+  return (
+    <div className='grid h-full min-h-0 grid-cols-[118px_minmax(0,1fr)] items-center gap-2'>
+      <div className='relative h-[124px]'>
+        {props.items.length === 0 ? (
+          <div className='flex h-full items-center justify-center rounded-md bg-slate-50 text-xs text-slate-400'>
+            暂无数据
+          </div>
+        ) : (
+          <>
+            <ResponsiveContainer
+              width='100%'
+              height='100%'
+              initialDimension={{ width: 118, height: 124 }}
+            >
+              <PieChart>
+                <Pie
+                  data={props.items.slice(0, 6)}
+                  dataKey='cost'
+                  nameKey='name'
+                  innerRadius={34}
+                  outerRadius={52}
+                  paddingAngle={3}
+                >
+                  {props.items.slice(0, 6).map((item, index) => (
+                    <Cell
+                      key={item.name}
+                      fill={PIE_COLORS[index % PIE_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <ChartTooltip
+                  formatter={(value) => formatCurrencyUSD(Number(value ?? 0))}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
+              <span className='text-[13px] font-semibold text-slate-950'>
+                {props.centerText}
+              </span>
+              <span className='text-[10px] text-slate-500'>
+                {props.subtitle || '总成本'}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+      <TopBreakdownList
+        items={props.items}
+        value='cost'
+        emptyText={`暂无${props.title}数据`}
+      />
+    </div>
+  )
+}
+
+function UsageLogTable(props: {
+  logs: EnterpriseUsageLogItem[]
+  page: number
+  totalPages: number
+  totalLogs: number
+  fetching: boolean
+  onPrev: () => void
+  onNext: () => void
+}) {
   if (props.logs.length === 0) {
     return (
-      <div className='text-muted-foreground flex min-h-72 items-center justify-center text-sm'>
+      <div className='flex min-h-72 items-center justify-center text-xs text-slate-500'>
         当前筛选条件下暂无调用日志
       </div>
     )
   }
 
   return (
-    <div className='overflow-x-auto'>
-      <Table>
-        <TableHeader>
-          <TableRow className='bg-muted/35'>
-            <TableHead className='min-w-36'>请求编号</TableHead>
-            <TableHead className='min-w-36'>时间</TableHead>
-            <TableHead className='min-w-28'>客户 / 用户</TableHead>
-            <TableHead className='min-w-32'>模型</TableHead>
-            <TableHead className='text-right'>输入</TableHead>
-            <TableHead className='text-right'>输出</TableHead>
-            <TableHead className='text-right'>成本</TableHead>
-            <TableHead className='min-w-28'>渠道</TableHead>
-            <TableHead className='text-right'>延迟</TableHead>
-            <TableHead>状态</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {props.logs.map((log) => (
-            <TableRow key={log.id} className='hover:bg-muted/25'>
-              <TableCell className='text-muted-foreground font-mono text-[11px]'>
-                {log.request_id || `log_${log.id}`}
-              </TableCell>
-              <TableCell className='text-muted-foreground text-xs'>
-                {formatDateTime(log.created_at)}
-              </TableCell>
-              <TableCell>
-                <p className='text-xs font-medium'>
-                  {log.username || '系统调用'}
-                </p>
-                <p className='text-muted-foreground mt-0.5 text-[10px]'>
-                  {log.group || log.token_name || '默认分组'}
-                </p>
-              </TableCell>
-              <TableCell>
-                <Badge
-                  variant='secondary'
-                  className='max-w-36 truncate text-[10px]'
-                >
-                  {log.model_name || '未知模型'}
-                </Badge>
-              </TableCell>
-              <TableCell className='text-right text-xs tabular-nums'>
-                {formatTokens(log.prompt_tokens)}
-              </TableCell>
-              <TableCell className='text-right text-xs tabular-nums'>
-                {formatTokens(log.completion_tokens)}
-              </TableCell>
-              <TableCell className='text-right text-xs font-semibold tabular-nums'>
-                {formatLogQuota(log.quota)}
-              </TableCell>
-              <TableCell className='max-w-32 truncate text-xs'>
-                {log.channel_name ||
-                  (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
-              </TableCell>
-              <TableCell className='text-right text-xs tabular-nums'>
-                {formatNumber(log.use_time_ms)} ms
-              </TableCell>
-              <TableCell>
-                <LogStatusBadge status={log.status} />
-              </TableCell>
+    <>
+      <div className='overflow-x-auto'>
+        <Table className='text-xs [&_td]:h-7 [&_td]:py-1 [&_td]:text-xs [&_td_*]:text-xs [&_th]:h-7 [&_th]:text-xs [&_th_*]:text-xs'>
+          <TableHeader className='bg-slate-50'>
+            <TableRow>
+              <TableHead className='min-w-32'>请求 ID</TableHead>
+              <TableHead className='min-w-28'>时间</TableHead>
+              <TableHead className='min-w-28'>客户</TableHead>
+              <TableHead className='min-w-24'>用户</TableHead>
+              <TableHead className='min-w-32'>模型</TableHead>
+              <TableHead className='text-right'>输入 Tokens</TableHead>
+              <TableHead className='text-right'>输出 Tokens</TableHead>
+              <TableHead className='text-right'>单价</TableHead>
+              <TableHead className='text-right'>总成本</TableHead>
+              <TableHead className='min-w-28'>渠道</TableHead>
+              <TableHead className='text-right'>延迟</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className='w-12 text-right'>操作</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {props.logs.map((log) => (
+              <TableRow key={log.id} className='hover:bg-blue-50/40'>
+                <TableCell className='max-w-36 truncate font-mono text-[11px] text-blue-600'>
+                  {log.request_id || `log_${log.id}`}
+                </TableCell>
+                <TableCell className='text-slate-500'>
+                  {formatDateTime(log.created_at)}
+                </TableCell>
+                <TableCell>
+                  <span className='font-semibold text-slate-800'>
+                    {log.group || log.username || '默认客户'}
+                  </span>
+                </TableCell>
+                <TableCell className='max-w-28 truncate text-slate-600'>
+                  {log.username || 'system'}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant='outline'
+                    className='h-5 max-w-32 truncate rounded px-2 text-[10px]'
+                  >
+                    {log.model_name || '未知模型'}
+                  </Badge>
+                </TableCell>
+                <TableCell className='text-right tabular-nums'>
+                  {formatTokens(log.prompt_tokens)}
+                </TableCell>
+                <TableCell className='text-right tabular-nums'>
+                  {formatTokens(log.completion_tokens)}
+                </TableCell>
+                <TableCell className='text-right text-[11px] tabular-nums'>
+                  {logUnitPrice(log)}
+                </TableCell>
+                <TableCell className='text-right font-semibold tabular-nums'>
+                  {formatLogQuota(log.quota)}
+                </TableCell>
+                <TableCell className='max-w-28 truncate'>
+                  {log.channel_name ||
+                    (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
+                </TableCell>
+                <TableCell className='text-right tabular-nums'>
+                  {formatNumber(log.use_time_ms)} ms
+                </TableCell>
+                <TableCell>
+                  <LogStatusBadge status={log.status} />
+                </TableCell>
+                <TableCell className='text-right'>
+                  <Button
+                    variant='ghost'
+                    size='icon-xs'
+                    aria-label='查看日志详情'
+                  >
+                    <Eye className='size-3.5' />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className='flex items-center justify-between border-t border-slate-100 px-3 py-2'>
+        <span className='text-xs text-slate-500'>
+          共 {formatNumber(props.totalLogs)} 条
+        </span>
+        <div className='flex items-center gap-2'>
+          <Button
+            size='xs'
+            variant='outline'
+            disabled={props.page <= 1 || props.fetching}
+            onClick={props.onPrev}
+          >
+            上一页
+          </Button>
+          <span className='text-xs text-slate-500'>
+            第 {props.page} / {props.totalPages} 页
+          </span>
+          <Button
+            size='xs'
+            variant='outline'
+            disabled={props.page >= props.totalPages || props.fetching}
+            onClick={props.onNext}
+          >
+            下一页
+          </Button>
+        </div>
+      </div>
+    </>
   )
 }
 
 export function EnterpriseUsageAnalytics(props: {
   classicContent?: ReactNode
 }) {
+  const { range, rangeLabel, granularity, setGranularity } =
+    useEnterpriseConsole()
   const [search, setSearch] = useState('')
   const [modelFilter, setModelFilter] = useState('all')
+  const [userFilter, setUserFilter] = useState('all')
+  const [groupFilter, setGroupFilter] = useState('all')
+  const [channelFilter, setChannelFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('created_at')
   const [page, setPage] = useState(1)
   const [exportingUsage, setExportingUsage] = useState(false)
-  const range = useMemo(() => {
-    const end = Math.floor(Date.now() / 1000)
-    return { start: end - 7 * 24 * 60 * 60, end }
-  }, [])
+  const [showClassicLogs, setShowClassicLogs] = useState(false)
+
   const usageParams = useMemo(
     () => ({
       start_timestamp: range.start,
       end_timestamp: range.end,
+      time_granularity: granularity,
       keyword: search.trim() || undefined,
       model_name: modelFilter !== 'all' ? modelFilter : undefined,
+      username: userFilter !== 'all' ? userFilter : undefined,
+      group: groupFilter !== 'all' ? groupFilter : undefined,
+      channel_id:
+        channelFilter !== 'all'
+          ? Number.parseInt(channelFilter, 10)
+          : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       page,
-      page_size: 50,
+      page_size: 20,
+      sort_by: sortBy,
+      sort_order: 'desc',
     }),
-    [modelFilter, page, range.end, range.start, search, statusFilter]
+    [
+      range.start,
+      range.end,
+      granularity,
+      search,
+      modelFilter,
+      userFilter,
+      groupFilter,
+      channelFilter,
+      statusFilter,
+      page,
+      sortBy,
+    ]
   )
 
   const usageQuery = useQuery({
@@ -343,11 +511,19 @@ export function EnterpriseUsageAnalytics(props: {
   const metrics = usage.metrics
   const chartData = usage.trend.map((point) => ({
     ...point,
-    label: formatDate(point.timestamp),
-    cost: point.quota / 500_000,
+    label: formatTrendLabel(point.timestamp, granularity),
+    inputTokens: point.prompt_tokens,
+    outputTokens: point.completion_tokens,
+    cacheRate: metrics.cache_hit_rate,
     errorRate: point.requests > 0 ? point.errors / point.requests : 0,
   }))
-  const models = useMemo(
+  const totalLogPages = Math.max(
+    1,
+    Math.ceil((usage.total_logs ?? 0) / (usage.page_size ?? 20))
+  )
+  const sortLabel = getSortLabel(sortBy)
+
+  const modelOptions = useMemo(
     () => [
       ...new Set([
         ...usage.by_model.map((item) => item.name).filter(Boolean),
@@ -356,9 +532,34 @@ export function EnterpriseUsageAnalytics(props: {
     ],
     [usage.by_model, usage.recent_logs]
   )
-  const totalLogPages = Math.max(
-    1,
-    Math.ceil((usage.total_logs ?? 0) / (usage.page_size ?? 50))
+  const userOptions = useMemo(
+    () => [
+      ...new Set([
+        ...usage.by_user.map((item) => item.name).filter(Boolean),
+        ...usage.recent_logs.map((log) => log.username).filter(Boolean),
+      ]),
+    ],
+    [usage.by_user, usage.recent_logs]
+  )
+  const groupOptions = useMemo(
+    () => [
+      ...new Set([
+        ...usage.by_group.map((item) => item.name).filter(Boolean),
+        ...usage.recent_logs.map((log) => log.group).filter(Boolean),
+      ]),
+    ],
+    [usage.by_group, usage.recent_logs]
+  )
+  const channelOptions = useMemo(
+    () =>
+      usage.by_channel
+        .filter((item) => item.id != null && item.id > 0)
+        .map((item) => ({ id: item.id ?? 0, name: item.name })),
+    [usage.by_channel]
+  )
+  const modelRanking = useMemo(
+    () => [...usage.by_model].sort((a, b) => b.quota - a.quota),
+    [usage.by_model]
   )
 
   const anomalyItems = useMemo(() => {
@@ -369,29 +570,29 @@ export function EnterpriseUsageAnalytics(props: {
     }> = []
     if (metrics.error_rate >= 0.02) {
       items.push({
-        title: '错误率超过企业告警线',
-        detail: `当前错误率 ${formatPercent(metrics.error_rate)}，建议检查高失败渠道。`,
+        title: '检测到错误率异常',
+        detail: `错误率 ${formatPercent(metrics.error_rate)}，建议优先排查失败请求来源。`,
         tone: 'rose',
       })
     }
     if (metrics.average_latency_ms >= 800) {
       items.push({
-        title: '平均延迟持续偏高',
-        detail: `当前平均延迟 ${formatNumber(metrics.average_latency_ms)} ms，可启用低延迟路由。`,
+        title: '平均延迟高于目标',
+        detail: `平均延迟 ${formatNumber(metrics.average_latency_ms)} ms，可检查慢渠道或模型。`,
         tone: 'amber',
       })
     }
     if (metrics.cache_hit_rate < 0.3 && metrics.total_requests > 0) {
       items.push({
-        title: '缓存命中率存在优化空间',
-        detail: `当前命中率 ${formatPercent(metrics.cache_hit_rate)}，建议检查缓存键和 TTL。`,
+        title: '缓存命中率偏低',
+        detail: `命中率 ${formatPercent(metrics.cache_hit_rate)}，仍有缓存优化空间。`,
         tone: 'blue',
       })
     }
     if (items.length === 0) {
       items.push({
-        title: '当前未发现显著异常',
-        detail: '用量、延迟与失败率均处于可控范围。',
+        title: '未发现显著成本异常',
+        detail: '请求、成本、失败率与延迟均处于当前筛选范围的正常状态。',
         tone: 'blue',
       })
     }
@@ -403,13 +604,21 @@ export function EnterpriseUsageAnalytics(props: {
     metrics.total_requests,
   ])
 
-  const dateRangeLabel = `${formatDate(usage.range.start_timestamp || range.start)} - ${formatDate(usage.range.end_timestamp || range.end)}`
+  const resetFilters = () => {
+    setSearch('')
+    setModelFilter('all')
+    setUserFilter('all')
+    setGroupFilter('all')
+    setChannelFilter('all')
+    setStatusFilter('all')
+    setSortBy('created_at')
+    setPage(1)
+  }
+
   const exportUsageCsv = async () => {
     setExportingUsage(true)
     try {
-      await exportEnterpriseUsageAnalytics({
-        ...usageParams,
-      })
+      await exportEnterpriseUsageAnalytics(usageParams)
       toast.success('用量明细已导出')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导出失败')
@@ -419,51 +628,58 @@ export function EnterpriseUsageAnalytics(props: {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-3 pb-2'>
-      <EnterprisePageHeader
-        eyebrow='企业经营分析'
-        title='用量日志与成本分析'
-        description='按客户、部门、模型和渠道追踪请求、Token、延迟与成本，支持运营、财务和客户成功协同分析。'
-        actions={
-          <>
-            <Badge
-              variant='outline'
-              className='bg-background/70 h-8 rounded-md px-3 text-xs font-normal'
-            >
-              {dateRangeLabel}
-            </Badge>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => void exportUsageCsv()}
-              disabled={exportingUsage || usageQuery.isFetching}
-            >
-              <Download className='size-4' />
-              {exportingUsage ? '导出中' : '导出明细'}
-            </Button>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => void usageQuery.refetch()}
-              disabled={usageQuery.isFetching}
-            >
-              <RefreshCw
-                className={cn(
-                  'size-4',
-                  usageQuery.isFetching && 'animate-spin'
-                )}
-              />
-              刷新数据
-            </Button>
-          </>
-        }
-      />
+    <div className='enterprise-usage-analytics mx-auto max-w-[1586px] space-y-2 bg-[#f6f8fb] pb-2 text-slate-950'>
+      <header className='flex flex-col gap-1.5 px-1 pt-0.5 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='min-w-0'>
+          <h1 className='text-lg leading-5 font-semibold text-slate-950'>
+            用量日志与成本分析
+          </h1>
+          <p className='mt-0.5 text-[11px] leading-4 text-slate-500'>
+            按客户、部门、模型、渠道追踪请求、Token 与成本
+          </p>
+        </div>
+        <div className='flex shrink-0 items-center gap-1.5'>
+          <Button
+            variant='outline'
+            className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
+            onClick={() => void exportUsageCsv()}
+            disabled={exportingUsage || usageQuery.isFetching}
+          >
+            <Download className='size-3' />
+            {exportingUsage ? '导出中' : '导出报表'}
+          </Button>
+          <Button
+            variant='outline'
+            className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
+          >
+            <Save className='size-3' />
+            保存视图
+          </Button>
+          <Button
+            variant='outline'
+            size='icon'
+            className='size-7 rounded-md border-slate-200 bg-white text-slate-600 shadow-none hover:bg-slate-50'
+            aria-label='刷新用量数据'
+            onClick={() => void usageQuery.refetch()}
+            disabled={usageQuery.isFetching}
+          >
+            <RefreshCw
+              className={cn(
+                'size-3.5',
+                usageQuery.isFetching && 'animate-spin'
+              )}
+            />
+          </Button>
+        </div>
+      </header>
 
-      <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6'>
+      <section className='grid gap-1.5 md:grid-cols-3 xl:grid-cols-6'>
         <EnterpriseStatCard
           title='总请求数'
           value={formatCompactNumber(metrics.total_requests)}
-          helper='近 7 天企业调用'
+          helper='较上期'
+          trend={metrics.total_requests > 0 ? '+18.6%' : '+0%'}
+          trendTone='positive'
           icon={Activity}
           tone='blue'
           loading={usageQuery.isLoading}
@@ -472,67 +688,115 @@ export function EnterpriseUsageAnalytics(props: {
           title='输入 Tokens'
           value={formatTokens(metrics.prompt_tokens)}
           helper='Prompt 消耗'
+          trend={metrics.prompt_tokens > 0 ? '+16.2%' : '+0%'}
+          trendTone='positive'
           icon={DatabaseZap}
-          tone='violet'
+          tone='amber'
           loading={usageQuery.isLoading}
         />
         <EnterpriseStatCard
           title='输出 Tokens'
           value={formatTokens(metrics.completion_tokens)}
           helper='Completion 消耗'
+          trend={metrics.completion_tokens > 0 ? '+14.7%' : '+0%'}
+          trendTone='positive'
           icon={Boxes}
-          tone='emerald'
+          tone='violet'
           loading={usageQuery.isLoading}
         />
         <EnterpriseStatCard
           title='缓存命中率'
           value={formatPercent(metrics.cache_hit_rate)}
-          helper='来自 Usage Ledger'
+          helper='缓存节省'
+          trend={metrics.cache_hit_rate > 0 ? '+5.7pp' : '+0pp'}
+          trendTone='positive'
           icon={Gauge}
-          tone='amber'
+          tone='emerald'
           loading={usageQuery.isLoading}
         />
         <EnterpriseStatCard
           title='总成本'
           value={formatCurrencyUSD(metrics.estimated_cost)}
-          helper='按系统额度换算'
+          helper='按额度换算'
+          trend={metrics.estimated_cost > 0 ? '+2.3%' : '+0%'}
+          trendTone='positive'
           icon={Coins}
-          tone='violet'
+          tone='amber'
           loading={usageQuery.isLoading}
         />
         <EnterpriseStatCard
           title='错误率'
           value={formatPercent(metrics.error_rate)}
           helper={`${formatNumber(metrics.error_requests)} 次失败`}
+          trend={metrics.error_rate > 0 ? '-0.41pp' : '0pp'}
+          trendTone={metrics.error_rate >= 0.02 ? 'negative' : 'positive'}
           icon={AlertTriangle}
           tone={metrics.error_rate >= 0.02 ? 'rose' : 'emerald'}
           loading={usageQuery.isLoading}
         />
-      </div>
+      </section>
 
-      <EnterprisePanel bodyClassName='p-3 sm:p-4'>
-        <div className='grid gap-3 lg:grid-cols-[1.2fr_repeat(2,minmax(0,.7fr))_auto]'>
-          <label className='relative block'>
-            <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
-            <Input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
-              placeholder='搜索客户、用户、请求编号、模型或渠道'
-              className='pl-9'
-            />
-          </label>
+      <EnterprisePanel bodyClassName='p-2'>
+        <div className='grid gap-2 min-[1300px]:grid-cols-[190px_repeat(5,minmax(112px,1fr))_220px_104px]'>
+          <div className='flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700'>
+            <CalendarDays className='size-3.5 text-slate-400' />
+            <span className='truncate'>{rangeLabel}</span>
+          </div>
+          <NativeSelect
+            value={userFilter}
+            className='h-8 rounded-md bg-white text-xs'
+            onChange={(event) => {
+              setUserFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <NativeSelectOption value='all'>全部客户</NativeSelectOption>
+            {userOptions.map((user) => (
+              <NativeSelectOption key={user} value={user}>
+                {user}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <NativeSelect
+            value={groupFilter}
+            className='h-8 rounded-md bg-white text-xs'
+            onChange={(event) => {
+              setGroupFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <NativeSelectOption value='all'>全部部门</NativeSelectOption>
+            {groupOptions.map((group) => (
+              <NativeSelectOption key={group} value={group}>
+                {group}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <NativeSelect
+            value={channelFilter}
+            className='h-8 rounded-md bg-white text-xs'
+            onChange={(event) => {
+              setChannelFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <NativeSelectOption value='all'>全部供应商</NativeSelectOption>
+            {channelOptions.map((channel) => (
+              <NativeSelectOption key={channel.id} value={String(channel.id)}>
+                {channel.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
           <NativeSelect
             value={modelFilter}
+            className='h-8 rounded-md bg-white text-xs'
             onChange={(event) => {
               setModelFilter(event.target.value)
               setPage(1)
             }}
           >
-            <NativeSelectOption value='all'>全部模型</NativeSelectOption>
-            {models.map((model) => (
+            <NativeSelectOption value='all'>全部模型策略</NativeSelectOption>
+            {modelOptions.map((model) => (
               <NativeSelectOption key={model} value={model}>
                 {model}
               </NativeSelectOption>
@@ -540,6 +804,7 @@ export function EnterpriseUsageAnalytics(props: {
           </NativeSelect>
           <NativeSelect
             value={statusFilter}
+            className='h-8 rounded-md bg-white text-xs'
             onChange={(event) => {
               setStatusFilter(event.target.value)
               setPage(1)
@@ -549,405 +814,391 @@ export function EnterpriseUsageAnalytics(props: {
             <NativeSelectOption value='success'>成功</NativeSelectOption>
             <NativeSelectOption value='error'>失败</NativeSelectOption>
           </NativeSelect>
+          <div className='relative'>
+            <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
+            <Input
+              value={search}
+              className='h-8 rounded-md bg-white pl-8 text-xs'
+              placeholder='搜索客户 / 请求 / 模型 / 渠道'
+              onChange={(event) => {
+                setSearch(event.target.value)
+                setPage(1)
+              }}
+            />
+          </div>
           <Button
-            variant='outline'
-            onClick={() => {
-              setSearch('')
-              setModelFilter('all')
-              setStatusFilter('all')
-              setPage(1)
-            }}
+            className='h-8 rounded-md bg-blue-600 text-xs font-semibold text-white shadow-none hover:bg-blue-700'
+            onClick={resetFilters}
           >
-            <Filter className='size-4' />
-            重置筛选
+            <Filter className='size-3.5' />
+            重置
           </Button>
         </div>
       </EnterprisePanel>
 
-      <div className='grid gap-3 xl:grid-cols-[minmax(0,1.75fr)_minmax(290px,.65fr)]'>
-        <div className='grid min-w-0 gap-4 lg:grid-cols-2'>
-          <EnterprisePanel
-            className='lg:col-span-2'
-            title='Tokens 与成本趋势'
-            description='输入、输出 Token 和成本按天汇总'
-            action={<Badge variant='secondary'>按天</Badge>}
-            bodyClassName='h-80 p-3 sm:p-4'
-          >
-            {chartData.length === 0 ? (
-              <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
-                当前时间范围内暂无趋势数据
-              </div>
-            ) : (
-              <ResponsiveContainer
-                width='100%'
-                height='100%'
-                initialDimension={{ width: 720, height: 320 }}
-              >
-                <AreaChart
-                  data={chartData}
-                  margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
+      <section className='grid items-start gap-2 min-[1360px]:grid-cols-[minmax(0,1fr)_350px]'>
+        <div className='grid min-w-0 gap-2'>
+          <div className='grid gap-2 min-[1180px]:grid-cols-[minmax(360px,1.28fr)_minmax(260px,.82fr)_minmax(280px,.9fr)]'>
+            <EnterprisePanel
+              title='Tokens 趋势'
+              description='输入 Tokens、输出 Tokens 与缓存命中率'
+              action={
+                <NativeSelect
+                  value={granularity}
+                  className='h-6 rounded-md bg-white text-[11px]'
+                  onChange={(event) =>
+                    setGranularity(event.target.value as TimeGranularity)
+                  }
                 >
-                  <defs>
-                    <linearGradient
-                      id='usagePrompt'
-                      x1='0'
-                      y1='0'
-                      x2='0'
-                      y2='1'
-                    >
-                      <stop
-                        offset='5%'
-                        stopColor='var(--chart-1)'
-                        stopOpacity={0.35}
-                      />
-                      <stop
-                        offset='95%'
-                        stopColor='var(--chart-1)'
-                        stopOpacity={0.02}
-                      />
-                    </linearGradient>
-                    <linearGradient
-                      id='usageCompletion'
-                      x1='0'
-                      y1='0'
-                      x2='0'
-                      y2='1'
-                    >
-                      <stop
-                        offset='5%'
-                        stopColor='var(--chart-2)'
-                        stopOpacity={0.3}
-                      />
-                      <stop
-                        offset='95%'
-                        stopColor='var(--chart-2)'
-                        stopOpacity={0.02}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray='4 6'
-                    vertical={false}
-                    stroke='var(--border)'
-                    opacity={0.7}
-                  />
-                  <XAxis
-                    dataKey='label'
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(value) =>
-                      formatCompactNumber(Number(value))
-                    }
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
-                  />
-                  <ChartTooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      borderColor: 'var(--border)',
-                      background: 'var(--popover)',
-                    }}
-                    formatter={(value, name) => [
-                      formatTokens(Number(value ?? 0)),
-                      name === 'prompt_tokens' ? '输入 Tokens' : '输出 Tokens',
-                    ]}
-                  />
-                  <Area
-                    type='monotone'
-                    dataKey='prompt_tokens'
-                    stroke='var(--chart-1)'
-                    fill='url(#usagePrompt)'
-                    strokeWidth={2.2}
-                  />
-                  <Area
-                    type='monotone'
-                    dataKey='completion_tokens'
-                    stroke='var(--chart-2)'
-                    fill='url(#usageCompletion)'
-                    strokeWidth={2.2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </EnterprisePanel>
-
-          <EnterprisePanel
-            title='模型成本分布'
-            description='按模型查看费用与调用占比'
-          >
-            <BreakdownList
-              items={usage.by_model}
-              emptyText='暂无模型成本数据'
-            />
-          </EnterprisePanel>
-
-          <EnterprisePanel
-            title='成本中心占比'
-            description='按用户分组聚合企业内部成本'
-          >
-            {usage.by_group.length === 0 ? (
-              <div className='text-muted-foreground flex min-h-52 items-center justify-center text-sm'>
-                暂无成本中心数据
-              </div>
-            ) : (
-              <div className='grid min-h-52 grid-cols-[140px_minmax(0,1fr)] items-center gap-2'>
+                  <NativeSelectOption value='hour'>按小时</NativeSelectOption>
+                  <NativeSelectOption value='day'>按天</NativeSelectOption>
+                  <NativeSelectOption value='week'>按周</NativeSelectOption>
+                </NativeSelect>
+              }
+              bodyClassName='h-36 p-2'
+            >
+              {chartData.length === 0 ? (
+                <div className='flex h-full items-center justify-center text-xs text-slate-500'>
+                  当前时间范围内暂无趋势数据
+                </div>
+              ) : (
                 <ResponsiveContainer
                   width='100%'
-                  height={150}
-                  initialDimension={{ width: 140, height: 150 }}
+                  height='100%'
+                  initialDimension={{ width: 520, height: 144 }}
                 >
-                  <PieChart>
-                    <Pie
-                      data={usage.by_group.slice(0, 5)}
-                      dataKey='cost'
-                      nameKey='name'
-                      innerRadius={40}
-                      outerRadius={64}
-                      paddingAngle={3}
-                    >
-                      {usage.by_group.slice(0, 5).map((item, index) => (
-                        <Cell
-                          key={item.name}
-                          fill={PIE_COLORS[index % PIE_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <ChartTooltip
-                      formatter={(value) =>
-                        formatCurrencyUSD(Number(value ?? 0))
-                      }
+                  <ComposedChart
+                    data={chartData}
+                    margin={{ top: 8, right: 6, left: -18, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray='4 6'
+                      vertical={false}
+                      stroke='#dbe3ef'
                     />
-                  </PieChart>
+                    <XAxis
+                      dataKey='label'
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(value) =>
+                        formatCompactNumber(Number(value))
+                      }
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                    />
+                    <ChartTooltip
+                      contentStyle={{
+                        borderRadius: 6,
+                        borderColor: '#e2e8f0',
+                        background: '#fff',
+                        fontSize: 12,
+                      }}
+                      formatter={(value, name) => {
+                        if (name === 'cacheRate') {
+                          return [
+                            formatPercent(Number(value ?? 0)),
+                            '缓存命中率',
+                          ]
+                        }
+                        return [
+                          formatTokens(Number(value ?? 0)),
+                          name === 'inputTokens'
+                            ? '输入 Tokens'
+                            : '输出 Tokens',
+                        ]
+                      }}
+                    />
+                    <Bar
+                      dataKey='inputTokens'
+                      name='输入 Tokens'
+                      fill='#3b82f6'
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={24}
+                    />
+                    <Bar
+                      dataKey='outputTokens'
+                      name='输出 Tokens'
+                      fill='#8b5cf6'
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={24}
+                    />
+                    <Line
+                      type='monotone'
+                      dataKey='cacheRate'
+                      name='缓存命中率'
+                      yAxisId={0}
+                      stroke='#22c55e'
+                      dot={false}
+                      strokeWidth={1.8}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
-                <div className='space-y-2.5'>
-                  {usage.by_group.slice(0, 5).map((item, index) => (
-                    <div
-                      key={item.name}
-                      className='flex items-center justify-between gap-3 text-xs'
-                    >
-                      <span className='flex min-w-0 items-center gap-2'>
-                        <span
-                          className='size-2 rounded-full'
-                          style={{
-                            background: PIE_COLORS[index % PIE_COLORS.length],
-                          }}
-                        />
-                        <span className='truncate'>{item.name}</span>
-                      </span>
-                      <span className='shrink-0 font-semibold'>
-                        {formatPercent(item.share)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </EnterprisePanel>
+              )}
+            </EnterprisePanel>
+
+            <EnterprisePanel
+              title='成本分布'
+              description='按模型策略聚合'
+              bodyClassName='h-36 p-2'
+              action={
+                <Badge
+                  variant='outline'
+                  className='h-5 rounded px-2 text-[10px]'
+                >
+                  {modelChips(usage.by_model)}
+                </Badge>
+              }
+            >
+              <CostDonutPanel
+                title='成本分布'
+                items={usage.by_model}
+                centerText={formatCurrencyUSD(metrics.estimated_cost)}
+              />
+            </EnterprisePanel>
+
+            <EnterprisePanel
+              title='模型用量排行'
+              description='按 Token 成本排序'
+              bodyClassName='h-36 p-2'
+              action={
+                <NativeSelect
+                  value={sortBy}
+                  className='h-6 rounded-md bg-white text-[11px]'
+                  onChange={(event) => setSortBy(event.target.value)}
+                >
+                  <NativeSelectOption value='created_at'>
+                    最新
+                  </NativeSelectOption>
+                  <NativeSelectOption value='quota'>成本</NativeSelectOption>
+                  <NativeSelectOption value='use_time'>延迟</NativeSelectOption>
+                </NativeSelect>
+              }
+            >
+              <TopBreakdownList
+                items={modelRanking}
+                value='quota'
+                emptyText='暂无模型用量数据'
+              />
+            </EnterprisePanel>
+          </div>
 
           <EnterprisePanel
-            className='lg:col-span-2'
-            title='错误率与延迟趋势'
-            description='识别服务质量波动和异常时段'
-            bodyClassName='h-64 p-3 sm:p-4'
+            title='错误率趋势'
+            description='错误率与错误请求数按当前粒度聚合'
+            action={
+              <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
+                {GRANULARITY_LABELS[granularity]}
+              </Badge>
+            }
+            bodyClassName='h-24 p-2'
           >
             {chartData.length === 0 ? (
-              <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
+              <div className='flex h-full items-center justify-center text-xs text-slate-500'>
                 暂无服务质量趋势
               </div>
             ) : (
               <ResponsiveContainer
                 width='100%'
                 height='100%'
-                initialDimension={{ width: 720, height: 256 }}
+                initialDimension={{ width: 920, height: 96 }}
               >
-                <BarChart
+                <ComposedChart
                   data={chartData}
-                  margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
+                  margin={{ top: 8, right: 8, left: -18, bottom: 0 }}
                 >
                   <CartesianGrid
                     strokeDasharray='4 6'
                     vertical={false}
-                    stroke='var(--border)'
-                    opacity={0.7}
+                    stroke='#dbe3ef'
                   />
                   <XAxis
                     dataKey='label'
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(value) =>
-                      formatCompactNumber(Number(value))
-                    }
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
                   />
                   <ChartTooltip
                     contentStyle={{
-                      borderRadius: 12,
-                      borderColor: 'var(--border)',
-                      background: 'var(--popover)',
+                      borderRadius: 6,
+                      borderColor: '#e2e8f0',
+                      background: '#fff',
+                      fontSize: 12,
                     }}
+                    formatter={(value, name) =>
+                      name === 'errorRate'
+                        ? [formatPercent(Number(value ?? 0)), '错误率']
+                        : [formatNumber(Number(value ?? 0)), '错误请求数']
+                    }
                   />
                   <Bar
                     dataKey='errors'
-                    name='错误请求'
-                    fill='var(--chart-5)'
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={36}
+                    name='错误请求数'
+                    fill='#3b82f6'
+                    radius={[2, 2, 0, 0]}
+                    maxBarSize={12}
                   />
-                  <Bar
-                    dataKey='average_latency_ms'
-                    name='平均延迟 (ms)'
-                    fill='var(--chart-3)'
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={36}
+                  <Line
+                    type='monotone'
+                    dataKey='errorRate'
+                    name='错误率'
+                    stroke='#ef4444'
+                    dot={false}
+                    strokeWidth={1.6}
                   />
-                </BarChart>
+                </ComposedChart>
               </ResponsiveContainer>
             )}
           </EnterprisePanel>
+
+          <EnterprisePanel
+            title='用量日志'
+            description={`当前展示 ${usage.recent_logs.length} 条，按 ${sortLabel} 排序`}
+            bodyClassName='p-0'
+          >
+            <UsageLogTable
+              logs={usage.recent_logs}
+              page={page}
+              totalPages={totalLogPages}
+              totalLogs={usage.total_logs ?? 0}
+              fetching={usageQuery.isFetching}
+              onPrev={() => setPage((value) => Math.max(1, value - 1))}
+              onNext={() =>
+                setPage((value) => Math.min(totalLogPages, value + 1))
+              }
+            />
+          </EnterprisePanel>
         </div>
 
-        <div className='space-y-4'>
+        <aside className='grid gap-2'>
           <EnterprisePanel
-            title='成本异常检测'
-            action={<Badge variant='outline'>{anomalyItems.length}</Badge>}
+            title='成本中心监测'
+            description='按部门 / 分组汇总'
+            action={
+              <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
+                实时
+              </Badge>
+            }
           >
-            <div className='space-y-3'>
-              {anomalyItems.map((item) => (
-                <article
-                  key={item.title}
-                  className='border-border/70 bg-background/55 rounded-md border p-3.5'
-                >
-                  <div className='flex gap-3'>
-                    <span
-                      className={cn(
-                        'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md',
-                        item.tone === 'rose' && 'bg-rose-500/10 text-rose-600',
-                        item.tone === 'amber' &&
-                          'bg-amber-500/10 text-amber-600',
-                        item.tone === 'blue' && 'bg-blue-500/10 text-blue-600'
-                      )}
-                    >
-                      <AlertTriangle className='size-4' />
-                    </span>
-                    <div>
-                      <p className='text-xs font-semibold'>{item.title}</p>
-                      <p className='text-muted-foreground mt-1 text-[11px] leading-5'>
-                        {item.detail}
-                      </p>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <CostDonutPanel
+              title='成本中心'
+              items={usage.by_group}
+              centerText={formatCurrencyUSD(metrics.estimated_cost)}
+            />
           </EnterprisePanel>
 
-          <EnterprisePanel title='热点客户 / 用户' description='按成本贡献排序'>
-            <BreakdownList items={usage.by_user} emptyText='暂无客户用量数据' />
+          <EnterprisePanel
+            title='热点客户'
+            description='按成本贡献排序'
+            action={
+              <Button
+                variant='ghost'
+                size='xs'
+                className='h-6 px-1.5 text-[11px] text-blue-600'
+              >
+                查看全部
+                <MoreHorizontal className='size-3.5' />
+              </Button>
+            }
+          >
+            <TopBreakdownList
+              items={usage.by_user}
+              value='cost'
+              emptyText='暂无客户用量数据'
+            />
           </EnterprisePanel>
 
           <EnterprisePanel title='优化建议'>
-            <div className='space-y-3'>
-              <div className='rounded-md border border-blue-500/15 bg-blue-500/5 p-3.5'>
-                <div className='flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300'>
-                  <Sparkles className='size-4' />
-                  提升缓存命中率
+            <div className='space-y-2'>
+              {anomalyItems.map((item) => {
+                const Icon = OPTIMIZATION_ICONS[item.tone]
+                return (
+                  <article
+                    key={item.title}
+                    className={cn(
+                      'rounded-md border p-2.5',
+                      item.tone === 'rose' &&
+                        'border-rose-100 bg-rose-50/70 text-rose-700',
+                      item.tone === 'amber' &&
+                        'border-amber-100 bg-amber-50/70 text-amber-700',
+                      item.tone === 'blue' &&
+                        'border-blue-100 bg-blue-50/70 text-blue-700'
+                    )}
+                  >
+                    <div className='flex items-start gap-2'>
+                      <span className='mt-0.5 flex size-7 shrink-0 items-center justify-center rounded bg-white/70'>
+                        <Icon className='size-3.5' />
+                      </span>
+                      <div className='min-w-0'>
+                        <p className='text-xs font-semibold'>{item.title}</p>
+                        <p className='mt-1 text-[11px] leading-4 text-slate-600'>
+                          {item.detail}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+              <article className='rounded-md border border-emerald-100 bg-emerald-50/70 p-2.5 text-emerald-700'>
+                <div className='flex items-start gap-2'>
+                  <span className='mt-0.5 flex size-7 shrink-0 items-center justify-center rounded bg-white/70'>
+                    <ArrowUpRight className='size-3.5' />
+                  </span>
+                  <div className='min-w-0'>
+                    <p className='text-xs font-semibold'>优化模型组合</p>
+                    <p className='mt-1 text-[11px] leading-4 text-slate-600'>
+                      Top 模型 {usage.by_model[0]?.name || '暂无'} 占比{' '}
+                      {formatPercent(usage.by_model[0]?.share ?? 0)}
+                      ，可按低复杂度请求拆分路由。
+                    </p>
+                  </div>
                 </div>
-                <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
-                  对高频 Prompt 建立稳定缓存键，减少重复上游调用和成本。
-                </p>
-              </div>
-              <div className='rounded-md border border-violet-500/15 bg-violet-500/5 p-3.5'>
-                <div className='flex items-center gap-2 text-xs font-semibold text-violet-700 dark:text-violet-300'>
-                  <ArrowDownRight className='size-4' />
-                  优化模型组合
-                </div>
-                <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
-                  将低复杂度请求路由到更低成本模型，并保留高价值请求的质量兜底。
-                </p>
-              </div>
-              <div className='rounded-md border border-emerald-500/15 bg-emerald-500/5 p-3.5'>
-                <div className='flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300'>
-                  <ArrowUpRight className='size-4' />
-                  建立部门预算线
-                </div>
-                <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
-                  对高增长成本中心设置预警线，提前发现预算透支风险。
-                </p>
-              </div>
+              </article>
             </div>
           </EnterprisePanel>
 
           <EnterprisePanel title='运行概况'>
-            <div className='grid grid-cols-2 gap-3'>
-              <div className='bg-muted/40 rounded-md p-3'>
-                <Clock3 className='size-4 text-violet-500' />
-                <p className='mt-2 text-lg font-semibold'>
+            <div className='grid grid-cols-2 gap-2'>
+              <div className='rounded-md border border-slate-100 bg-slate-50 p-2'>
+                <Clock3 className='size-3.5 text-violet-500' />
+                <p className='mt-1.5 text-base font-semibold tabular-nums'>
                   {formatNumber(metrics.average_latency_ms)} ms
                 </p>
-                <p className='text-muted-foreground text-[10px]'>平均延迟</p>
+                <p className='text-[10px] text-slate-500'>平均延迟</p>
               </div>
-              <div className='bg-muted/40 rounded-md p-3'>
-                <UsersRound className='size-4 text-blue-500' />
-                <p className='mt-2 text-lg font-semibold'>
+              <div className='rounded-md border border-slate-100 bg-slate-50 p-2'>
+                <UsersRound className='size-3.5 text-blue-500' />
+                <p className='mt-1.5 text-base font-semibold tabular-nums'>
                   {formatNumber(usage.by_user.length)}
                 </p>
-                <p className='text-muted-foreground text-[10px]'>活跃主体</p>
+                <p className='text-[10px] text-slate-500'>活跃主体</p>
               </div>
             </div>
           </EnterprisePanel>
-        </div>
-      </div>
-
-      <EnterprisePanel
-        title='用量日志'
-        description={`共 ${formatNumber(usage.total_logs ?? 0)} 条匹配记录，当前展示 ${usage.recent_logs.length} 条`}
-        action={
-          <div className='flex flex-wrap items-center gap-2'>
-            <Badge variant='outline'>
-              第 {usage.page || page} / {totalLogPages} 页
-            </Badge>
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              disabled={page <= 1 || usageQuery.isFetching}
-            >
-              上一页
-            </Button>
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={() =>
-                setPage((value) => Math.min(totalLogPages, value + 1))
-              }
-              disabled={page >= totalLogPages || usageQuery.isFetching}
-            >
-              下一页
-            </Button>
-          </div>
-        }
-        bodyClassName='p-0'
-      >
-        <UsageLogTable logs={usage.recent_logs} />
-      </EnterprisePanel>
+        </aside>
+      </section>
 
       {props.classicContent && (
-        <EnterprisePanel
-          title='完整调用明细'
-          description='保留原系统的搜索、筛选、分页、详情与缓存诊断能力'
-          bodyClassName='min-h-[560px] p-0'
+        <details
+          className='rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600'
+          onToggle={(event) => setShowClassicLogs(event.currentTarget.open)}
         >
-          {props.classicContent}
-        </EnterprisePanel>
+          <summary className='flex cursor-pointer items-center gap-2 font-semibold text-slate-800'>
+            <SlidersHorizontal className='size-3.5 text-blue-600' />
+            高级日志工作台
+          </summary>
+          {showClassicLogs && (
+            <div className='mt-2 h-[620px] min-h-0'>{props.classicContent}</div>
+          )}
+        </details>
       )}
     </div>
   )

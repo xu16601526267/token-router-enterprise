@@ -281,6 +281,7 @@ type EnterpriseUsageTrendPoint struct {
 }
 
 type EnterpriseUsageBreakdownItem struct {
+	Id    int     `json:"id,omitempty"`
 	Name  string  `json:"name"`
 	Quota int64   `json:"quota"`
 	Cost  float64 `json:"cost"`
