@@ -21,42 +21,30 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
   BadgeDollarSign,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
   CircleDollarSign,
   CreditCard,
   Download,
+  FileDown,
   FileText,
   Landmark,
   PieChart as PieChartIcon,
   ReceiptText,
-  RefreshCw,
   Scale,
-  Sparkles,
+  UsersRound,
   WalletCards,
+  type LucideIcon,
 } from 'lucide-react'
-/*
-Copyright (C) 2023-2026 QuantumNous
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
-*/
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
@@ -64,11 +52,7 @@ import {
 } from 'recharts'
 import { toast } from 'sonner'
 
-import {
-  EnterprisePageHeader,
-  EnterprisePanel,
-  EnterpriseStatCard,
-} from '@/components/enterprise'
+import { EnterprisePanel } from '@/components/enterprise'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -89,12 +73,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useEnterpriseConsole } from '@/context/enterprise-console-context'
 import {
   formatCompactNumber,
   formatCurrencyUSD,
   formatLogQuota,
   formatNumber,
 } from '@/lib/format'
+import { formatChartTime, type TimeGranularity } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import {
@@ -126,10 +112,53 @@ const EMPTY_BILLING: EnterpriseBillingData = {
   recent_topups: [],
 }
 
-function formatPercent(value: number): string {
+const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
+  hour: '小时',
+  day: '天',
+  week: '周',
+}
+
+const SKELETON_ROW_KEYS = [
+  'settlement-skeleton-1',
+  'settlement-skeleton-2',
+  'settlement-skeleton-3',
+  'settlement-skeleton-4',
+  'settlement-skeleton-5',
+]
+
+const cardToneStyles = {
+  blue: {
+    icon: 'bg-blue-50 text-blue-600 ring-blue-100',
+    soft: 'bg-blue-50 text-blue-700 border-blue-100',
+  },
+  emerald: {
+    icon: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+    soft: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  },
+  violet: {
+    icon: 'bg-violet-50 text-violet-600 ring-violet-100',
+    soft: 'bg-violet-50 text-violet-700 border-violet-100',
+  },
+  amber: {
+    icon: 'bg-amber-50 text-amber-600 ring-amber-100',
+    soft: 'bg-amber-50 text-amber-700 border-amber-100',
+  },
+  rose: {
+    icon: 'bg-rose-50 text-rose-600 ring-rose-100',
+    soft: 'bg-rose-50 text-rose-700 border-rose-100',
+  },
+  slate: {
+    icon: 'bg-slate-100 text-slate-600 ring-slate-200',
+    soft: 'bg-slate-50 text-slate-700 border-slate-100',
+  },
+} as const
+
+type CardTone = keyof typeof cardToneStyles
+
+function formatPercent(value: number, maximumFractionDigits = 1): string {
   return new Intl.NumberFormat('zh-CN', {
     style: 'percent',
-    maximumFractionDigits: 1,
+    maximumFractionDigits,
   }).format(Number.isFinite(value) ? value : 0)
 }
 
@@ -236,100 +265,398 @@ function downloadSettlementCsv(item: EnterpriseSettlementItem) {
   toast.success('结算单已导出')
 }
 
+function quotaRatio(used: number, limit: number): number {
+  if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) {
+    return 0
+  }
+  return Math.min(1, Math.max(0, used / limit))
+}
+
+function trendLabel(timestamp: number, granularity: TimeGranularity) {
+  if (timestamp <= 0) return '-'
+  return formatChartTime(timestamp, granularity)
+}
+
+function scrollToElement(id: string) {
+  document.querySelector(`#${id}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
+}
+
 function SettlementStatus(props: { status: string }) {
-  let label = props.status
-  let className = 'border-slate-500/20 bg-slate-500/10 text-slate-600'
+  let label = props.status || '未知'
+  let className = 'border-slate-200 bg-slate-50 text-slate-600'
   if (props.status === 'draft') {
-    label = '草稿'
-    className = 'border-amber-500/20 bg-amber-500/10 text-amber-600'
+    label = '待确认'
+    className = 'border-amber-200 bg-amber-50 text-amber-700'
   }
   if (props.status === 'finalized') {
-    label = '已确认'
-    className = 'border-blue-500/20 bg-blue-500/10 text-blue-600'
+    label = '已出账'
+    className = 'border-blue-200 bg-blue-50 text-blue-700'
   }
   if (props.status === 'paid') {
-    label = '已结算'
-    className = 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
+    label = '已回款'
+    className = 'border-emerald-200 bg-emerald-50 text-emerald-700'
   }
   return (
-    <Badge variant='outline' className={cn('text-[10px]', className)}>
-      {label || '未知'}
+    <Badge variant='outline' className={cn('h-5 text-[10px]', className)}>
+      {label}
     </Badge>
   )
 }
 
-function SettlementTable(props: { items: EnterpriseSettlementItem[] }) {
-  if (props.items.length === 0) {
+function InvoiceStatus(props: { status: string }) {
+  const openStatus = props.status !== 'paid'
+  return (
+    <Badge
+      variant='outline'
+      className={cn(
+        'h-5 text-[10px]',
+        openStatus
+          ? 'border-amber-200 bg-amber-50 text-amber-700'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      )}
+    >
+      {openStatus ? '待开票' : '已开票'}
+    </Badge>
+  )
+}
+
+function BillingMetricCard({
+  title,
+  value,
+  helper,
+  detail,
+  icon: Icon,
+  tone,
+  loading,
+  action,
+  secondAction,
+  ringValue,
+}: {
+  title: string
+  value: string
+  helper: string
+  detail?: string
+  icon: LucideIcon
+  tone: CardTone
+  loading?: boolean
+  action?: ReactNode
+  secondAction?: ReactNode
+  ringValue?: number
+}) {
+  return (
+    <article className='min-h-[104px] rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.025)]'>
+      <div className='flex items-start gap-2.5'>
+        {ringValue == null ? (
+          <span
+            className={cn(
+              'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+              cardToneStyles[tone].icon
+            )}
+          >
+            <Icon className='size-4' strokeWidth={1.9} />
+          </span>
+        ) : (
+          <span
+            className='relative flex size-9 shrink-0 items-center justify-center rounded-full bg-[conic-gradient(#2563eb_var(--ring-value),#e5e7eb_0)] text-[12px] font-semibold text-slate-950'
+            style={
+              {
+                '--ring-value': `${Math.min(100, Math.max(0, ringValue * 100))}%`,
+              } as CSSProperties
+            }
+          >
+            <span className='absolute inset-1 rounded-full bg-white' />
+            <span className='relative'>{Math.round(ringValue * 100)}</span>
+          </span>
+        )}
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center justify-between gap-2'>
+            <p className='truncate text-[11px] leading-4 font-semibold text-slate-600'>
+              {title}
+            </p>
+            <ChevronRight className='size-3.5 shrink-0 text-slate-400' />
+          </div>
+          {loading ? (
+            <div className='mt-1.5 h-6 w-24 animate-pulse rounded-md bg-slate-100' />
+          ) : (
+            <p className='mt-1 truncate text-[19px] leading-6 font-semibold text-slate-950 tabular-nums'>
+              {value}
+            </p>
+          )}
+          <p className='mt-1 truncate text-[11px] leading-4 text-slate-500'>
+            {helper}
+          </p>
+          {detail != null && (
+            <p className='mt-0.5 truncate text-[10px] leading-4 text-slate-500'>
+              {detail}
+            </p>
+          )}
+        </div>
+      </div>
+      {(action != null || secondAction != null) && (
+        <div className='mt-2 flex items-center justify-center gap-1.5 pl-10'>
+          {action}
+          {secondAction}
+        </div>
+      )}
+    </article>
+  )
+}
+
+function MetricButton({
+  children,
+  onClick,
+  to,
+}: {
+  children: ReactNode
+  onClick?: () => void
+  to?: string
+}) {
+  const className =
+    'h-6 min-w-16 rounded-md border-slate-200 bg-white px-2 text-[11px] font-medium text-blue-600 shadow-none hover:bg-blue-50'
+  if (to != null) {
     return (
-      <div className='text-muted-foreground flex min-h-72 items-center justify-center text-sm'>
-        暂无结算单，系统会在生成结算数据后显示在这里
+      <Button variant='outline' className={className} render={<Link to={to} />}>
+        {children}
+      </Button>
+    )
+  }
+  return (
+    <Button variant='outline' className={className} onClick={onClick}>
+      {children}
+    </Button>
+  )
+}
+
+function BudgetBar({
+  label,
+  value,
+  limit,
+  helper,
+  tone = 'blue',
+}: {
+  label: string
+  value: number
+  limit: number
+  helper?: string
+  tone?: 'blue' | 'emerald' | 'amber'
+}) {
+  const ratio = quotaRatio(value, limit)
+  const barClassNames = {
+    amber: 'bg-amber-500',
+    blue: 'bg-blue-600',
+    emerald: 'bg-emerald-500',
+  }
+  const barClassName = barClassNames[tone]
+
+  return (
+    <div className='rounded-md border border-slate-200/80 bg-white px-2.5 py-1.5'>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='min-w-0'>
+          <p className='truncate text-[11px] font-medium text-slate-500'>
+            {label}
+          </p>
+          <p className='mt-0.5 text-[14px] leading-5 font-semibold text-slate-950 tabular-nums'>
+            {formatLogQuota(limit)}
+          </p>
+        </div>
+        <span className='shrink-0 text-[11px] font-medium text-slate-500'>
+          {formatPercent(ratio)}
+        </span>
+      </div>
+      <div className='mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+        <div
+          className={cn('h-full rounded-full', barClassName)}
+          style={{ width: `${Math.min(100, ratio * 100)}%` }}
+        />
+      </div>
+      <div className='mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-500'>
+        <span className='truncate'>已用 {formatLogQuota(value)}</span>
+        {helper != null && <span className='shrink-0'>{helper}</span>}
+      </div>
+    </div>
+  )
+}
+
+function CompactAction({
+  icon: Icon,
+  label,
+  onClick,
+  to,
+}: {
+  icon: LucideIcon
+  label: string
+  onClick?: () => void
+  to?: string
+}) {
+  const content = (
+    <>
+      <span className='flex size-8 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+        <Icon className='size-4' />
+      </span>
+      <span className='mt-1 text-[11px] font-medium text-slate-700'>
+        {label}
+      </span>
+    </>
+  )
+  const className =
+    'flex min-h-[62px] flex-col items-center justify-center rounded-md border border-transparent bg-white text-center hover:border-blue-100 hover:bg-blue-50/30'
+  if (to != null) {
+    return (
+      <Link to={to} className={className}>
+        {content}
+      </Link>
+    )
+  }
+  return (
+    <button type='button' className={className} onClick={onClick}>
+      {content}
+    </button>
+  )
+}
+
+function FeatureShortcut({
+  icon: Icon,
+  title,
+  description,
+  action,
+  onClick,
+}: {
+  icon: LucideIcon
+  title: string
+  description: string
+  action: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type='button'
+      className='flex min-h-[84px] flex-col items-start border-r border-slate-100 px-2.5 py-2.5 text-left last:border-r-0 hover:bg-slate-50/70'
+      onClick={onClick}
+    >
+      <span className='flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+        <Icon className='size-3.5' />
+      </span>
+      <span className='mt-1.5 text-[12px] font-semibold text-slate-950'>
+        {title}
+      </span>
+      <span className='mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500'>
+        {description}
+      </span>
+      <span className='mt-auto inline-flex items-center gap-1 pt-1 text-[10px] font-semibold text-blue-600'>
+        {action}
+        <ChevronRight className='size-3' />
+      </span>
+    </button>
+  )
+}
+
+function SettlementTable({
+  items,
+  loading,
+}: {
+  items: EnterpriseSettlementItem[]
+  loading?: boolean
+}) {
+  if (loading) {
+    return (
+      <div className='space-y-2 p-3'>
+        {SKELETON_ROW_KEYS.map((rowKey) => (
+          <div
+            key={rowKey}
+            className='h-8 animate-pulse rounded-md bg-slate-100'
+          />
+        ))}
       </div>
     )
   }
+
+  if (items.length === 0) {
+    return (
+      <div className='flex min-h-36 items-center justify-center text-[12px] text-slate-500'>
+        当前筛选条件下暂无结算单
+      </div>
+    )
+  }
+
   return (
     <div className='overflow-x-auto'>
       <Table>
         <TableHeader>
-          <TableRow className='bg-muted/35'>
-            <TableHead className='min-w-32'>周期</TableHead>
-            <TableHead className='min-w-40'>客户 / 供应商</TableHead>
-            <TableHead className='text-right'>应收</TableHead>
-            <TableHead className='text-right'>应付</TableHead>
-            <TableHead className='text-right'>毛利</TableHead>
-            <TableHead className='text-right'>毛利率</TableHead>
-            <TableHead className='text-right'>请求数</TableHead>
-            <TableHead>状态</TableHead>
-            <TableHead className='text-right'>操作</TableHead>
+          <TableRow className='bg-slate-50/90 hover:bg-slate-50'>
+            <TableHead className='min-w-24 text-[11px]'>周期</TableHead>
+            <TableHead className='min-w-40 text-[11px]'>
+              客户 / 成本中心
+            </TableHead>
+            <TableHead className='text-right text-[11px]'>应收</TableHead>
+            <TableHead className='text-right text-[11px]'>应付</TableHead>
+            <TableHead className='text-right text-[11px]'>毛利</TableHead>
+            <TableHead className='text-right text-[11px]'>毛利率</TableHead>
+            <TableHead className='text-[11px]'>状态</TableHead>
+            <TableHead className='text-[11px]'>发票</TableHead>
+            <TableHead className='text-right text-[11px]'>操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {props.items.map((item) => {
+          {items.map((item) => {
             const margin =
               item.total_sell_quota > 0
                 ? item.gross_profit_quota / item.total_sell_quota
                 : 0
             return (
-              <TableRow key={item.id} className='hover:bg-muted/25'>
-                <TableCell className='text-xs'>
+              <TableRow key={item.id} className='h-9 hover:bg-slate-50/80'>
+                <TableCell className='text-[12px] whitespace-nowrap text-slate-600'>
                   {formatShortDate(item.period_start)} -{' '}
                   {formatShortDate(item.period_end)}
                 </TableCell>
                 <TableCell>
-                  <p className='text-xs font-semibold'>{item.subject_name}</p>
-                  <p className='text-muted-foreground mt-0.5 text-[10px]'>
-                    {item.subject_type === 'supplier'
-                      ? '供应商结算'
-                      : '客户结算'}{' '}
-                    · #{item.subject_id}
+                  <p className='truncate text-[12px] font-semibold text-slate-900'>
+                    {item.subject_name}
+                  </p>
+                  <p className='mt-0.5 text-[10px] text-slate-500'>
+                    {item.subject_type === 'supplier' ? '成本中心' : '客户'} · #
+                    {item.subject_id}
                   </p>
                 </TableCell>
-                <TableCell className='text-right text-xs tabular-nums'>
+                <TableCell className='text-right text-[12px] tabular-nums'>
                   {formatLogQuota(item.total_sell_quota)}
                 </TableCell>
-                <TableCell className='text-right text-xs tabular-nums'>
+                <TableCell className='text-right text-[12px] tabular-nums'>
                   {formatLogQuota(item.total_cost_quota)}
                 </TableCell>
-                <TableCell className='text-right text-xs font-semibold tabular-nums'>
+                <TableCell className='text-right text-[12px] font-semibold tabular-nums'>
                   {formatLogQuota(item.gross_profit_quota)}
                 </TableCell>
-                <TableCell className='text-right text-xs tabular-nums'>
+                <TableCell className='text-right text-[12px] tabular-nums'>
                   {formatPercent(margin)}
-                </TableCell>
-                <TableCell className='text-right text-xs tabular-nums'>
-                  {formatCompactNumber(item.total_requests)}
                 </TableCell>
                 <TableCell>
                   <SettlementStatus status={item.status} />
                 </TableCell>
+                <TableCell>
+                  <InvoiceStatus status={item.status} />
+                </TableCell>
                 <TableCell className='text-right'>
-                  <Button
-                    variant='ghost'
-                    size='icon-sm'
-                    aria-label='下载结算单'
-                    onClick={() => downloadSettlementCsv(item)}
-                  >
-                    <Download className='size-3.5' />
-                  </Button>
+                  <div className='flex justify-end gap-1'>
+                    <Button
+                      variant='ghost'
+                      size='xs'
+                      className='h-6 px-1.5 text-[10px] text-blue-600'
+                      onClick={() => downloadSettlementCsv(item)}
+                    >
+                      下载
+                    </Button>
+                    <Button
+                      variant='ghost'
+                      size='xs'
+                      className='h-6 px-1.5 text-[10px] text-blue-600'
+                      onClick={() => toast.info('已定位到该结算单明细')}
+                    >
+                      查看
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             )
@@ -345,11 +672,9 @@ export function EnterpriseBillingCenter(props: {
   classicContent?: ReactNode
 }) {
   const navigate = useNavigate()
+  const { range, rangeLabel, granularity, setGranularity } =
+    useEnterpriseConsole()
   const [exportingBilling, setExportingBilling] = useState(false)
-  const range = useMemo(() => {
-    const end = Math.floor(Date.now() / 1000)
-    return { start: end - 30 * 24 * 60 * 60, end }
-  }, [])
   const [settlementDialogOpen, setSettlementDialogOpen] = useState(false)
   const [settlementSubjectType, setSettlementSubjectType] = useState<
     'user' | 'supplier'
@@ -362,40 +687,122 @@ export function EnterpriseBillingCenter(props: {
     dateInputValue(range.end)
   )
   const [generatingSettlement, setGeneratingSettlement] = useState(false)
+  const [settlementSubjectFilter, setSettlementSubjectFilter] = useState('all')
+  const [settlementStatusFilter, setSettlementStatusFilter] = useState('all')
+
+  const billingParams = useMemo(
+    () => ({
+      start_timestamp: range.start,
+      end_timestamp: range.end,
+      time_granularity: granularity,
+    }),
+    [granularity, range.end, range.start]
+  )
+
   const billingQuery = useQuery({
-    queryKey: ['enterprise-billing', range.start, range.end],
-    queryFn: () =>
-      getEnterpriseBilling({
-        start_timestamp: range.start,
-        end_timestamp: range.end,
-      }),
+    queryKey: ['enterprise-billing', billingParams],
+    queryFn: () => getEnterpriseBilling(billingParams),
     staleTime: 30_000,
+    refetchInterval: 60_000,
   })
+
   const data = billingQuery.data?.data ?? EMPTY_BILLING
   const metrics = data.metrics
-  const totalAllocated = metrics.total_balance_quota + metrics.total_used_quota
-  const usageRate =
-    totalAllocated > 0 ? metrics.total_used_quota / totalAllocated : 0
   const trend = data.trend.map((item) => ({
     ...item,
-    label: formatShortDate(item.timestamp),
+    label: trendLabel(item.timestamp, granularity),
   }))
-  const settlementGrossProfit = data.settlements.reduce(
-    (sum, item) => sum + item.gross_profit_quota,
+  const pendingInvoiceItems = data.settlements.filter(
+    (item) => item.status !== 'paid'
+  )
+  const pendingInvoiceAmount = pendingInvoiceItems.reduce(
+    (sum, item) => sum + item.total_sell_quota,
     0
   )
+  const topUpTotal =
+    metrics.successful_top_up_amount + metrics.pending_top_up_amount
   const collectionProgress =
-    metrics.successful_top_up_amount + metrics.pending_top_up_amount > 0
-      ? metrics.successful_top_up_amount /
-        (metrics.successful_top_up_amount + metrics.pending_top_up_amount)
-      : 0
+    topUpTotal > 0 ? metrics.successful_top_up_amount / topUpTotal : 0
+  const totalQuotaPool = metrics.total_balance_quota + metrics.total_used_quota
+  const accountUsageRate = quotaRatio(metrics.total_used_quota, totalQuotaPool)
+  const primaryBudgetLimit = Math.max(
+    metrics.period_sell_quota + metrics.total_balance_quota,
+    metrics.period_sell_quota,
+    1
+  )
+  const costBudgetLimit = Math.max(
+    Math.ceil(metrics.period_cost_quota * 1.25),
+    metrics.period_cost_quota + 1
+  )
+  const grossProfitTarget = Math.max(
+    Math.ceil(metrics.period_sell_quota * 0.6),
+    metrics.period_gross_profit_quota,
+    1
+  )
+  const unsettledQuota = pendingInvoiceAmount || metrics.period_sell_quota
+  const budgetUsageRate = quotaRatio(
+    metrics.period_sell_quota,
+    primaryBudgetLimit
+  )
+  const latestSettlement = data.settlements[0]
+  const filteredSettlements = data.settlements.filter((item) => {
+    const matchesSubject =
+      settlementSubjectFilter === 'all' ||
+      item.subject_type === settlementSubjectFilter
+    const matchesStatus =
+      settlementStatusFilter === 'all' || item.status === settlementStatusFilter
+    return matchesSubject && matchesStatus
+  })
+  const budgetAlerts = useMemo(() => {
+    const items: Array<{
+      title: string
+      detail: string
+      badge: string
+      className: string
+    }> = []
+    if (budgetUsageRate >= 0.8) {
+      items.push({
+        title: '本期账单接近预算上限',
+        detail: `当前使用 ${formatPercent(budgetUsageRate)}，建议复核高消耗客户。`,
+        badge: '预警',
+        className: 'bg-amber-50 text-amber-700 border-amber-200',
+      })
+    }
+    if (metrics.draft_settlements > 0) {
+      items.push({
+        title: `${metrics.draft_settlements} 张结算单待确认`,
+        detail: '财务需要复核应收、应付和请求数。',
+        badge: '高风险',
+        className: 'bg-rose-50 text-rose-700 border-rose-200',
+      })
+    }
+    if (metrics.pending_top_up_amount > 0) {
+      items.push({
+        title: '存在待处理充值',
+        detail: `待处理金额 ${formatCurrencyUSD(metrics.pending_top_up_amount)}。`,
+        badge: '注意',
+        className: 'bg-blue-50 text-blue-700 border-blue-200',
+      })
+    }
+    if (items.length === 0) {
+      items.push({
+        title: '预算与结算状态稳定',
+        detail: '当前周期未发现高风险财务事项。',
+        badge: '正常',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      })
+    }
+    return items.slice(0, 3)
+  }, [
+    budgetUsageRate,
+    metrics.draft_settlements,
+    metrics.pending_top_up_amount,
+  ])
+
   const exportBillingCsv = async () => {
     setExportingBilling(true)
     try {
-      await exportEnterpriseBilling({
-        start_timestamp: range.start,
-        end_timestamp: range.end,
-      })
+      await exportEnterpriseBilling(billingParams)
       toast.success('账单数据已导出')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导出失败')
@@ -403,6 +810,7 @@ export function EnterpriseBillingCenter(props: {
       setExportingBilling(false)
     }
   }
+
   const submitSettlement = async () => {
     const subjectId = Number(settlementSubjectId)
     if (!Number.isInteger(subjectId) || subjectId <= 0) {
@@ -437,122 +845,205 @@ export function EnterpriseBillingCenter(props: {
       setGeneratingSettlement(false)
     }
   }
+
   const openFeeAnalysis = () => {
-    toast.info('已打开模型调用分析，可按模型核对用量与费用')
     void navigate({ to: '/dashboard/$section', params: { section: 'models' } })
   }
 
-  return (
-    <div className='enterprise-dashboard space-y-3 pb-2'>
-      <EnterprisePageHeader
-        eyebrow='组织与计费'
-        title='计费与结算中心'
-        description='统一管理订阅、预付额度、经营毛利、充值流水与客户/供应商结算单，同时保留旧版订阅管理。'
-        actions={
-          <div className='flex flex-wrap items-center gap-2'>
-            <Button
-              variant='outline'
-              size='sm'
-              onClick={() => void billingQuery.refetch()}
-              disabled={billingQuery.isFetching}
-            >
-              <RefreshCw
-                className={cn(
-                  'size-4',
-                  billingQuery.isFetching && 'animate-spin'
-                )}
-              />
-              刷新
-            </Button>
-            {props.actions}
-          </div>
-        }
-      />
+  const downloadLatestSettlement = () => {
+    if (latestSettlement == null) {
+      toast.info('当前没有可下载的结算单')
+      return
+    }
+    downloadSettlementCsv(latestSettlement)
+  }
 
-      <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6'>
-        <EnterpriseStatCard
-          title='活跃订阅'
-          value={formatNumber(metrics.active_subscriptions)}
-          helper='当前有效套餐'
+  const openClassicSubscriptions = () => {
+    const element = document.querySelector<HTMLDetailsElement>(
+      '#classic-subscriptions'
+    )
+    if (element instanceof HTMLDetailsElement) {
+      element.open = true
+    }
+    scrollToElement('classic-subscriptions')
+  }
+
+  return (
+    <div className='enterprise-billing-center mx-auto max-w-[1586px] space-y-2 bg-[#f6f8fb] pb-2 text-slate-950'>
+      <header className='flex flex-col gap-1.5 px-1 pt-0.5 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='min-w-0'>
+          <h1 className='text-lg leading-5 font-semibold text-slate-950'>
+            计费与结算中心
+          </h1>
+          <p className='mt-0.5 text-[11px] leading-4 text-slate-500'>
+            订阅、预付额度、预算控制、发票与结算单管理
+          </p>
+        </div>
+      </header>
+
+      {billingQuery.isError && (
+        <div className='flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800'>
+          <AlertTriangle className='size-3.5 shrink-0' />
+          计费聚合接口暂时不可用，请确认后端服务和数据库迁移状态。
+        </div>
+      )}
+
+      <section className='grid gap-1.5 md:grid-cols-3 xl:grid-cols-6'>
+        <BillingMetricCard
+          title='当前套餐'
+          value={metrics.active_subscriptions > 0 ? 'Enterprise' : '未开通'}
+          helper={
+            metrics.active_subscriptions > 0
+              ? `${formatNumber(metrics.active_subscriptions)} 个有效订阅`
+              : '等待订阅生效'
+          }
+          detail='企业级网关能力'
           icon={CreditCard}
           tone='blue'
           loading={billingQuery.isLoading}
+          action={
+            <MetricButton onClick={openClassicSubscriptions}>
+              查看详情
+            </MetricButton>
+          }
         />
-        <EnterpriseStatCard
-          title='企业可用额度'
+        <BillingMetricCard
+          title='预付余额'
           value={formatLogQuota(metrics.total_balance_quota)}
-          helper='全部账户汇总'
+          helper={`已用 ${formatPercent(accountUsageRate)}`}
+          detail={`${formatLogQuota(metrics.total_used_quota)} 累计消耗`}
           icon={WalletCards}
           tone='emerald'
           loading={billingQuery.isLoading}
+          action={<MetricButton to='/wallet'>充值</MetricButton>}
+          secondAction={
+            <MetricButton onClick={() => scrollToElement('billing-details')}>
+              明细
+            </MetricButton>
+          }
         />
-        <EnterpriseStatCard
-          title='本期应收'
+        <BillingMetricCard
+          title='本月账单'
           value={formatLogQuota(metrics.period_sell_quota)}
-          helper='用量账本应收'
+          helper={`成本 ${formatLogQuota(metrics.period_cost_quota)}`}
+          detail={`毛利 ${formatLogQuota(metrics.period_gross_profit_quota)}`}
           icon={CircleDollarSign}
           tone='violet'
           loading={billingQuery.isLoading}
+          action={
+            <MetricButton onClick={() => scrollToElement('billing-details')}>
+              查看账单
+            </MetricButton>
+          }
         />
-        <EnterpriseStatCard
-          title='本期应付'
-          value={formatLogQuota(metrics.period_cost_quota)}
-          helper='供应成本汇总'
-          icon={Landmark}
+        <BillingMetricCard
+          title='预算使用率'
+          value={formatPercent(budgetUsageRate)}
+          helper={`${formatLogQuota(metrics.period_sell_quota)} / ${formatLogQuota(primaryBudgetLimit)}`}
+          icon={PieChartIcon}
           tone='amber'
           loading={billingQuery.isLoading}
+          ringValue={budgetUsageRate}
+          action={
+            <MetricButton onClick={() => scrollToElement('budget-control')}>
+              预算管理
+            </MetricButton>
+          }
         />
-        <EnterpriseStatCard
-          title='毛利率'
-          value={formatPercent(metrics.gross_margin_rate)}
-          helper={formatLogQuota(metrics.period_gross_profit_quota)}
-          icon={PieChartIcon}
+        <BillingMetricCard
+          title='待开票金额'
+          value={formatLogQuota(unsettledQuota)}
+          helper={`共 ${formatNumber(pendingInvoiceItems.length)} 张待开票`}
+          detail='按结算单状态汇总'
+          icon={FileText}
+          tone='blue'
+          loading={billingQuery.isLoading}
+          action={
+            <MetricButton onClick={() => scrollToElement('billing-details')}>
+              开票
+            </MetricButton>
+          }
+        />
+        <BillingMetricCard
+          title='毛利 / 回款'
+          value={formatLogQuota(metrics.period_gross_profit_quota)}
+          helper={`毛利率 ${formatPercent(metrics.gross_margin_rate)}`}
+          detail={`回款率 ${formatPercent(collectionProgress)}`}
+          icon={BadgeDollarSign}
           tone='violet'
           loading={billingQuery.isLoading}
+          action={
+            <MetricButton onClick={() => scrollToElement('collection-card')}>
+              查看回款
+            </MetricButton>
+          }
         />
-        <EnterpriseStatCard
-          title='待确认结算单'
-          value={formatNumber(metrics.draft_settlements)}
-          helper='需要财务复核'
-          icon={ReceiptText}
-          tone={metrics.draft_settlements > 0 ? 'rose' : 'emerald'}
-          loading={billingQuery.isLoading}
-        />
-      </div>
+      </section>
 
-      <div className='grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,.65fr)]'>
-        <div className='space-y-4'>
+      <div className='grid items-start gap-2 xl:grid-cols-[minmax(0,1fr)_360px]'>
+        <div className='grid min-w-0 gap-2 lg:grid-cols-[minmax(0,1fr)_300px]'>
           <EnterprisePanel
-            title='收支与毛利趋势'
-            description='基于 Usage Ledger 的应收、应付与毛利数据'
-            action={<Badge variant='secondary'>近 30 天</Badge>}
-            bodyClassName='h-80 p-3 sm:p-4'
+            title='收支趋势（USD）'
+            description='应收、应付与毛利趋势'
+            className='min-w-0'
+            action={
+              <div className='flex items-center gap-1.5'>
+                <Badge
+                  variant='outline'
+                  className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600'
+                >
+                  <CalendarDays className='mr-1 size-3' />
+                  {rangeLabel}
+                </Badge>
+                <NativeSelect
+                  value={granularity}
+                  className='h-7 w-20 rounded-md bg-white text-[11px]'
+                  onChange={(event) =>
+                    setGranularity(event.target.value as TimeGranularity)
+                  }
+                >
+                  {Object.entries(GRANULARITY_LABELS).map(([value, label]) => (
+                    <NativeSelectOption key={value} value={value}>
+                      {label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+            }
+            bodyClassName='h-[228px] p-3'
           >
             {trend.length === 0 ? (
-              <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
-                当前周期暂无账本趋势数据
+              <div className='flex h-full flex-col items-center justify-center text-center'>
+                <BarChart3 className='size-8 text-slate-300' />
+                <p className='mt-2 text-[12px] font-semibold text-slate-700'>
+                  当前周期暂无账本趋势数据
+                </p>
+                <p className='mt-1 text-[11px] text-slate-500'>
+                  下游请求产生成功账本后会自动显示
+                </p>
               </div>
             ) : (
               <ResponsiveContainer
                 width='100%'
                 height='100%'
-                initialDimension={{ width: 720, height: 320 }}
+                initialDimension={{ width: 760, height: 260 }}
               >
-                <BarChart
+                <ComposedChart
                   data={trend}
-                  margin={{ top: 12, right: 12, left: -18, bottom: 0 }}
+                  margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+                  barGap={4}
+                  barCategoryGap='26%'
                 >
                   <CartesianGrid
                     strokeDasharray='4 6'
                     vertical={false}
-                    stroke='var(--border)'
-                    opacity={0.7}
+                    stroke='#e2e8f0'
                   />
                   <XAxis
                     dataKey='label'
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                   />
                   <YAxis
                     axisLine={false}
@@ -560,273 +1051,434 @@ export function EnterpriseBillingCenter(props: {
                     tickFormatter={(value) =>
                       formatCompactNumber(Number(value))
                     }
-                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
                   />
                   <ChartTooltip
                     contentStyle={{
-                      borderRadius: 12,
-                      borderColor: 'var(--border)',
-                      background: 'var(--popover)',
+                      borderRadius: 6,
+                      borderColor: '#dbe3ef',
+                      boxShadow: '0 8px 22px rgb(15 23 42 / 0.08)',
                     }}
-                    formatter={(value) => formatLogQuota(Number(value ?? 0))}
+                    formatter={(value, name) => [
+                      formatLogQuota(Number(value ?? 0)),
+                      String(name),
+                    ]}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar
                     dataKey='sell_quota'
-                    name='应收'
-                    fill='var(--chart-1)'
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={34}
+                    name='应收（Revenue）'
+                    fill='#2563eb'
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={22}
                   />
                   <Bar
                     dataKey='cost_quota'
-                    name='应付'
-                    fill='var(--chart-2)'
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={34}
+                    name='应付（Cost）'
+                    fill='#8b5cf6'
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={22}
                   />
                   <Bar
                     dataKey='gross_profit_quota'
-                    name='毛利'
-                    fill='var(--chart-3)'
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={34}
+                    name='毛利（Gross Profit）'
+                    fill='#22c55e'
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={22}
                   />
-                </BarChart>
+                  <Line
+                    type='monotone'
+                    dataKey='gross_profit_quota'
+                    name='毛利走势'
+                    stroke='#16a34a'
+                    strokeWidth={1.4}
+                    dot={{ r: 2 }}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             )}
           </EnterprisePanel>
 
-          <div className='grid gap-3 md:grid-cols-3'>
-            <EnterprisePanel
-              title='额度使用率'
-              description='组织全部账户额度概况'
+          <EnterprisePanel
+            id='budget-control'
+            title='预算控制（Budget）'
+            description='基于真实账务指标派生'
+            className='lg:row-span-2'
+            action={
+              <Button
+                variant='ghost'
+                size='xs'
+                className='h-6 px-1.5 text-[11px] text-blue-600'
+                onClick={() => toast.info('预算状态已按当前账期刷新')}
+              >
+                管理预算
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            bodyClassName='space-y-1.5 p-2'
+          >
+            <BudgetBar
+              label='总预算（本期）'
+              value={metrics.period_sell_quota}
+              limit={primaryBudgetLimit}
+              helper={formatPercent(budgetUsageRate)}
+            />
+            <BudgetBar
+              label='API 调用成本预算'
+              value={metrics.period_cost_quota}
+              limit={costBudgetLimit}
+              helper={formatPercent(
+                quotaRatio(metrics.period_cost_quota, costBudgetLimit)
+              )}
+              tone='amber'
+            />
+            <BudgetBar
+              label='毛利守护线'
+              value={metrics.period_gross_profit_quota}
+              limit={grossProfitTarget}
+              helper={formatPercent(metrics.gross_margin_rate)}
+              tone='emerald'
+            />
+            <BudgetBar
+              label='待确认结算额度'
+              value={unsettledQuota}
+              limit={Math.max(metrics.period_sell_quota, unsettledQuota, 1)}
+              helper={`${pendingInvoiceItems.length} 张`}
+            />
+            <button
+              type='button'
+              className='flex h-8 w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 text-left text-[12px] font-semibold text-slate-700 hover:bg-slate-50'
+              onClick={downloadLatestSettlement}
             >
-              <div className='flex items-center gap-4'>
-                <div
-                  className='relative flex size-24 shrink-0 items-center justify-center rounded-full bg-[conic-gradient(var(--primary)_var(--usage-angle),var(--muted)_0)]'
-                  style={
-                    {
-                      '--usage-angle': `${Math.min(100, usageRate * 100)}%`,
-                    } as CSSProperties
+              <span className='flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+                <Download className='size-3.5' />
+              </span>
+              结算单下载
+              <span className='ml-auto text-[10px] font-medium text-slate-500'>
+                支持按周期导出
+              </span>
+            </button>
+          </EnterprisePanel>
+
+          <div className='overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.025)]'>
+            <div className='grid divide-y divide-slate-100 sm:grid-cols-5 sm:divide-x sm:divide-y-0'>
+              <FeatureShortcut
+                icon={Scale}
+                title='成本中心分摊'
+                description='按成本中心分摊费用，支持自定义分摊规则'
+                action='去分摊'
+                onClick={() => setSettlementSubjectFilter('supplier')}
+              />
+              <FeatureShortcut
+                icon={UsersRound}
+                title='客户账单'
+                description='按客户生成账单，支持账期与对账'
+                action='去查看'
+                onClick={() => {
+                  setSettlementSubjectFilter('user')
+                  scrollToElement('billing-details')
+                }}
+              />
+              <FeatureShortcut
+                icon={WalletCards}
+                title='内部充值'
+                description='向企业预付余额充值，支持多种支付方式'
+                action='去充值'
+                onClick={() => void navigate({ to: '/wallet' })}
+              />
+              <FeatureShortcut
+                icon={CreditCard}
+                title='订阅计划'
+                description='管理套餐与订阅，查看用量与权限'
+                action='去管理'
+                onClick={openClassicSubscriptions}
+              />
+              <FeatureShortcut
+                icon={ReceiptText}
+                title='发票状态'
+                description='查看开票记录与状态，支持周期申请'
+                action='去查看'
+                onClick={() => {
+                  setSettlementStatusFilter('draft')
+                  scrollToElement('billing-details')
+                }}
+              />
+            </div>
+          </div>
+
+          <EnterprisePanel
+            id='billing-details'
+            title='结算与账单明细'
+            description='客户和供应商结算单统一视图'
+            className='lg:col-span-2'
+            bodyClassName='p-0'
+            action={
+              <div className='flex items-center gap-1.5'>
+                <NativeSelect
+                  value={settlementSubjectFilter}
+                  className='h-7 w-32 rounded-md bg-white text-[11px]'
+                  onChange={(event) =>
+                    setSettlementSubjectFilter(event.target.value)
                   }
                 >
-                  <div className='bg-card flex size-18 items-center justify-center rounded-full text-lg font-semibold'>
-                    {formatPercent(usageRate)}
-                  </div>
-                </div>
-                <dl className='min-w-0 space-y-2 text-xs'>
-                  <div>
-                    <dt className='text-muted-foreground'>累计已用</dt>
-                    <dd className='font-semibold'>
-                      {formatLogQuota(metrics.total_used_quota)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className='text-muted-foreground'>当前余额</dt>
-                    <dd className='font-semibold'>
-                      {formatLogQuota(metrics.total_balance_quota)}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            </EnterprisePanel>
-
-            <EnterprisePanel
-              title='充值回款'
-              description='本期成功与待处理充值'
-            >
-              <div className='space-y-3'>
-                <div className='flex items-end justify-between'>
-                  <div>
-                    <p className='text-xl font-semibold'>
-                      {formatPercent(collectionProgress)}
-                    </p>
-                    <p className='text-muted-foreground text-[11px]'>
-                      成功回款占比
-                    </p>
-                  </div>
-                  <Scale className='size-8 text-emerald-500/80' />
-                </div>
-                <div className='bg-muted h-2 overflow-hidden rounded-full'>
-                  <div
-                    className='h-full rounded-full bg-emerald-500'
-                    style={{
-                      width: `${Math.min(100, collectionProgress * 100)}%`,
-                    }}
-                  />
-                </div>
-                <div className='grid grid-cols-2 gap-2 text-xs'>
-                  <div className='bg-muted/40 rounded-md p-2'>
-                    <p className='text-muted-foreground'>已完成</p>
-                    <p className='mt-1 font-semibold'>
-                      {formatCurrencyUSD(metrics.successful_top_up_amount)}
-                    </p>
-                  </div>
-                  <div className='bg-muted/40 rounded-md p-2'>
-                    <p className='text-muted-foreground'>待处理</p>
-                    <p className='mt-1 font-semibold'>
-                      {formatCurrencyUSD(metrics.pending_top_up_amount)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </EnterprisePanel>
-
-            <EnterprisePanel title='结算毛利' description='最近结算单累计毛利'>
-              <div className='flex h-full flex-col justify-between gap-4'>
-                <div>
-                  <p className='text-xl font-semibold'>
-                    {formatLogQuota(settlementGrossProfit)}
-                  </p>
-                  <p className='text-muted-foreground mt-1 text-xs'>
-                    {data.settlements.length} 张结算单
-                  </p>
-                </div>
-                <div className='text-muted-foreground rounded-md border border-violet-500/15 bg-violet-500/5 p-3 text-[11px] leading-5'>
-                  毛利来自结算单应收减应付，不包含支付通道手续费。
-                </div>
-              </div>
-            </EnterprisePanel>
-          </div>
-        </div>
-
-        <div className='space-y-4'>
-          <EnterprisePanel title='预算与结算预警'>
-            <div className='space-y-3'>
-              {usageRate >= 0.8 && (
-                <div className='rounded-md border border-rose-500/15 bg-rose-500/5 p-3.5'>
-                  <p className='flex items-center gap-2 text-xs font-semibold text-rose-600'>
-                    <AlertTriangle className='size-4' />
-                    组织额度使用率超过 80%
-                  </p>
-                  <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
-                    建议检查高用量客户并补充企业余额。
-                  </p>
-                </div>
-              )}
-              {metrics.draft_settlements > 0 && (
-                <div className='rounded-md border border-amber-500/15 bg-amber-500/5 p-3.5'>
-                  <p className='flex items-center gap-2 text-xs font-semibold text-amber-600'>
-                    <FileText className='size-4' />
-                    {metrics.draft_settlements} 张结算单待确认
-                  </p>
-                  <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
-                    请财务复核应收、应付和请求明细。
-                  </p>
-                </div>
-              )}
-              {usageRate < 0.8 && metrics.draft_settlements === 0 && (
-                <div className='rounded-md border border-emerald-500/15 bg-emerald-500/5 p-3.5'>
-                  <p className='flex items-center gap-2 text-xs font-semibold text-emerald-600'>
-                    <Sparkles className='size-4' />
-                    当前财务状态稳定
-                  </p>
-                  <p className='text-muted-foreground mt-1.5 text-[11px] leading-5'>
-                    额度和结算流程暂未发现高风险事项。
-                  </p>
-                </div>
-              )}
-            </div>
-          </EnterprisePanel>
-
-          <EnterprisePanel title='最近充值流水'>
-            <div className='space-y-2.5'>
-              {data.recent_topups.slice(0, 6).map((topup) => (
-                <div
-                  key={topup.id}
-                  className='bg-muted/35 flex items-center justify-between gap-3 rounded-md p-3'
+                  <NativeSelectOption value='all'>
+                    全部客户 / 成本中心
+                  </NativeSelectOption>
+                  <NativeSelectOption value='user'>客户账单</NativeSelectOption>
+                  <NativeSelectOption value='supplier'>
+                    成本中心
+                  </NativeSelectOption>
+                </NativeSelect>
+                <NativeSelect
+                  value={settlementStatusFilter}
+                  className='h-7 w-24 rounded-md bg-white text-[11px]'
+                  onChange={(event) =>
+                    setSettlementStatusFilter(event.target.value)
+                  }
                 >
-                  <div className='min-w-0'>
-                    <p className='truncate text-xs font-semibold'>
-                      {topup.username || `用户 #${topup.user_id}`}
-                    </p>
-                    <p className='text-muted-foreground mt-0.5 truncate text-[10px]'>
-                      {topup.payment_provider ||
-                        topup.payment_method ||
-                        '内部充值'}{' '}
-                      · {formatDate(topup.create_time)}
-                    </p>
-                  </div>
-                  <div className='shrink-0 text-right'>
-                    <p className='text-xs font-semibold'>
-                      {formatCurrencyUSD(topup.money)}
-                    </p>
-                    <Badge variant='outline' className='mt-1 text-[9px]'>
-                      {topup.status || '未知'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-              {data.recent_topups.length === 0 && (
-                <p className='text-muted-foreground py-8 text-center text-sm'>
-                  暂无充值流水
-                </p>
-              )}
-            </div>
-          </EnterprisePanel>
-
-          <EnterprisePanel title='快捷操作'>
-            <div className='grid grid-cols-2 gap-2'>
-              <Button
-                variant='outline'
-                className='h-auto flex-col gap-2 py-3'
-                render={<Link to='/wallet' />}
-              >
-                <WalletCards className='size-4 text-emerald-500' />
-                <span className='text-xs'>企业充值</span>
-              </Button>
-              <Button
-                variant='outline'
-                className='h-auto flex-col gap-2 py-3'
-                onClick={() => setSettlementDialogOpen(true)}
-              >
-                <ReceiptText className='size-4 text-violet-500' />
-                <span className='text-xs'>生成结算单</span>
-              </Button>
-              <Button
-                variant='outline'
-                className='h-auto flex-col gap-2 py-3'
-                onClick={() => void exportBillingCsv()}
-                disabled={exportingBilling}
-              >
-                <Download className='size-4 text-blue-500' />
-                <span className='text-xs'>
-                  {exportingBilling ? '导出中' : '导出账单'}
-                </span>
-              </Button>
-              <Button
-                variant='outline'
-                className='h-auto flex-col gap-2 py-3'
-                onClick={openFeeAnalysis}
-              >
-                <BadgeDollarSign className='size-4 text-amber-500' />
-                <span className='text-xs'>费用分析</span>
-              </Button>
+                  <NativeSelectOption value='all'>全部状态</NativeSelectOption>
+                  <NativeSelectOption value='draft'>待确认</NativeSelectOption>
+                  <NativeSelectOption value='finalized'>
+                    已出账
+                  </NativeSelectOption>
+                  <NativeSelectOption value='paid'>已回款</NativeSelectOption>
+                </NativeSelect>
+                <Button
+                  variant='outline'
+                  className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] text-slate-700 shadow-none'
+                  onClick={() => void exportBillingCsv()}
+                  disabled={exportingBilling}
+                >
+                  <Download className='size-3' />
+                  导出
+                </Button>
+              </div>
+            }
+          >
+            <SettlementTable
+              items={filteredSettlements}
+              loading={billingQuery.isLoading}
+            />
+            <div className='flex h-9 items-center justify-between border-t border-slate-100 px-3 text-[11px] text-slate-500'>
+              <span>共 {formatNumber(filteredSettlements.length)} 条</span>
+              <span>{rangeLabel}</span>
             </div>
           </EnterprisePanel>
         </div>
+
+        <aside className='grid min-w-0 gap-2'>
+          <EnterprisePanel
+            title='预算预警'
+            action={
+              <Button
+                variant='ghost'
+                size='xs'
+                className='h-6 px-1.5 text-[11px] text-blue-600'
+                onClick={() => scrollToElement('budget-control')}
+              >
+                查看全部
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            bodyClassName='space-y-2 p-2.5'
+          >
+            {budgetAlerts.map((item) => (
+              <div
+                key={item.title}
+                className='flex items-center gap-2 rounded-md border border-slate-100 bg-white px-2.5 py-2'
+              >
+                <span className='size-1.5 rounded-full bg-amber-400' />
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[11px] font-semibold text-slate-800'>
+                    {item.title}
+                  </p>
+                  <p className='mt-0.5 truncate text-[10px] text-slate-500'>
+                    {item.detail}
+                  </p>
+                </div>
+                <Badge
+                  variant='outline'
+                  className={cn(
+                    'h-5 shrink-0 rounded-md px-1.5 text-[10px]',
+                    item.className
+                  )}
+                >
+                  {item.badge}
+                </Badge>
+              </div>
+            ))}
+          </EnterprisePanel>
+
+          <EnterprisePanel
+            title='自动续费状态'
+            action={
+              <Button
+                variant='ghost'
+                size='xs'
+                className='h-6 px-1.5 text-[11px] text-blue-600'
+                onClick={openClassicSubscriptions}
+              >
+                管理订阅
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            bodyClassName='divide-y divide-slate-100 p-0'
+          >
+            <div className='flex items-center gap-2 px-3 py-2.5'>
+              <span className='flex size-7 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+                <CreditCard className='size-3.5' />
+              </span>
+              <div className='min-w-0 flex-1'>
+                <p className='truncate text-[12px] font-semibold text-slate-800'>
+                  Enterprise 年付套餐
+                </p>
+                <p className='mt-0.5 text-[10px] text-slate-500'>
+                  {metrics.active_subscriptions > 0
+                    ? `${metrics.active_subscriptions} 个订阅运行中`
+                    : '暂无有效订阅'}
+                </p>
+              </div>
+              <span className='inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600'>
+                <CheckCircle2 className='size-3' />
+                已启用
+              </span>
+            </div>
+            <div className='flex items-center gap-2 px-3 py-2.5'>
+              <span className='flex size-7 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+                <WalletCards className='size-3.5' />
+              </span>
+              <div className='min-w-0 flex-1'>
+                <p className='truncate text-[12px] font-semibold text-slate-800'>
+                  预付额度自动补充
+                </p>
+                <p className='mt-0.5 text-[10px] text-slate-500'>
+                  当前余额 {formatLogQuota(metrics.total_balance_quota)}
+                </p>
+              </div>
+              <span className='inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600'>
+                <CheckCircle2 className='size-3' />
+                监控中
+              </span>
+            </div>
+          </EnterprisePanel>
+
+          <EnterprisePanel
+            id='collection-card'
+            title='收款进度（本月）'
+            action={
+              <Button
+                variant='ghost'
+                size='xs'
+                className='h-6 px-1.5 text-[11px] text-blue-600'
+                onClick={() => scrollToElement('billing-details')}
+              >
+                查看全部
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            bodyClassName='p-3'
+          >
+            <div className='flex items-center gap-4'>
+              <div
+                className='relative flex size-20 shrink-0 items-center justify-center rounded-full bg-[conic-gradient(#2563eb_var(--ring-value),#e2e8f0_0)]'
+                style={
+                  {
+                    '--ring-value': `${Math.min(100, collectionProgress * 100)}%`,
+                  } as CSSProperties
+                }
+              >
+                <div className='flex size-14 flex-col items-center justify-center rounded-full bg-white'>
+                  <span className='text-[14px] font-semibold text-slate-950 tabular-nums'>
+                    {formatPercent(collectionProgress, 0)}
+                  </span>
+                  <span className='text-[9px] text-slate-500'>已回款</span>
+                </div>
+              </div>
+              <dl className='grid flex-1 gap-1.5 text-[11px]'>
+                <div className='flex items-center justify-between gap-2'>
+                  <dt className='text-slate-500'>应收总额</dt>
+                  <dd className='font-semibold text-slate-900'>
+                    {formatLogQuota(metrics.period_sell_quota)}
+                  </dd>
+                </div>
+                <div className='flex items-center justify-between gap-2'>
+                  <dt className='text-slate-500'>已回款</dt>
+                  <dd className='font-semibold text-slate-900'>
+                    {formatCurrencyUSD(metrics.successful_top_up_amount)}
+                  </dd>
+                </div>
+                <div className='flex items-center justify-between gap-2'>
+                  <dt className='text-slate-500'>待回款</dt>
+                  <dd className='font-semibold text-slate-900'>
+                    {formatCurrencyUSD(metrics.pending_top_up_amount)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </EnterprisePanel>
+
+          <EnterprisePanel title='快速操作' bodyClassName='p-3'>
+            <div className='grid grid-cols-4 gap-2'>
+              <CompactAction icon={WalletCards} label='充值' to='/wallet' />
+              <CompactAction
+                icon={FileDown}
+                label='导出账单'
+                onClick={() => void exportBillingCsv()}
+              />
+              <CompactAction
+                icon={ReceiptText}
+                label='创建结算单'
+                onClick={() => setSettlementDialogOpen(true)}
+              />
+              <CompactAction
+                icon={FileText}
+                label='申请发票'
+                onClick={() => scrollToElement('billing-details')}
+              />
+              <CompactAction icon={UsersRound} label='客户对账' to='/users' />
+              <CompactAction
+                icon={Download}
+                label='下载结算单'
+                onClick={downloadLatestSettlement}
+              />
+              <CompactAction
+                icon={Landmark}
+                label='预算管理'
+                onClick={() => scrollToElement('budget-control')}
+              />
+              <CompactAction
+                icon={BadgeDollarSign}
+                label='费用分析'
+                onClick={openFeeAnalysis}
+              />
+            </div>
+          </EnterprisePanel>
+        </aside>
       </div>
 
-      <EnterprisePanel
-        title='结算与账单明细'
-        description='客户和供应商结算单统一视图'
-        action={
-          <Badge variant='outline'>共 {data.settlements.length} 条</Badge>
-        }
-        bodyClassName='p-0'
-      >
-        <SettlementTable items={data.settlements} />
-      </EnterprisePanel>
-
       {props.classicContent && (
-        <EnterprisePanel
-          title='订阅计划管理'
-          description='保留原有套餐创建、支付平台关联、启停和编辑能力'
-          bodyClassName='min-h-[520px] p-0'
+        <details
+          id='classic-subscriptions'
+          className='rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.025)]'
         >
-          {props.classicContent}
-        </EnterprisePanel>
+          <summary className='flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-[13px] font-semibold text-slate-900'>
+            订阅计划管理
+            <span className='ml-auto text-[11px] font-medium text-slate-500'>
+              展开套餐创建、支付平台关联、启停和编辑能力
+            </span>
+            {props.actions != null && (
+              <span
+                className='shrink-0'
+                onClick={(event) => event.stopPropagation()}
+              >
+                {props.actions}
+              </span>
+            )}
+          </summary>
+          <div className='border-t border-slate-100 p-2'>
+            {props.classicContent}
+          </div>
+        </details>
       )}
 
       <Dialog

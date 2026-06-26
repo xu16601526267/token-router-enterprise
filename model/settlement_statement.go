@@ -282,7 +282,7 @@ type MarginSummaryRow struct {
 
 func normalizeMarginGroupBy(groupBy string) string {
 	switch strings.TrimSpace(groupBy) {
-	case "channel", "user", "model", "day":
+	case "channel", "user", "model", "hour", "day", "week":
 		return strings.TrimSpace(groupBy)
 	default:
 		return "supplier"
@@ -329,6 +329,12 @@ func SearchMarginSummary(filters MarginSummaryFilters) ([]MarginSummaryRow, erro
 	case "day":
 		groupExpr = "(created_at / 86400) * 86400"
 		selectPrefix = "(created_at / 86400) * 86400 AS bucket_start"
+	case "hour":
+		groupExpr = "(created_at / 3600) * 3600"
+		selectPrefix = "(created_at / 3600) * 3600 AS bucket_start"
+	case "week":
+		groupExpr = "(created_at / 604800) * 604800"
+		selectPrefix = "(created_at / 604800) * 604800 AS bucket_start"
 	}
 
 	var rows []MarginSummaryRow
@@ -358,7 +364,7 @@ func SearchMarginSummary(filters MarginSummaryFilters) ([]MarginSummaryRow, erro
 			rows[i].GroupKey = strconv.Itoa(rows[i].UserId)
 		case "model":
 			rows[i].GroupKey = rows[i].ModelName
-		case "day":
+		case "hour", "day", "week":
 			rows[i].GroupKey = strconv.FormatInt(rows[i].BucketStart, 10)
 		}
 	}

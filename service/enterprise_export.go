@@ -459,7 +459,7 @@ func enterpriseBillingTopUpItems(startTimestamp int64, endTimestamp int64) ([]dt
 }
 
 func BuildEnterpriseBillingCSV(startTimestamp int64, endTimestamp int64) ([]byte, error) {
-	data, err := GetEnterpriseBilling(startTimestamp, endTimestamp)
+	data, err := GetEnterpriseBilling(startTimestamp, endTimestamp, "day")
 	if err != nil {
 		return nil, err
 	}

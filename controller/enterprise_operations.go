@@ -348,7 +348,7 @@ func GetEnterpriseUsers(c *gin.Context) {
 
 func GetEnterpriseBilling(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
-	data, err := service.GetEnterpriseBilling(startTimestamp, endTimestamp)
+	data, err := service.GetEnterpriseBilling(startTimestamp, endTimestamp, string(parseEnterpriseOverviewGranularity(c)))
 	if err != nil {
 		common.ApiError(c, err)
 		return

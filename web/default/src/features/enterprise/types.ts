@@ -231,7 +231,11 @@ export type EnterpriseTopUpItem = {
 
 export type EnterpriseBillingData = {
   generated_at: number
-  range: { start_timestamp: number; end_timestamp: number }
+  range: {
+    start_timestamp: number
+    end_timestamp: number
+    time_granularity?: string
+  }
   metrics: {
     total_balance_quota: number
     total_used_quota: number

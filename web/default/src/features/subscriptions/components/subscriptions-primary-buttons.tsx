@@ -29,11 +29,13 @@ export function SubscriptionsPrimaryButtons() {
   return (
     <div className='flex gap-2'>
       <Button
+        variant='outline'
         size='sm'
+        className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
         onClick={() => setOpen('create')}
         disabled={!complianceConfirmed}
       >
-        <Plus className='h-4 w-4' />
+        <Plus className='size-3.5' />
         {t('Create Plan')}
       </Button>
     </div>

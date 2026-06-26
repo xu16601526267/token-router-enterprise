@@ -363,8 +363,9 @@ type EnterpriseUsersData struct {
 // Billing and settlement -------------------------------------------------------
 
 type EnterpriseBillingRange struct {
-	StartTimestamp int64 `json:"start_timestamp"`
-	EndTimestamp   int64 `json:"end_timestamp"`
+	StartTimestamp  int64  `json:"start_timestamp"`
+	EndTimestamp    int64  `json:"end_timestamp"`
+	TimeGranularity string `json:"time_granularity,omitempty"`
 }
 
 type EnterpriseBillingMetrics struct {

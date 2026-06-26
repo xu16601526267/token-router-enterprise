@@ -47,10 +47,20 @@ type enterpriseTopUpRow struct {
 	CreateTime      int64
 }
 
-func GetEnterpriseBilling(startTimestamp int64, endTimestamp int64) (*dto.EnterpriseBillingData, error) {
+func normalizeEnterpriseBillingGranularity(granularity string) string {
+	switch granularity {
+	case "hour", "week":
+		return granularity
+	default:
+		return "day"
+	}
+}
+
+func GetEnterpriseBilling(startTimestamp int64, endTimestamp int64, timeGranularity string) (*dto.EnterpriseBillingData, error) {
+	timeGranularity = normalizeEnterpriseBillingGranularity(timeGranularity)
 	data := &dto.EnterpriseBillingData{
 		GeneratedAt:  common.GetTimestamp(),
-		Range:        dto.EnterpriseBillingRange{StartTimestamp: startTimestamp, EndTimestamp: endTimestamp},
+		Range:        dto.EnterpriseBillingRange{StartTimestamp: startTimestamp, EndTimestamp: endTimestamp, TimeGranularity: timeGranularity},
 		Trend:        []dto.EnterpriseBillingTrendPoint{},
 		Settlements:  []dto.EnterpriseSettlementItem{},
 		RecentTopups: []dto.EnterpriseTopUpItem{},
@@ -83,7 +93,7 @@ func GetEnterpriseBilling(startTimestamp int64, endTimestamp int64) (*dto.Enterp
 	}
 
 	trendRows, err := model.SearchMarginSummary(model.MarginSummaryFilters{
-		GroupBy: "day", StartTime: startTimestamp, EndTime: endTimestamp,
+		GroupBy: timeGranularity, StartTime: startTimestamp, EndTime: endTimestamp,
 	})
 	if err != nil {
 		return nil, err
