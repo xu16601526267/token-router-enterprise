@@ -186,6 +186,19 @@ function formatCount(value: number): string {
   return new Intl.NumberFormat('zh-CN', { notation: 'compact' }).format(value)
 }
 
+function formatCompactQuota(value: number): string {
+  const formatted = formatLogQuota(value)
+  if (formatted.length <= 8) {
+    return formatted
+  }
+  const numeric = Number(formatted.replace(/^\$/, ''))
+  if (Number.isFinite(numeric) && Math.abs(numeric) < 1) {
+    const compact = numeric.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+    return `$${compact}`
+  }
+  return formatted
+}
+
 function dateInputToTimestamp(value: string, boundary: 'start' | 'end') {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return undefined
@@ -332,6 +345,55 @@ function DetailField(props: {
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+function CompactSummaryItem(props: {
+  label: string
+  value: string
+  helper?: string
+  tone?: 'blue' | 'emerald' | 'amber' | 'rose' | 'slate'
+}) {
+  const toneClass = {
+    blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+    amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+    rose: 'bg-rose-50 text-rose-700 ring-rose-100',
+    slate: 'bg-slate-50 text-slate-700 ring-slate-100',
+  }[props.tone ?? 'slate']
+  return (
+    <div className='min-w-0 rounded-md border border-slate-100 bg-slate-50/45 px-2.5 py-2'>
+      <p className='text-[11px] leading-4 font-medium text-slate-500'>
+        {props.label}
+      </p>
+      <p
+        className={cn(
+          'mt-1 block max-w-full truncate rounded px-1 text-[13px] leading-5 font-semibold tabular-nums ring-1',
+          toneClass
+        )}
+      >
+        {props.value}
+      </p>
+      {props.helper != null && (
+        <p className='mt-1 truncate text-[11px] leading-4 text-slate-500'>
+          {props.helper}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ThinProgress(props: { value: number; tone?: 'blue' | 'emerald' }) {
+  return (
+    <div className='h-1.5 overflow-hidden rounded-full bg-slate-100'>
+      <div
+        className={cn(
+          'h-full rounded-full',
+          props.tone === 'emerald' ? 'bg-emerald-500' : 'bg-blue-500'
+        )}
+        style={{ width: `${Math.min(100, Math.max(0, props.value))}%` }}
+      />
     </div>
   )
 }
@@ -701,9 +763,76 @@ export function EnterpriseApiKeys() {
     })
     return [...groups].sort((a, b) => a.localeCompare(b))
   }, [items, users])
+  const visibleActiveCount = useMemo(
+    () =>
+      items.filter((item) => item.effective_status === TOKEN_STATUS_ENABLED)
+        .length,
+    [items]
+  )
+  const visibleRestrictedCount = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          item.effective_status !== TOKEN_STATUS_ENABLED ||
+          item.model_limits_enabled ||
+          Boolean(item.allow_ips?.trim())
+      ).length,
+    [items]
+  )
+  const visibleModelLimitedCount = useMemo(
+    () => items.filter((item) => item.model_limits_enabled).length,
+    [items]
+  )
+  const visibleIpRestrictedCount = useMemo(
+    () => items.filter((item) => Boolean(item.allow_ips?.trim())).length,
+    [items]
+  )
+  const visibleFailureCount = useMemo(
+    () =>
+      items.reduce(
+        (total, item) => total + Math.max(0, item.recent_failure_count ?? 0),
+        0
+      ),
+    [items]
+  )
+  const visibleUsedQuota = useMemo(
+    () =>
+      items.reduce((total, item) => total + Math.max(0, item.used_quota), 0),
+    [items]
+  )
+  const environmentStats = useMemo(() => {
+    const groups = new Map<string, number>()
+    items.forEach((item) => {
+      const label = environmentLabel(item.group || item.user_group)
+      groups.set(label, (groups.get(label) ?? 0) + 1)
+    })
+    return [...groups.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 4)
+  }, [items])
   const selectedStatus = selected
     ? tokenStatus(selected.effective_status)
     : null
+  const selectedIpCount = selected?.allow_ips
+    ? selected.allow_ips.split('\n').filter(Boolean).length
+    : 0
+  const selectedQuotaTotal = selected
+    ? Math.max(0, selected.used_quota) + Math.max(0, selected.remain_quota)
+    : 0
+  let selectedQuotaUsage = 0
+  if (selected && !selected.unlimited_quota && selectedQuotaTotal > 0) {
+    selectedQuotaUsage = Math.round(
+      (Math.max(0, selected.used_quota) / selectedQuotaTotal) * 100
+    )
+  }
+  let selectedSecurityLevel = '未选择'
+  if (selected?.allow_ips?.trim()) {
+    selectedSecurityLevel = 'IP 白名单'
+  } else if (selected?.model_limits_enabled) {
+    selectedSecurityLevel = '模型白名单'
+  } else if (selected) {
+    selectedSecurityLevel = '基础访问'
+  }
   const selectedBaseUrl =
     typeof window === 'undefined' ? '/v1' : `${window.location.origin}/v1`
   const selectedClientId = selected
@@ -1288,6 +1417,100 @@ export function EnterpriseApiKeys() {
                     </TableBody>
                   </Table>
                 </div>
+                <div className='grid gap-3 border-t border-slate-100 bg-slate-50/20 px-3 py-2.5 xl:grid-cols-[1.05fr_0.95fr_1fr]'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center justify-between gap-2'>
+                      <p className='text-xs font-semibold text-slate-900'>
+                        当前筛选概览
+                      </p>
+                      <span className='text-[11px] text-slate-500'>
+                        第 {page} 页 / 共 {totalPages} 页
+                      </span>
+                    </div>
+                    <div className='mt-2 grid grid-cols-3 gap-2'>
+                      <CompactSummaryItem
+                        label='可调用'
+                        value={formatCount(summary?.active ?? 0)}
+                        helper={`当前页 ${visibleActiveCount}`}
+                        tone='emerald'
+                      />
+                      <CompactSummaryItem
+                        label='受限/失效'
+                        value={formatCount(
+                          (summary?.disabled ?? 0) + (summary?.exhausted ?? 0)
+                        )}
+                        helper={`当前页 ${visibleRestrictedCount}`}
+                        tone='rose'
+                      />
+                      <CompactSummaryItem
+                        label='即将过期'
+                        value={formatCount(summary?.expiring_soon ?? 0)}
+                        helper='未来 7 天'
+                        tone='amber'
+                      />
+                    </div>
+                  </div>
+                  <div className='min-w-0 border-slate-100 xl:border-l xl:pl-3'>
+                    <p className='text-xs font-semibold text-slate-900'>
+                      环境与策略覆盖
+                    </p>
+                    <div className='mt-2 space-y-1.5'>
+                      {(environmentStats.length > 0
+                        ? environmentStats
+                        : [['无数据', 0] as [string, number]]
+                      ).map(([label, count]) => (
+                        <div
+                          key={label}
+                          className='grid grid-cols-[54px_minmax(0,1fr)_28px] items-center gap-2 text-[11px]'
+                        >
+                          <span className='truncate font-medium text-slate-600'>
+                            {label}
+                          </span>
+                          <ThinProgress
+                            value={
+                              items.length > 0
+                                ? (count / items.length) * 100
+                                : 0
+                            }
+                            tone={label === '生产' ? 'emerald' : 'blue'}
+                          />
+                          <span className='text-right text-slate-500 tabular-nums'>
+                            {count}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className='mt-2 truncate text-[11px] text-slate-500'>
+                      模型白名单 {visibleModelLimitedCount} · IP 白名单{' '}
+                      {visibleIpRestrictedCount}
+                    </p>
+                  </div>
+                  <div className='min-w-0 border-slate-100 xl:border-l xl:pl-3'>
+                    <p className='text-xs font-semibold text-slate-900'>
+                      调用与额度状态
+                    </p>
+                    <div className='mt-2 grid grid-cols-3 gap-2'>
+                      <CompactSummaryItem
+                        label='可见用量'
+                        value={formatCompactQuota(visibleUsedQuota)}
+                        helper='当前页'
+                        tone='blue'
+                      />
+                      <CompactSummaryItem
+                        label='24h 失败'
+                        value={formatCount(visibleFailureCount)}
+                        helper='当前页'
+                        tone={visibleFailureCount > 0 ? 'rose' : 'emerald'}
+                      />
+                      <CompactSummaryItem
+                        label='已分配客户'
+                        value={formatCount(summary?.active_users ?? 0)}
+                        helper={`可选 ${users.length}`}
+                        tone='slate'
+                      />
+                    </div>
+                  </div>
+                </div>
                 <div className='flex items-center justify-between border-t border-slate-100 px-3 py-2'>
                   <span className='text-xs text-slate-500'>
                     共 {pageData?.total ?? 0} 条 · 密钥明文不在列表中返回
@@ -1364,9 +1587,9 @@ export function EnterpriseApiKeys() {
                 </div>
               ) : (
                 <div className='min-h-[520px]'>
-                  <div className='flex items-start justify-between gap-3 border-b border-slate-100 p-3.5'>
+                  <div className='flex items-start justify-between gap-3 border-b border-slate-100 p-3'>
                     <div className='flex min-w-0 items-start gap-3'>
-                      <span className='flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100'>
+                      <span className='flex size-9 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100'>
                         <KeyRound className='size-4' />
                       </span>
                       <div className='min-w-0'>
@@ -1428,9 +1651,44 @@ export function EnterpriseApiKeys() {
                     ))}
                   </div>
 
-                  <div className='space-y-3 p-3'>
+                  <div className='space-y-2.5 p-3'>
                     {detailTab === 'access' && (
                       <>
+                        <div className='grid grid-cols-3 gap-2 border-b border-slate-100 pb-2.5'>
+                          <div>
+                            <p className='text-[11px] text-slate-500'>
+                              剩余额度
+                            </p>
+                            <p className='mt-0.5 truncate text-[13px] font-semibold text-slate-950'>
+                              {selected.unlimited_quota
+                                ? '无限'
+                                : formatLogQuota(selected.remain_quota)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className='text-[11px] text-slate-500'>
+                              安全边界
+                            </p>
+                            <p className='mt-0.5 truncate text-[13px] font-semibold text-slate-950'>
+                              {selectedSecurityLevel}
+                            </p>
+                          </div>
+                          <div>
+                            <p className='text-[11px] text-slate-500'>
+                              24h 失败
+                            </p>
+                            <p
+                              className={cn(
+                                'mt-0.5 truncate text-[13px] font-semibold',
+                                (selected.recent_failure_count ?? 0) > 0
+                                  ? 'text-rose-600'
+                                  : 'text-emerald-600'
+                              )}
+                            >
+                              {formatCount(selected.recent_failure_count ?? 0)}
+                            </p>
+                          </div>
+                        </div>
                         <DetailField
                           label='Base URL'
                           value={selectedBaseUrl}
@@ -1489,19 +1747,35 @@ export function EnterpriseApiKeys() {
                           </p>
                           <div className='mt-2 grid grid-cols-3 gap-2 text-[11px]'>
                             <div>
-                              <p className='text-slate-500'>Webhook 状态</p>
-                              <p className='mt-1 inline-flex items-center gap-1 font-semibold text-emerald-600'>
-                                <span className='size-1.5 rounded-full bg-emerald-500' />
-                                {selected.allow_ips ? '受限访问' : '正常'}
+                              <p className='text-slate-500'>访问状态</p>
+                              <p
+                                className={cn(
+                                  'mt-1 inline-flex items-center gap-1 font-semibold',
+                                  selected.effective_status ===
+                                    TOKEN_STATUS_ENABLED
+                                    ? 'text-emerald-600'
+                                    : 'text-rose-600'
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    'size-1.5 rounded-full',
+                                    selected.effective_status ===
+                                      TOKEN_STATUS_ENABLED
+                                      ? 'bg-emerald-500'
+                                      : 'bg-rose-500'
+                                  )}
+                                />
+                                {selectedStatus?.label ?? '未知'}
                               </p>
                             </div>
                             <div>
-                              <p className='text-slate-500'>最近成功</p>
+                              <p className='text-slate-500'>最近调用</p>
                               <p className='mt-1 font-semibold text-slate-800'>
                                 {selected.accessed_time > 0
                                   ? dayjs
                                       .unix(selected.accessed_time)
-                                      .format('YYYY-MM-DD HH:mm:ss')
+                                      .format('YYYY-MM-DD HH:mm')
                                   : '暂无调用'}
                               </p>
                             </div>
@@ -1557,7 +1831,7 @@ export function EnterpriseApiKeys() {
                     {detailTab === 'quota' && (
                       <>
                         <div className='grid grid-cols-2 gap-2 text-xs'>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/40 p-2.5'>
                             <p className='text-slate-500'>剩余额度</p>
                             <p className='mt-1 text-lg font-semibold text-slate-950'>
                               {selected.unlimited_quota
@@ -1565,13 +1839,13 @@ export function EnterpriseApiKeys() {
                                 : formatLogQuota(selected.remain_quota)}
                             </p>
                           </div>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/40 p-2.5'>
                             <p className='text-slate-500'>已用额度</p>
                             <p className='mt-1 text-lg font-semibold text-slate-950'>
                               {formatLogQuota(selected.used_quota)}
                             </p>
                           </div>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/40 p-2.5'>
                             <p className='text-slate-500'>最近调用</p>
                             <p className='mt-1 font-semibold text-slate-950'>
                               {selected.accessed_time > 0
@@ -1581,7 +1855,7 @@ export function EnterpriseApiKeys() {
                                 : '从未使用'}
                             </p>
                           </div>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/40 p-2.5'>
                             <p className='text-slate-500'>过期时间</p>
                             <p className='mt-1 font-semibold text-slate-950'>
                               {selected.expired_time > 0
@@ -1591,6 +1865,31 @@ export function EnterpriseApiKeys() {
                                 : '永不过期'}
                             </p>
                           </div>
+                        </div>
+                        <div className='rounded-md border border-slate-100 bg-slate-50/30 p-2.5'>
+                          <div className='flex items-center justify-between text-[11px]'>
+                            <span className='font-medium text-slate-600'>
+                              配额消耗
+                            </span>
+                            <span className='font-semibold text-slate-900'>
+                              {selected.unlimited_quota
+                                ? '无限额度'
+                                : `${selectedQuotaUsage}%`}
+                            </span>
+                          </div>
+                          <div className='mt-2'>
+                            <ThinProgress
+                              value={
+                                selected.unlimited_quota
+                                  ? 0
+                                  : selectedQuotaUsage
+                              }
+                              tone='emerald'
+                            />
+                          </div>
+                          <p className='mt-2 text-[11px] text-slate-500'>
+                            按已用额度和剩余额度实时估算，不展示密钥明文。
+                          </p>
                         </div>
                         <Button
                           size='sm'
@@ -1605,34 +1904,42 @@ export function EnterpriseApiKeys() {
 
                     {detailTab === 'security' && (
                       <>
-                        <div className='rounded-md border border-slate-200 p-3'>
+                        <div className='rounded-md border border-slate-100 bg-slate-50/35 p-2.5'>
                           <p className='text-xs font-semibold text-slate-900'>
                             授权模型
                           </p>
                           <div className='mt-2'>{modelChips(selected)}</div>
                         </div>
-                        <div className='rounded-md border border-slate-200 p-3'>
-                          <p className='text-xs font-semibold text-slate-900'>
-                            IP 白名单
-                          </p>
+                        <div className='rounded-md border border-slate-100 bg-slate-50/35 p-2.5'>
+                          <div className='flex items-center justify-between gap-2'>
+                            <p className='text-xs font-semibold text-slate-900'>
+                              IP 白名单
+                            </p>
+                            <Badge
+                              variant='outline'
+                              className='h-5 rounded px-2 text-[10px]'
+                            >
+                              {selectedIpCount} 条
+                            </Badge>
+                          </div>
                           <p className='mt-2 text-xs leading-5 whitespace-pre-wrap text-slate-600'>
                             {selected.allow_ips || '未限制来源 IP'}
                           </p>
                         </div>
                         <div className='grid grid-cols-2 gap-2 text-xs'>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/35 p-2.5'>
                             <p className='text-slate-500'>路由分组</p>
                             <p className='mt-1 font-semibold text-slate-950'>
                               {selected.group || '继承用户'}
                             </p>
                           </div>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/35 p-2.5'>
                             <p className='text-slate-500'>速率限制</p>
                             <p className='mt-1 font-semibold text-slate-950'>
                               {selected.rate_limit?.trim() || '继承租户'}
                             </p>
                           </div>
-                          <div className='rounded-md border border-slate-200 p-3'>
+                          <div className='rounded-md border border-slate-100 bg-slate-50/35 p-2.5'>
                             <p className='text-slate-500'>跨组重试</p>
                             <p className='mt-1 font-semibold text-slate-950'>
                               {selected.cross_group_retry ? '允许' : '不允许'}
