@@ -34,6 +34,9 @@ export type EnterpriseApiKeyQuery = {
   status?: number
   user_id?: number
   group?: string
+  model_limit_mode?: string
+  created_start?: number
+  created_end?: number
 }
 
 export async function getEnterpriseApiKeys(

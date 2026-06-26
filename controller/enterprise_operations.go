@@ -45,6 +45,14 @@ func enterprisePositiveInt(c *gin.Context, key string, fallback int, max int) in
 	return value
 }
 
+func enterprisePositiveInt64(c *gin.Context, key string, fallback int64) int64 {
+	value, err := strconv.ParseInt(c.Query(key), 10, 64)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
 func enterprisePathID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
@@ -186,7 +194,10 @@ func GetEnterpriseAPIKeys(c *gin.Context) {
 	filters := model.EnterpriseTokenFilters{
 		Keyword: strings.TrimSpace(c.Query("keyword")), Status: status,
 		UserId: userId, Group: strings.TrimSpace(c.Query("group")),
-		ManagerId: c.GetInt("id"), ManagerRole: c.GetInt("role"),
+		ModelLimitMode: strings.TrimSpace(c.Query("model_limit_mode")),
+		CreatedStart:   enterprisePositiveInt64(c, "created_start", 0),
+		CreatedEnd:     enterprisePositiveInt64(c, "created_end", 0),
+		ManagerId:      c.GetInt("id"), ManagerRole: c.GetInt("role"),
 		RestrictByManagerRole: true,
 	}
 	items, total, summary, err := service.ListEnterpriseAPIKeys(filters, (page-1)*pageSize, pageSize)
@@ -205,7 +216,10 @@ func ExportEnterpriseAPIKeys(c *gin.Context) {
 	filters := model.EnterpriseTokenFilters{
 		Keyword: strings.TrimSpace(c.Query("keyword")), Status: status,
 		UserId: userId, Group: strings.TrimSpace(c.Query("group")),
-		ManagerId: c.GetInt("id"), ManagerRole: c.GetInt("role"),
+		ModelLimitMode: strings.TrimSpace(c.Query("model_limit_mode")),
+		CreatedStart:   enterprisePositiveInt64(c, "created_start", 0),
+		CreatedEnd:     enterprisePositiveInt64(c, "created_end", 0),
+		ManagerId:      c.GetInt("id"), ManagerRole: c.GetInt("role"),
 		RestrictByManagerRole: true,
 	}
 	body, err := service.BuildEnterpriseAPIKeysCSV(filters)

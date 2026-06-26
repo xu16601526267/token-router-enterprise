@@ -32,6 +32,9 @@ type EnterpriseTokenFilters struct {
 	Status                int
 	UserId                int
 	Group                 string
+	ModelLimitMode        string
+	CreatedStart          int64
+	CreatedEnd            int64
 	ManagerId             int
 	ManagerRole           int
 	RestrictByManagerRole bool
@@ -60,6 +63,18 @@ func applyEnterpriseTokenFilters(query *gorm.DB, filters EnterpriseTokenFilters)
 	}
 	if filters.Group != "" {
 		query = query.Where(CommonGroupColumnForTable("tokens")+" = ?", strings.TrimSpace(filters.Group))
+	}
+	switch strings.TrimSpace(filters.ModelLimitMode) {
+	case "restricted":
+		query = query.Where("tokens.model_limits_enabled = ?", true)
+	case "all":
+		query = query.Where("tokens.model_limits_enabled = ?", false)
+	}
+	if filters.CreatedStart > 0 {
+		query = query.Where("tokens.created_time >= ?", filters.CreatedStart)
+	}
+	if filters.CreatedEnd > 0 {
+		query = query.Where("tokens.created_time <= ?", filters.CreatedEnd)
 	}
 	switch filters.Status {
 	case common.TokenStatusEnabled:

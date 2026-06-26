@@ -33,17 +33,14 @@ import {
   ShieldCheck,
   Trash2,
   Users,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
-import {
-  EnterprisePageHeader,
-  EnterprisePanel,
-  EnterpriseStatCard,
-} from '@/components/enterprise'
+import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -85,12 +82,14 @@ import type {
   EnterpriseApiKeyInput,
   EnterpriseApiKeyItem,
   EnterpriseApiKeySecret,
+  EnterpriseApiKeyUser,
 } from './enterprise-types'
 
 const TOKEN_STATUS_ENABLED = 1
 const TOKEN_STATUS_DISABLED = 2
 const TOKEN_STATUS_EXPIRED = 3
 const EMPTY_API_KEY_ITEMS: EnterpriseApiKeyItem[] = []
+const EMPTY_API_KEY_USERS: EnterpriseApiKeyUser[] = []
 const TOKEN_STATUS_EXHAUSTED = 4
 
 type ApiKeyFormState = {
@@ -151,7 +150,11 @@ function tokenStatus(status: number): {
 
 function modelChips(item: EnterpriseApiKeyItem) {
   if (!item.model_limits_enabled) {
-    return <Badge variant='outline'>全部模型</Badge>
+    return (
+      <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
+        全部模型
+      </Badge>
+    )
   }
   const models = item.model_limits
     .split(',')
@@ -160,13 +163,153 @@ function modelChips(item: EnterpriseApiKeyItem) {
   return (
     <div className='flex max-w-56 flex-wrap gap-1'>
       {models.slice(0, 2).map((model) => (
-        <Badge key={model} variant='secondary' className='max-w-32 truncate'>
+        <Badge
+          key={model}
+          variant='secondary'
+          className='h-5 max-w-32 rounded px-2 text-[10px]'
+        >
           {model}
         </Badge>
       ))}
       {models.length > 2 && (
-        <Badge variant='outline'>+{models.length - 2}</Badge>
+        <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
+          +{models.length - 2}
+        </Badge>
       )}
+    </div>
+  )
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat('zh-CN', { notation: 'compact' }).format(value)
+}
+
+function dateInputToTimestamp(value: string, boundary: 'start' | 'end') {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return undefined
+  }
+  const parsed = dayjs(value)
+  if (!parsed.isValid()) {
+    return undefined
+  }
+  return boundary === 'start'
+    ? parsed.startOf('day').unix()
+    : parsed.endOf('day').unix()
+}
+
+function keyOwner(item: EnterpriseApiKeyItem) {
+  return item.display_name || item.username || `用户 #${item.user_id}`
+}
+
+function environmentLabel(value: string) {
+  const normalized = value.toLowerCase()
+  if (
+    normalized.includes('prod') ||
+    normalized.includes('production') ||
+    value.includes('生产')
+  ) {
+    return '生产'
+  }
+  if (
+    normalized.includes('stag') ||
+    normalized.includes('preview') ||
+    value.includes('预发')
+  ) {
+    return '预发'
+  }
+  if (
+    normalized.includes('dev') ||
+    normalized.includes('test') ||
+    normalized.includes('sandbox') ||
+    value.includes('开发')
+  ) {
+    return '开发'
+  }
+  return value || '默认'
+}
+
+function environmentBadgeClass(label: string) {
+  if (label === '生产') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-600'
+  }
+  if (label === '预发') {
+    return 'border-blue-200 bg-blue-50 text-blue-600'
+  }
+  if (label === '开发') {
+    return 'border-violet-200 bg-violet-50 text-violet-600'
+  }
+  return 'border-slate-200 bg-slate-50 text-slate-600'
+}
+
+function MetricTile(props: {
+  title: string
+  value: string
+  helper: string
+  icon: LucideIcon
+  tone: 'blue' | 'violet' | 'amber' | 'emerald' | 'rose'
+  loading?: boolean
+}) {
+  const toneClass = {
+    blue: 'bg-blue-50 text-blue-600 ring-blue-100',
+    violet: 'bg-violet-50 text-violet-600 ring-violet-100',
+    amber: 'bg-amber-50 text-amber-600 ring-amber-100',
+    emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+    rose: 'bg-rose-50 text-rose-600 ring-rose-100',
+  }[props.tone]
+  const Icon = props.icon
+  return (
+    <div className='rounded-md border border-slate-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+      <div className='flex items-start gap-2.5'>
+        <span
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+            toneClass
+          )}
+        >
+          <Icon className='size-4' aria-hidden='true' />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <p className='truncate text-[12px] font-medium text-slate-600'>
+            {props.title}
+          </p>
+          <p className='mt-1 text-[22px] leading-6 font-semibold text-slate-950'>
+            {props.loading ? '...' : props.value}
+          </p>
+          <p className='mt-1 truncate text-[11px] text-slate-500'>
+            {props.helper}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DetailField(props: {
+  label: string
+  value: string
+  copyValue?: string
+}) {
+  return (
+    <div className='space-y-1'>
+      <p className='text-[11px] font-medium text-slate-500'>{props.label}</p>
+      <div className='flex min-h-8 items-center gap-2 rounded-md border border-slate-200 bg-slate-50/70 px-2'>
+        <code className='min-w-0 flex-1 truncate text-[11px] text-slate-800'>
+          {props.value}
+        </code>
+        {props.copyValue != null && (
+          <Button
+            size='icon-xs'
+            variant='ghost'
+            aria-label={`复制${props.label}`}
+            onClick={() => {
+              void navigator.clipboard.writeText(props.copyValue ?? props.value)
+              toast.success('已复制')
+            }}
+          >
+            <Copy className='size-3' />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
@@ -457,6 +600,14 @@ export function EnterpriseApiKeys() {
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('all')
+  const [tenantFilter, setTenantFilter] = useState('all')
+  const [groupFilter, setGroupFilter] = useState('all')
+  const [modelLimitMode, setModelLimitMode] = useState('any')
+  const [createdStart, setCreatedStart] = useState('')
+  const [createdEnd, setCreatedEnd] = useState('')
+  const [detailTab, setDetailTab] = useState<
+    'access' | 'quota' | 'security' | 'audit'
+  >('access')
   const [selected, setSelected] = useState<EnterpriseApiKeyItem | null>(null)
   const [editing, setEditing] = useState<EnterpriseApiKeyItem | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -469,11 +620,25 @@ export function EnterpriseApiKeys() {
   const params = useMemo(
     () => ({
       page,
-      page_size: 20,
+      page_size: 10,
       keyword: keyword.trim() || undefined,
       status: status === 'all' ? undefined : Number(status),
+      user_id: tenantFilter === 'all' ? undefined : Number(tenantFilter),
+      group: groupFilter === 'all' ? undefined : groupFilter,
+      model_limit_mode: modelLimitMode === 'any' ? undefined : modelLimitMode,
+      created_start: dateInputToTimestamp(createdStart, 'start'),
+      created_end: dateInputToTimestamp(createdEnd, 'end'),
     }),
-    [page, keyword, status]
+    [
+      page,
+      keyword,
+      status,
+      tenantFilter,
+      groupFilter,
+      modelLimitMode,
+      createdStart,
+      createdEnd,
+    ]
   )
   const keysQuery = useQuery({
     queryKey: ['enterprise-api-keys', params],
@@ -486,6 +651,87 @@ export function EnterpriseApiKeys() {
   const pageData = keysQuery.data?.data
   const summary = pageData?.summary
   const items = pageData?.items ?? EMPTY_API_KEY_ITEMS
+  const users = usersQuery.data?.data ?? EMPTY_API_KEY_USERS
+  const groupOptions = useMemo(() => {
+    const groups = new Set<string>()
+    users.forEach((user) => {
+      if (user.group) groups.add(user.group)
+    })
+    items.forEach((item) => {
+      if (item.group) groups.add(item.group)
+      if (item.user_group) groups.add(item.user_group)
+    })
+    return [...groups].sort((a, b) => a.localeCompare(b))
+  }, [items, users])
+  const selectedStatus = selected
+    ? tokenStatus(selected.effective_status)
+    : null
+  const selectedEnvironment = selected
+    ? environmentLabel(selected.group || selected.user_group)
+    : ''
+  const selectedBaseUrl =
+    typeof window === 'undefined' ? '/v1' : `${window.location.origin}/v1`
+  const selectedClientId = selected
+    ? `tr_client_${selected.id}_${selected.masked_key.replace(/^sk-/, '')}`
+    : ''
+  const sdkSnippet = selected
+    ? [
+        `curl -X POST ${selectedBaseUrl}/chat/completions \\`,
+        `  -H "Authorization: Bearer ${selected.masked_key}" \\`,
+        '  -H "Content-Type: application/json" \\',
+        "  -d '{",
+        '    "model": "gpt-4o",',
+        '    "messages": [{"role": "user", "content": "Hello"}]',
+        "  }'",
+      ].join('\n')
+    : ''
+  const auditEvents = selected
+    ? [
+        selected.accessed_time > 0
+          ? {
+              time: selected.accessed_time,
+              title: 'API Key 使用',
+              detail: `${keyOwner(selected)} 最近一次调用`,
+              status: '成功',
+            }
+          : null,
+        {
+          time: selected.created_time,
+          title: '创建 API Key',
+          detail: `${selected.name} 已创建`,
+          status: '活跃',
+        },
+        selected.expired_time > 0
+          ? {
+              time: selected.expired_time,
+              title: '到期策略',
+              detail: `密钥将在 ${dayjs.unix(selected.expired_time).format('YYYY-MM-DD HH:mm')} 到期`,
+              status:
+                selected.expired_time <= dayjs().unix() ? '已过期' : '计划',
+            }
+          : null,
+      ].filter(
+        (
+          event
+        ): event is {
+          time: number
+          title: string
+          detail: string
+          status: string
+        } => event != null
+      )
+    : []
+
+  const resetFilters = () => {
+    setKeyword('')
+    setStatus('all')
+    setTenantFilter('all')
+    setGroupFilter('all')
+    setModelLimitMode('any')
+    setCreatedStart('')
+    setCreatedEnd('')
+    setPage(1)
+  }
 
   useEffect(() => {
     if (items.length === 0) {
@@ -568,9 +814,8 @@ export function EnterpriseApiKeys() {
       <SectionPageLayout.Content>
         <div className='flex h-full min-h-0 flex-col gap-3 overflow-auto pb-5'>
           <EnterprisePageHeader
-            eyebrow='企业客户接入治理'
-            title='接口密钥与客户接入'
-            description='面向企业客户统一发放、轮换和审计 API Key，并管理额度、模型范围、IP 白名单与路由分组。'
+            title='API Keys 与客户接入'
+            description='面向企业客户的密钥发放、租户接入与访问控制'
             actions={
               <>
                 <Button
@@ -604,363 +849,702 @@ export function EnterpriseApiKeys() {
             }
           />
 
-          <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5'>
-            <EnterpriseStatCard
-              title='密钥总数'
-              value={String(summary?.total ?? 0)}
-              helper='全部企业密钥'
-              icon={KeyRound}
-              tone='blue'
-              loading={keysQuery.isLoading}
-            />
-            <EnterpriseStatCard
-              title='活跃密钥'
-              value={String(summary?.active ?? 0)}
-              helper='可正常调用'
-              icon={ShieldCheck}
-              tone='emerald'
-              loading={keysQuery.isLoading}
-            />
-            <EnterpriseStatCard
-              title='活跃客户'
-              value={String(summary?.active_users ?? 0)}
-              helper='已分配密钥用户'
-              icon={Users}
-              tone='violet'
-              loading={keysQuery.isLoading}
-            />
-            <EnterpriseStatCard
-              title='即将到期'
-              value={String(summary?.expiring_soon ?? 0)}
-              helper='未来 7 天'
-              icon={CalendarClock}
-              tone='amber'
-              loading={keysQuery.isLoading}
-            />
-            <EnterpriseStatCard
-              title='额度异常'
-              value={String(
-                (summary?.exhausted ?? 0) + (summary?.disabled ?? 0)
-              )}
-              helper='耗尽或禁用'
-              icon={AlertTriangle}
-              tone='rose'
-              loading={keysQuery.isLoading}
-            />
-          </div>
+          <div className='grid min-h-0 gap-2 2xl:grid-cols-[minmax(0,1fr)_384px]'>
+            <div className='flex min-w-0 flex-col gap-2'>
+              <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5'>
+                <MetricTile
+                  title='活跃 API Keys'
+                  value={formatCount(summary?.active ?? 0)}
+                  helper='可正常调用'
+                  icon={KeyRound}
+                  tone='blue'
+                  loading={keysQuery.isLoading}
+                />
+                <MetricTile
+                  title='活跃租户'
+                  value={formatCount(summary?.active_users ?? 0)}
+                  helper='已分配密钥用户'
+                  icon={Users}
+                  tone='violet'
+                  loading={keysQuery.isLoading}
+                />
+                <MetricTile
+                  title='即将过期密钥'
+                  value={formatCount(summary?.expiring_soon ?? 0)}
+                  helper='未来 7 天'
+                  icon={CalendarClock}
+                  tone='amber'
+                  loading={keysQuery.isLoading}
+                />
+                <MetricTile
+                  title='本月调用额度'
+                  value={formatLogQuota(summary?.total_used_quota ?? 0)}
+                  helper='按当前权限汇总'
+                  icon={ShieldCheck}
+                  tone='emerald'
+                  loading={keysQuery.isLoading}
+                />
+                <MetricTile
+                  title='受限访问'
+                  value={formatCount(
+                    (summary?.exhausted ?? 0) + (summary?.disabled ?? 0)
+                  )}
+                  helper='禁用或额度耗尽'
+                  icon={AlertTriangle}
+                  tone='rose'
+                  loading={keysQuery.isLoading}
+                />
+              </div>
 
-          <EnterprisePanel bodyClassName='p-3 sm:p-4'>
-            <div className='flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
-              <div className='flex flex-1 flex-col gap-2 sm:flex-row'>
-                <div className='relative max-w-md flex-1'>
-                  <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
-                  <Input
-                    value={keyword}
-                    className='pl-9'
-                    placeholder='搜索客户、邮箱、密钥名称或完整 Key'
+              <EnterprisePanel bodyClassName='p-2.5'>
+                <div className='grid gap-2 lg:grid-cols-[repeat(5,minmax(120px,1fr))_minmax(220px,1.3fr)_64px]'>
+                  <NativeSelect
+                    value={tenantFilter}
+                    className='h-8 rounded-md text-xs'
                     onChange={(event) => {
-                      setKeyword(event.target.value)
+                      setTenantFilter(event.target.value)
                       setPage(1)
                     }}
-                  />
+                  >
+                    <NativeSelectOption value='all'>
+                      全部租户
+                    </NativeSelectOption>
+                    {users.map((user) => (
+                      <NativeSelectOption key={user.id} value={String(user.id)}>
+                        {user.display_name || user.username}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <NativeSelect
+                    value={groupFilter}
+                    className='h-8 rounded-md text-xs'
+                    onChange={(event) => {
+                      setGroupFilter(event.target.value)
+                      setPage(1)
+                    }}
+                  >
+                    <NativeSelectOption value='all'>
+                      全部环境
+                    </NativeSelectOption>
+                    {groupOptions.map((group) => (
+                      <NativeSelectOption key={group} value={group}>
+                        {environmentLabel(group)}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                  <NativeSelect
+                    value={modelLimitMode}
+                    className='h-8 rounded-md text-xs'
+                    onChange={(event) => {
+                      setModelLimitMode(event.target.value)
+                      setPage(1)
+                    }}
+                  >
+                    <NativeSelectOption value='any'>
+                      授权模型：全部
+                    </NativeSelectOption>
+                    <NativeSelectOption value='all'>
+                      全量模型
+                    </NativeSelectOption>
+                    <NativeSelectOption value='restricted'>
+                      白名单模型
+                    </NativeSelectOption>
+                  </NativeSelect>
+                  <NativeSelect
+                    value={status}
+                    className='h-8 rounded-md text-xs'
+                    onChange={(event) => {
+                      setStatus(event.target.value)
+                      setPage(1)
+                    }}
+                  >
+                    <NativeSelectOption value='all'>
+                      全部状态
+                    </NativeSelectOption>
+                    <NativeSelectOption value={TOKEN_STATUS_ENABLED}>
+                      活跃
+                    </NativeSelectOption>
+                    <NativeSelectOption value={TOKEN_STATUS_DISABLED}>
+                      已禁用
+                    </NativeSelectOption>
+                    <NativeSelectOption value={TOKEN_STATUS_EXPIRED}>
+                      已过期
+                    </NativeSelectOption>
+                    <NativeSelectOption value={TOKEN_STATUS_EXHAUSTED}>
+                      额度耗尽
+                    </NativeSelectOption>
+                  </NativeSelect>
+                  <div className='flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2'>
+                    <CalendarClock className='size-3.5 text-slate-400' />
+                    <Input
+                      value={createdStart}
+                      placeholder='开始'
+                      aria-label='开始日期，格式 YYYY-MM-DD'
+                      className='h-6 min-w-0 rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+                      onChange={(event) => {
+                        setCreatedStart(event.target.value)
+                        setPage(1)
+                      }}
+                    />
+                    <span className='text-[11px] text-slate-400'>~</span>
+                    <Input
+                      value={createdEnd}
+                      placeholder='结束'
+                      aria-label='结束日期，格式 YYYY-MM-DD'
+                      className='h-6 min-w-0 rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+                      onChange={(event) => {
+                        setCreatedEnd(event.target.value)
+                        setPage(1)
+                      }}
+                    />
+                  </div>
+                  <div className='relative'>
+                    <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
+                    <Input
+                      value={keyword}
+                      className='h-8 rounded-md pl-8 text-xs'
+                      placeholder='搜索客户 / 租户 / 密钥名称 / Key ID'
+                      onChange={(event) => {
+                        setKeyword(event.target.value)
+                        setPage(1)
+                      }}
+                    />
+                  </div>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className='h-8'
+                    onClick={resetFilters}
+                  >
+                    重置
+                  </Button>
                 </div>
-                <NativeSelect
-                  value={status}
-                  className='w-full sm:w-40'
-                  onChange={(event) => {
-                    setStatus(event.target.value)
-                    setPage(1)
-                  }}
-                >
-                  <NativeSelectOption value='all'>全部状态</NativeSelectOption>
-                  <NativeSelectOption value={TOKEN_STATUS_ENABLED}>
-                    活跃
-                  </NativeSelectOption>
-                  <NativeSelectOption value={TOKEN_STATUS_DISABLED}>
-                    已禁用
-                  </NativeSelectOption>
-                  <NativeSelectOption value={TOKEN_STATUS_EXPIRED}>
-                    已过期
-                  </NativeSelectOption>
-                  <NativeSelectOption value={TOKEN_STATUS_EXHAUSTED}>
-                    额度耗尽
-                  </NativeSelectOption>
-                </NativeSelect>
-              </div>
-              <p className='text-muted-foreground text-xs'>
-                共 {pageData?.total ?? 0} 条 · 密钥明文不在列表中返回
-              </p>
-            </div>
-          </EnterprisePanel>
+              </EnterprisePanel>
 
-          <div className='grid min-h-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_360px]'>
-            <EnterprisePanel bodyClassName='p-0' className='min-w-0'>
-              <div className='overflow-x-auto'>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>客户 / 租户</TableHead>
-                      <TableHead>密钥名称</TableHead>
-                      <TableHead>授权模型</TableHead>
-                      <TableHead>额度</TableHead>
-                      <TableHead>IP 白名单</TableHead>
-                      <TableHead>最近使用</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead className='w-32'>操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={8}
-                          className='text-muted-foreground h-40 text-center'
-                        >
-                          {keysQuery.isLoading
-                            ? '正在加载企业密钥…'
-                            : '没有符合条件的企业密钥'}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      items.map((item) => {
-                        const statusConfig = tokenStatus(item.effective_status)
-                        const ipCount = item.allow_ips
-                          ? item.allow_ips.split('\n').filter(Boolean).length
-                          : 0
-                        return (
-                          <TableRow
-                            key={item.id}
-                            className={cn(
-                              'cursor-pointer',
-                              selected?.id === item.id && 'bg-primary/[0.045]'
-                            )}
-                            onClick={() => setSelected(item)}
-                          >
-                            <TableCell>
-                              <div className='max-w-48'>
-                                <p className='truncate font-medium'>
-                                  {item.display_name || item.username}
-                                </p>
-                                <p className='text-muted-foreground truncate text-xs'>
-                                  {item.email || item.user_group}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <p className='max-w-44 truncate font-medium'>
-                                {item.name}
-                              </p>
-                              <code className='text-muted-foreground text-[11px]'>
-                                {item.masked_key}
-                              </code>
-                            </TableCell>
-                            <TableCell>{modelChips(item)}</TableCell>
-                            <TableCell>
-                              <p className='text-sm font-medium'>
-                                {item.unlimited_quota
-                                  ? '无限额度'
-                                  : formatLogQuota(item.remain_quota)}
-                              </p>
-                              <p className='text-muted-foreground text-[11px]'>
-                                已用 {formatLogQuota(item.used_quota)}
-                              </p>
-                            </TableCell>
-                            <TableCell>
-                              {ipCount > 0 ? `${ipCount} 条` : '未限制'}
-                            </TableCell>
-                            <TableCell>
-                              {item.accessed_time > 0
-                                ? dayjs.unix(item.accessed_time).fromNow()
-                                : '从未使用'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                className={cn(
-                                  'border-0',
-                                  statusConfig.className
-                                )}
-                              >
-                                {statusConfig.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className='flex items-center gap-1'>
-                                <Button
-                                  size='icon-sm'
-                                  variant='ghost'
-                                  aria-label='编辑密钥'
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    openEdit(item)
-                                  }}
-                                >
-                                  <Edit3 className='size-4' />
-                                </Button>
-                                <Button
-                                  size='icon-sm'
-                                  variant='ghost'
-                                  aria-label='轮换密钥'
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    setSelected(item)
-                                    setConfirmAction('rotate')
-                                  }}
-                                >
-                                  <RotateCcw className='size-4' />
-                                </Button>
-                                <Button
-                                  size='icon-sm'
-                                  variant='ghost'
-                                  className='text-destructive'
-                                  aria-label='删除密钥'
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    setSelected(item)
-                                    setConfirmAction('delete')
-                                  }}
-                                >
-                                  <Trash2 className='size-4' />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className='flex items-center justify-between border-t px-4 py-3'>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={page <= 1}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
-                >
-                  上一页
-                </Button>
-                <span className='text-muted-foreground text-xs'>
-                  第 {page} 页
-                </span>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  disabled={items.length < 20}
-                  onClick={() => setPage((value) => value + 1)}
-                >
-                  下一页
-                </Button>
-              </div>
-            </EnterprisePanel>
-
-            <EnterprisePanel
-              title={selected ? '接入与治理详情' : '选择一条密钥'}
-              description={
-                selected
-                  ? '仅展示脱敏信息与治理配置。'
-                  : '从左侧列表选择密钥查看详情。'
-              }
-              action={
-                selected ? (
-                  <MoreHorizontal className='text-muted-foreground size-4' />
-                ) : null
-              }
-            >
-              {!selected ? (
-                <div className='flex min-h-72 flex-col items-center justify-center text-center'>
-                  <span className='bg-primary/10 text-primary flex size-12 items-center justify-center rounded-md'>
-                    <KeyRound className='size-5' />
-                  </span>
-                  <p className='mt-3 text-sm font-medium'>企业密钥治理</p>
-                  <p className='text-muted-foreground mt-1 max-w-64 text-xs leading-5'>
-                    查看 Base URL、路由分组、模型范围、到期时间和最近使用情况。
-                  </p>
-                </div>
-              ) : (
-                <div className='space-y-3'>
-                  <div>
-                    <p className='text-muted-foreground text-xs'>客户 / 用户</p>
-                    <p className='mt-1 font-semibold'>
-                      {selected.display_name || selected.username}
-                    </p>
-                    <p className='text-muted-foreground text-xs'>
-                      {selected.email}
-                    </p>
-                  </div>
-                  <div className='bg-muted/25 rounded-md border p-3'>
-                    <p className='text-muted-foreground text-[11px]'>
-                      Base URL
-                    </p>
-                    <div className='mt-1 flex items-center gap-2'>
-                      <code className='min-w-0 flex-1 truncate text-xs'>
-                        /v1
-                      </code>
-                      <Button
-                        size='icon-sm'
-                        variant='ghost'
-                        onClick={() =>
-                          navigator.clipboard.writeText(
-                            `${window.location.origin}/v1`
-                          )
-                        }
-                      >
-                        <Copy className='size-3.5' />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className='grid grid-cols-2 gap-3 text-xs'>
-                    <div className='rounded-md border p-3'>
-                      <p className='text-muted-foreground'>路由分组</p>
-                      <p className='mt-1 font-medium'>
-                        {selected.group || '继承用户'}
-                      </p>
-                    </div>
-                    <div className='rounded-md border p-3'>
-                      <p className='text-muted-foreground'>到期时间</p>
-                      <p className='mt-1 font-medium'>
-                        {selected.expired_time > 0
-                          ? dayjs
-                              .unix(selected.expired_time)
-                              .format('YYYY-MM-DD')
-                          : '永不过期'}
-                      </p>
-                    </div>
-                    <div className='rounded-md border p-3'>
-                      <p className='text-muted-foreground'>IP 白名单</p>
-                      <p className='mt-1 font-medium'>
-                        {selected.allow_ips
-                          ? `${selected.allow_ips.split('\n').filter(Boolean).length} 条规则`
-                          : '未限制'}
-                      </p>
-                    </div>
-                    <div className='rounded-md border p-3'>
-                      <p className='text-muted-foreground'>跨组重试</p>
-                      <p className='mt-1 font-medium'>
-                        {selected.cross_group_retry ? '允许' : '不允许'}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className='text-xs font-medium'>授权模型</p>
-                    <div className='mt-2'>{modelChips(selected)}</div>
-                  </div>
-                  <div className='flex gap-2 border-t pt-4'>
-                    <Button
-                      size='sm'
-                      className='flex-1'
-                      onClick={() => openEdit(selected)}
-                    >
-                      <Edit3 className='size-4' />
-                      编辑配置
+              <EnterprisePanel bodyClassName='p-0' className='min-w-0'>
+                <div className='flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2'>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <Button size='sm' className='h-8' onClick={openCreate}>
+                      <Plus className='size-3.5' />
+                      创建 API Key
                     </Button>
                     <Button
                       size='sm'
                       variant='outline'
+                      className='h-8'
+                      onClick={() => void exportKeys()}
+                      disabled={exporting || keysQuery.isFetching}
+                    >
+                      <Download className='size-3.5' />
+                      批量导出
+                    </Button>
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      className='h-8'
+                      disabled={!selected}
                       onClick={() => setConfirmAction('rotate')}
                     >
-                      <RotateCcw className='size-4' />
-                      轮换
+                      <RotateCcw className='size-3.5' />
+                      轮换密钥
                     </Button>
+                    <Button
+                      size='sm'
+                      variant='destructive'
+                      className='h-8'
+                      disabled={!selected}
+                      onClick={() => setConfirmAction('delete')}
+                    >
+                      <Trash2 className='size-3.5' />
+                      吊销访问
+                    </Button>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Button variant='outline' size='sm' className='h-8'>
+                      <MoreHorizontal className='size-3.5' />
+                      列设置
+                    </Button>
+                    <Button
+                      variant='outline'
+                      size='icon-sm'
+                      aria-label='刷新密钥列表'
+                      onClick={() => keysQuery.refetch()}
+                      disabled={keysQuery.isFetching}
+                    >
+                      <RefreshCw
+                        className={cn(
+                          'size-3.5',
+                          keysQuery.isFetching && 'animate-spin'
+                        )}
+                      />
+                    </Button>
+                  </div>
+                </div>
+                <div className='overflow-x-auto'>
+                  <Table className='text-xs [&_td]:h-12 [&_td]:py-1.5 [&_td]:text-xs [&_td_*]:text-xs [&_th]:h-8 [&_th]:text-xs [&_th_*]:text-xs'>
+                    <TableHeader className='bg-slate-50'>
+                      <TableRow>
+                        <TableHead className='w-8'>
+                          <span className='sr-only'>选择</span>
+                        </TableHead>
+                        <TableHead>客户 / 租户</TableHead>
+                        <TableHead>环境</TableHead>
+                        <TableHead>密钥名称 / Key ID</TableHead>
+                        <TableHead>授权模型</TableHead>
+                        <TableHead>额度 / 配额</TableHead>
+                        <TableHead>QPS 限流</TableHead>
+                        <TableHead>IP 白名单</TableHead>
+                        <TableHead>最近使用</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead className='w-28 text-right'>操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={11}
+                            className='h-44 text-center text-xs text-slate-500'
+                          >
+                            {keysQuery.isLoading
+                              ? '正在加载企业密钥...'
+                              : '没有符合条件的企业密钥'}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        items.map((item) => {
+                          const statusConfig = tokenStatus(
+                            item.effective_status
+                          )
+                          const ipCount = item.allow_ips
+                            ? item.allow_ips.split('\n').filter(Boolean).length
+                            : 0
+                          const envLabel = environmentLabel(
+                            item.group || item.user_group
+                          )
+                          return (
+                            <TableRow
+                              key={item.id}
+                              className={cn(
+                                'cursor-pointer',
+                                selected?.id === item.id &&
+                                  'bg-blue-50/70 ring-1 ring-inset ring-blue-200'
+                              )}
+                              onClick={() => {
+                                setSelected(item)
+                                setDetailTab('access')
+                              }}
+                            >
+                              <TableCell>
+                                <input
+                                  type='checkbox'
+                                  aria-label={`选择 ${item.name}`}
+                                  checked={selected?.id === item.id}
+                                  onChange={() => setSelected(item)}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className='size-3.5 rounded border-slate-300'
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <div className='max-w-44'>
+                                  <p className='truncate font-semibold text-slate-900'>
+                                    {keyOwner(item)}
+                                  </p>
+                                  <p className='truncate text-[11px] text-slate-500'>
+                                    {item.username ||
+                                      item.email ||
+                                      item.user_group}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant='outline'
+                                  className={cn(
+                                    'h-5 rounded px-2 text-[10px]',
+                                    environmentBadgeClass(envLabel)
+                                  )}
+                                >
+                                  {envLabel}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <p className='max-w-44 truncate font-semibold text-slate-900'>
+                                  {item.name}
+                                </p>
+                                <div className='flex items-center gap-1'>
+                                  <code className='max-w-36 truncate text-[11px] text-slate-500'>
+                                    {item.masked_key}
+                                  </code>
+                                  <Button
+                                    size='icon-xs'
+                                    variant='ghost'
+                                    aria-label='复制脱敏 Key ID'
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      void navigator.clipboard.writeText(
+                                        item.masked_key
+                                      )
+                                      toast.success('已复制脱敏 Key ID')
+                                    }}
+                                  >
+                                    <Copy className='size-3' />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell>{modelChips(item)}</TableCell>
+                              <TableCell>
+                                <p className='font-semibold text-slate-900'>
+                                  {item.unlimited_quota
+                                    ? '无限额度'
+                                    : formatLogQuota(item.remain_quota)}
+                                </p>
+                                <p className='text-[11px] text-slate-500'>
+                                  已用 {formatLogQuota(item.used_quota)}
+                                </p>
+                              </TableCell>
+                              <TableCell>继承租户</TableCell>
+                              <TableCell>
+                                {ipCount > 0 ? `${ipCount} 条` : '0 条'}
+                              </TableCell>
+                              <TableCell>
+                                {item.accessed_time > 0
+                                  ? dayjs.unix(item.accessed_time).fromNow()
+                                  : '从未使用'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={cn(
+                                    'h-5 rounded px-2 text-[10px]',
+                                    statusConfig.className
+                                  )}
+                                >
+                                  {statusConfig.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className='text-right'>
+                                <div className='flex justify-end gap-1'>
+                                  <Button
+                                    size='icon-xs'
+                                    variant='ghost'
+                                    aria-label='编辑密钥'
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      openEdit(item)
+                                    }}
+                                  >
+                                    <Edit3 className='size-3.5' />
+                                  </Button>
+                                  <Button
+                                    size='icon-xs'
+                                    variant='ghost'
+                                    aria-label='轮换密钥'
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setSelected(item)
+                                      setConfirmAction('rotate')
+                                    }}
+                                  >
+                                    <RotateCcw className='size-3.5' />
+                                  </Button>
+                                  <Button
+                                    size='icon-xs'
+                                    variant='ghost'
+                                    className='text-rose-600'
+                                    aria-label='删除密钥'
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setSelected(item)
+                                      setConfirmAction('delete')
+                                    }}
+                                  >
+                                    <Trash2 className='size-3.5' />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className='flex items-center justify-between border-t border-slate-100 px-3 py-2'>
+                  <span className='text-xs text-slate-500'>
+                    共 {pageData?.total ?? 0} 条 · 密钥明文不在列表中返回
+                  </span>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      size='xs'
+                      variant='outline'
+                      disabled={page <= 1}
+                      onClick={() => setPage((value) => Math.max(1, value - 1))}
+                    >
+                      上一页
+                    </Button>
+                    <span className='text-xs text-slate-500'>第 {page} 页</span>
+                    <Button
+                      size='xs'
+                      variant='outline'
+                      disabled={items.length < 10}
+                      onClick={() => setPage((value) => value + 1)}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              </EnterprisePanel>
+            </div>
+
+            <EnterprisePanel
+              className='min-w-0'
+              bodyClassName='p-0'
+              title={selected ? keyOwner(selected) : '选择一条密钥'}
+              description={
+                selected
+                  ? `${selectedEnvironment} · ${selected.username || selected.user_group || '未绑定用户'}`
+                  : '从左侧列表选择密钥查看接入配置。'
+              }
+              action={
+                selectedStatus ? (
+                  <Badge
+                    className={cn(
+                      'h-5 rounded px-2 text-[10px]',
+                      selectedStatus.className
+                    )}
+                  >
+                    {selectedStatus.label}
+                  </Badge>
+                ) : null
+              }
+            >
+              {!selected ? (
+                <div className='flex min-h-[520px] flex-col items-center justify-center text-center'>
+                  <span className='flex size-11 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
+                    <KeyRound className='size-5' />
+                  </span>
+                  <p className='mt-3 text-sm font-semibold text-slate-900'>
+                    企业密钥治理
+                  </p>
+                  <p className='mt-1 max-w-64 text-xs leading-5 text-slate-500'>
+                    查看 Base URL、SDK 示例、额度、安全策略和审计状态。
+                  </p>
+                </div>
+              ) : (
+                <div className='min-h-[520px]'>
+                  <div className='flex border-b border-slate-100 px-3'>
+                    {[
+                      ['access', '接入详情'],
+                      ['quota', '额度与用量'],
+                      ['security', '安全与策略'],
+                      ['audit', '审计日志'],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type='button'
+                        className={cn(
+                          'h-9 border-b-2 px-2 text-xs font-medium',
+                          detailTab === value
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-900'
+                        )}
+                        onClick={() =>
+                          setDetailTab(
+                            value as 'access' | 'quota' | 'security' | 'audit'
+                          )
+                        }
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className='space-y-3 p-3'>
+                    {detailTab === 'access' && (
+                      <>
+                        <DetailField
+                          label='Base URL'
+                          value={selectedBaseUrl}
+                          copyValue={selectedBaseUrl}
+                        />
+                        <DetailField
+                          label='Webhook 回调地址'
+                          value='未配置回调地址'
+                        />
+                        <DetailField
+                          label='Client ID'
+                          value={selectedClientId}
+                          copyValue={selectedClientId}
+                        />
+                        <div>
+                          <div className='flex items-center justify-between'>
+                            <p className='text-xs font-semibold text-slate-900'>
+                              SDK 快速接入
+                            </p>
+                            <div className='flex gap-1'>
+                              {['cURL', 'Python', 'Node.js', 'Java'].map(
+                                (item) => (
+                                  <Badge
+                                    key={item}
+                                    variant='outline'
+                                    className='h-5 rounded px-2 text-[10px]'
+                                  >
+                                    {item}
+                                  </Badge>
+                                )
+                              )}
+                            </div>
+                          </div>
+                          <div className='mt-2 rounded-md border border-slate-200 bg-slate-50 p-2'>
+                            <pre className='max-h-36 overflow-auto text-[11px] leading-5 whitespace-pre-wrap text-slate-700'>
+                              {sdkSnippet}
+                            </pre>
+                            <div className='mt-2 flex justify-end'>
+                              <Button
+                                size='xs'
+                                variant='outline'
+                                onClick={() => {
+                                  void navigator.clipboard.writeText(sdkSnippet)
+                                  toast.success('SDK 示例已复制')
+                                }}
+                              >
+                                <Copy className='size-3' />
+                                复制
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {detailTab === 'quota' && (
+                      <>
+                        <div className='grid grid-cols-2 gap-2 text-xs'>
+                          <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>剩余额度</p>
+                            <p className='mt-1 text-lg font-semibold text-slate-950'>
+                              {selected.unlimited_quota
+                                ? '无限'
+                                : formatLogQuota(selected.remain_quota)}
+                            </p>
+                          </div>
+                          <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>已用额度</p>
+                            <p className='mt-1 text-lg font-semibold text-slate-950'>
+                              {formatLogQuota(selected.used_quota)}
+                            </p>
+                          </div>
+                          <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>最近调用</p>
+                            <p className='mt-1 font-semibold text-slate-950'>
+                              {selected.accessed_time > 0
+                                ? dayjs
+                                    .unix(selected.accessed_time)
+                                    .format('YYYY-MM-DD HH:mm')
+                                : '从未使用'}
+                            </p>
+                          </div>
+                          <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>过期时间</p>
+                            <p className='mt-1 font-semibold text-slate-950'>
+                              {selected.expired_time > 0
+                                ? dayjs
+                                    .unix(selected.expired_time)
+                                    .format('YYYY-MM-DD HH:mm')
+                                : '永不过期'}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size='sm'
+                          className='w-full'
+                          onClick={() => openEdit(selected)}
+                        >
+                          <Edit3 className='size-3.5' />
+                          调整额度与有效期
+                        </Button>
+                      </>
+                    )}
+
+                    {detailTab === 'security' && (
+                      <>
+                        <div className='rounded-md border border-slate-200 p-3'>
+                          <p className='text-xs font-semibold text-slate-900'>
+                            授权模型
+                          </p>
+                          <div className='mt-2'>{modelChips(selected)}</div>
+                        </div>
+                        <div className='rounded-md border border-slate-200 p-3'>
+                          <p className='text-xs font-semibold text-slate-900'>
+                            IP 白名单
+                          </p>
+                          <p className='mt-2 text-xs leading-5 whitespace-pre-wrap text-slate-600'>
+                            {selected.allow_ips || '未限制来源 IP'}
+                          </p>
+                        </div>
+                        <div className='grid grid-cols-2 gap-2 text-xs'>
+                          <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>路由分组</p>
+                            <p className='mt-1 font-semibold text-slate-950'>
+                              {selected.group || '继承用户'}
+                            </p>
+                          </div>
+                          <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>跨组重试</p>
+                            <p className='mt-1 font-semibold text-slate-950'>
+                              {selected.cross_group_retry ? '允许' : '不允许'}
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {detailTab === 'audit' && (
+                      <div className='space-y-2'>
+                        {auditEvents.map((event) => (
+                          <div
+                            key={`${event.title}-${event.time}`}
+                            className='grid grid-cols-[96px_minmax(0,1fr)_44px] gap-2 rounded-md border border-slate-100 px-2 py-2 text-xs'
+                          >
+                            <span className='text-slate-500'>
+                              {event.time > 0
+                                ? dayjs.unix(event.time).format('MM-DD HH:mm')
+                                : '-'}
+                            </span>
+                            <span className='min-w-0'>
+                              <span className='block truncate font-semibold text-slate-900'>
+                                {event.title}
+                              </span>
+                              <span className='block truncate text-[11px] text-slate-500'>
+                                {event.detail}
+                              </span>
+                            </span>
+                            <Badge className='h-5 rounded bg-emerald-50 px-2 text-[10px] text-emerald-600'>
+                              {event.status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className='flex gap-2 border-t border-slate-100 pt-3'>
+                      <Button
+                        size='sm'
+                        className='flex-1'
+                        onClick={() => openEdit(selected)}
+                      >
+                        <Edit3 className='size-3.5' />
+                        编辑配置
+                      </Button>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        onClick={() => setConfirmAction('rotate')}
+                      >
+                        <RotateCcw className='size-3.5' />
+                        轮换
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -974,7 +1558,7 @@ export function EnterpriseApiKeys() {
               if (!open) setEditing(null)
             }}
             editing={editing}
-            users={usersQuery.data?.data ?? []}
+            users={users}
             saving={saveMutation.isPending}
             onSubmit={(input) => saveMutation.mutate(input)}
           />
