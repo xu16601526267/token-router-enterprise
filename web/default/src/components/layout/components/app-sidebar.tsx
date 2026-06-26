@@ -56,7 +56,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible={collapsible} variant='sidebar'>
-      <SidebarHeader className='border-sidebar-border/60 border-b px-3 py-3'>
+      <SidebarHeader className='border-sidebar-border/60 border-b px-2 py-2'>
         <SystemBrand
           variant='sidebar'
           nameOverride='Token Router'
@@ -66,7 +66,7 @@ export function AppSidebar() {
 
       {view && <SidebarViewHeader view={view} />}
 
-      <SidebarContent className='py-2.5'>
+      <SidebarContent className='py-1'>
         <AnimatePresence mode='wait' initial={false}>
           <motion.div
             key={key}

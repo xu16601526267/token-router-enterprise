@@ -105,8 +105,8 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
         <div
           className={
             props.fixedContent
-              ? 'enterprise-dashboard min-h-0 flex-1 overflow-hidden px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4'
-              : 'enterprise-dashboard min-h-0 flex-1 overflow-auto px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4'
+              ? 'enterprise-dashboard min-h-0 flex-1 overflow-hidden px-4 pt-2 pb-3 sm:px-6 sm:pt-3 sm:pb-4'
+              : 'enterprise-dashboard min-h-0 flex-1 overflow-auto px-4 pt-2 pb-3 sm:px-6 sm:pt-3 sm:pb-4'
           }
         >
           {content}

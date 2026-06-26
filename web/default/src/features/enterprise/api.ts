@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+import type { TimeGranularity } from '@/lib/time'
 
 import type {
   EnterpriseApiResponse,
@@ -39,6 +40,7 @@ import type {
 type EnterpriseRangeParams = {
   start_timestamp: number
   end_timestamp: number
+  time_granularity?: TimeGranularity
 }
 
 type EnterpriseUsageParams = EnterpriseRangeParams & {

@@ -113,30 +113,70 @@ For commercial licensing, please contact support@quantumnous.com
   }
 
   .enterprise-app-shell [data-sidebar='group-label'] {
-    height: 1.75rem;
+    height: 1.25rem;
     padding-inline: 0.5rem;
-    color: color-mix(in oklch, var(--sidebar-foreground) 58%, transparent);
-    font-size: 10px;
+    color: color-mix(in oklch, var(--sidebar-foreground) 64%, transparent);
+    font-size: 9.5px;
     letter-spacing: 0;
   }
 
   .enterprise-app-shell [data-sidebar='menu-button'] {
-    min-height: 1.85rem;
-    border-radius: 6px;
+    height: 1.7rem;
+    min-height: 1.7rem;
+    gap: 0.45rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 4px;
     font-size: 12px;
+    font-weight: 500;
+    line-height: 1rem;
   }
 
-  .enterprise-app-shell [data-sidebar='menu-button'][data-active='true'] {
-    background: #1d4ed8;
+  .enterprise-app-shell [data-sidebar='menu-button'] svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    opacity: 0.95;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-button'][data-active],
+  .enterprise-app-shell [data-sidebar='menu-button'][data-status='active'] {
+    background: #1f5eff;
     color: #fff;
-    box-shadow: inset 2px 0 0 rgb(147 197 253 / 0.9);
+    box-shadow:
+      inset 2px 0 0 rgb(147 197 253 / 0.95),
+      0 2px 7px rgb(15 23 42 / 0.12);
   }
 
   .enterprise-app-shell [data-slot='button'],
+  .enterprise-app-shell [data-slot='dropdown-menu-trigger'],
   .enterprise-app-shell [data-slot='input'],
   .enterprise-app-shell [data-slot='select-trigger'],
   .enterprise-app-shell [data-slot='badge'] {
     border-radius: 6px;
+  }
+
+  .enterprise-app-shell [data-sidebar='header'] {
+    padding: 0.45rem 0.6rem;
+  }
+
+  .enterprise-app-shell [data-sidebar='content'] {
+    padding-block: 0.35rem;
+  }
+
+  .enterprise-app-shell [data-sidebar='group'] {
+    padding: 0.25rem 0.45rem;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-sub'] {
+    margin-inline: 0.6rem;
+    padding-block: 0.125rem;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-sub-button'] {
+    height: 1.45rem;
+    border-radius: 4px;
+    padding-inline: 0.5rem;
+    font-size: 11px;
+    line-height: 0.95rem;
   }
 
   .enterprise-dashboard,
@@ -200,22 +240,63 @@ For commercial licensing, please contact support@quantumnous.com
 }
 
 @layer utilities {
+  .enterprise-app-shell [data-sidebar='group-label'] {
+    height: 1.25rem !important;
+    padding-inline: 0.5rem !important;
+    font-size: 11.5px !important;
+    color: #64748b !important;
+    font-weight: 650 !important;
+    line-height: 1rem !important;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-button'] {
+    height: 1.7rem !important;
+    min-height: 1.7rem !important;
+    gap: 0.45rem !important;
+    padding: 0.25rem 0.55rem !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    line-height: 1rem !important;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-button'] svg {
+    width: 0.875rem !important;
+    height: 0.875rem !important;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-sub-button'] {
+    height: 1.45rem !important;
+    min-height: 1.45rem !important;
+    border-radius: 4px !important;
+    padding-inline: 0.5rem !important;
+    font-size: 11px !important;
+    line-height: 0.95rem !important;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-sub-button'] svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+
   .enterprise-app-shell [data-slot='button'],
+  .enterprise-app-shell [data-slot='dropdown-menu-trigger'],
   .enterprise-app-shell [data-slot='input'],
   .enterprise-app-shell [data-slot='select-trigger'],
   .enterprise-app-shell [data-slot='badge'],
+  .enterprise-dashboard .rounded-md,
   .enterprise-dashboard .rounded-lg,
   .enterprise-dashboard .rounded-xl,
   .enterprise-dashboard .rounded-2xl,
+  .enterprise-overview .rounded-md,
   .enterprise-overview .rounded-lg,
   .enterprise-overview .rounded-xl,
   .enterprise-overview .rounded-2xl {
-    border-radius: 6px !important;
+    border-radius: 4px !important;
   }
 
   .enterprise-dashboard [data-slot='button'][data-size='icon'],
   .enterprise-overview [data-slot='button'][data-size='icon'] {
-    border-radius: 6px !important;
+    border-radius: 4px !important;
   }
 }
 

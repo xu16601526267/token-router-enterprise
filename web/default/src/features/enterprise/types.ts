@@ -82,6 +82,7 @@ export type EnterpriseOverviewData = {
   range: {
     start_timestamp: number
     end_timestamp: number
+    time_granularity?: string
   }
   metrics: EnterpriseOverviewMetrics
   trend: EnterpriseOverviewTrendPoint[]

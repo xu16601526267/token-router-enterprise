@@ -13,9 +13,18 @@ import (
 
 const enterpriseOverviewMaxRangeSeconds = int64(31 * 24 * 60 * 60)
 
+type enterpriseOverviewGranularity string
+
+const (
+	enterpriseOverviewGranularityHour enterpriseOverviewGranularity = "hour"
+	enterpriseOverviewGranularityDay  enterpriseOverviewGranularity = "day"
+	enterpriseOverviewGranularityWeek enterpriseOverviewGranularity = "week"
+)
+
 type enterpriseOverviewRange struct {
-	StartTimestamp int64 `json:"start_timestamp"`
-	EndTimestamp   int64 `json:"end_timestamp"`
+	StartTimestamp  int64  `json:"start_timestamp"`
+	EndTimestamp    int64  `json:"end_timestamp"`
+	TimeGranularity string `json:"time_granularity"`
 }
 
 type enterpriseOverviewMetrics struct {
@@ -99,7 +108,7 @@ type enterpriseOverviewAggregate struct {
 func parseEnterpriseOverviewRange(c *gin.Context) (int64, int64) {
 	now := time.Now().Unix()
 	endTimestamp := now
-	startTimestamp := now - 7*24*60*60
+	startTimestamp := now - 30*24*60*60
 
 	if raw := c.Query("end_timestamp"); raw != "" {
 		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
@@ -113,12 +122,68 @@ func parseEnterpriseOverviewRange(c *gin.Context) (int64, int64) {
 	}
 
 	if endTimestamp <= startTimestamp {
-		startTimestamp = endTimestamp - 7*24*60*60
+		startTimestamp = endTimestamp - 30*24*60*60
 	}
 	if endTimestamp-startTimestamp > enterpriseOverviewMaxRangeSeconds {
 		startTimestamp = endTimestamp - enterpriseOverviewMaxRangeSeconds
 	}
 	return startTimestamp, endTimestamp
+}
+
+func parseEnterpriseOverviewGranularity(c *gin.Context) enterpriseOverviewGranularity {
+	switch c.Query("time_granularity") {
+	case string(enterpriseOverviewGranularityHour):
+		return enterpriseOverviewGranularityHour
+	case string(enterpriseOverviewGranularityWeek):
+		return enterpriseOverviewGranularityWeek
+	default:
+		return enterpriseOverviewGranularityDay
+	}
+}
+
+func enterpriseOverviewTrendBucket(timestamp int64, granularity enterpriseOverviewGranularity) int64 {
+	bucketTime := time.Unix(timestamp, 0).UTC()
+
+	switch granularity {
+	case enterpriseOverviewGranularityHour:
+		return time.Date(
+			bucketTime.Year(),
+			bucketTime.Month(),
+			bucketTime.Day(),
+			bucketTime.Hour(),
+			0,
+			0,
+			0,
+			time.UTC,
+		).Unix()
+	case enterpriseOverviewGranularityWeek:
+		weekday := int(bucketTime.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		weekStart := bucketTime.AddDate(0, 0, -(weekday - 1))
+		return time.Date(
+			weekStart.Year(),
+			weekStart.Month(),
+			weekStart.Day(),
+			0,
+			0,
+			0,
+			0,
+			time.UTC,
+		).Unix()
+	default:
+		return time.Date(
+			bucketTime.Year(),
+			bucketTime.Month(),
+			bucketTime.Day(),
+			0,
+			0,
+			0,
+			0,
+			time.UTC,
+		).Unix()
+	}
 }
 
 func quotaToCurrency(quota int64) float64 {
@@ -164,6 +229,7 @@ func rankingItemsFromMap(values map[string]enterpriseOverviewAggregate, totalReq
 // compatible with the original console.
 func GetEnterpriseOverview(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
+	granularity := parseEnterpriseOverviewGranularity(c)
 	quotaRows, quotaErr := model.GetAllQuotaDates(startTimestamp, endTimestamp, "")
 	if quotaErr != nil {
 		common.ApiError(c, quotaErr)
@@ -181,8 +247,7 @@ func GetEnterpriseOverview(c *gin.Context) {
 		metrics.TotalTokens += int64(row.TokenUsed)
 		metrics.TotalQuota += int64(row.Quota)
 
-		day := time.Unix(row.CreatedAt, 0).UTC()
-		bucket := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC).Unix()
+		bucket := enterpriseOverviewTrendBucket(row.CreatedAt, granularity)
 		trendValue := trendMap[bucket]
 		trendValue.Requests += int64(row.Count)
 		trendValue.Tokens += int64(row.TokenUsed)
@@ -317,8 +382,9 @@ func GetEnterpriseOverview(c *gin.Context) {
 	data := enterpriseOverviewData{
 		GeneratedAt: time.Now().Unix(),
 		Range: enterpriseOverviewRange{
-			StartTimestamp: startTimestamp,
-			EndTimestamp:   endTimestamp,
+			StartTimestamp:  startTimestamp,
+			EndTimestamp:    endTimestamp,
+			TimeGranularity: string(granularity),
 		},
 		Metrics:   metrics,
 		Trend:     trend,

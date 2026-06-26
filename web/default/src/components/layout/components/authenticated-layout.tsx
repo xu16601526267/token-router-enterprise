@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { AnimatedOutlet } from '@/components/page-transition'
 import { SkipToMain } from '@/components/skip-to-main'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { EnterpriseConsoleProvider } from '@/context/enterprise-console-context'
 import { LayoutProvider } from '@/context/layout-provider'
 import { SearchProvider } from '@/context/search-provider'
 import { getCookie } from '@/lib/cookies'
@@ -37,33 +38,35 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
   return (
     <LayoutProvider>
       <SearchProvider>
-        <SidebarProvider
-          defaultOpen={defaultOpen}
-          className='enterprise-app-shell'
-          style={
-            {
-              '--app-header-height': '0px',
-              '--enterprise-topbar-height': '3.25rem',
-              '--sidebar-width': '13.75rem',
-              '--sidebar-width-icon': '3rem',
-            } as React.CSSProperties
-          }
-        >
-          <SkipToMain />
-          <AppSidebar />
-          <SidebarInset
-            className={cn(
-              '@container/content',
-              'h-svh min-h-0 overflow-hidden bg-[#f6f8fb]',
-              'md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:shadow-none'
-            )}
+        <EnterpriseConsoleProvider>
+          <SidebarProvider
+            defaultOpen={defaultOpen}
+            className='enterprise-app-shell'
+            style={
+              {
+                '--app-header-height': '0px',
+                '--enterprise-topbar-height': '3.25rem',
+                '--sidebar-width': '13rem',
+                '--sidebar-width-icon': '2.75rem',
+              } as React.CSSProperties
+            }
           >
-            <AppHeader />
-            <div className='enterprise-content-scroll flex min-h-0 flex-1 flex-col overflow-auto'>
-              {props.children ?? <AnimatedOutlet />}
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
+            <SkipToMain />
+            <AppSidebar />
+            <SidebarInset
+              className={cn(
+                '@container/content',
+                'h-svh min-h-0 overflow-hidden bg-[#f6f8fb]',
+                'md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:shadow-none'
+              )}
+            >
+              <AppHeader />
+              <div className='enterprise-content-scroll flex min-h-0 flex-1 flex-col overflow-auto'>
+                {props.children ?? <AnimatedOutlet />}
+              </div>
+            </SidebarInset>
+          </SidebarProvider>
+        </EnterpriseConsoleProvider>
       </SearchProvider>
     </LayoutProvider>
   )
