@@ -21,12 +21,12 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Boxes,
-  CalendarDays,
   CheckCircle2,
   CircleDollarSign,
   Download,
   Gauge,
   MoreHorizontal,
+  Plus,
   Power,
   PowerOff,
   Radio,
@@ -48,6 +48,13 @@ import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
@@ -58,7 +65,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { useEnterpriseConsole } from '@/context/enterprise-console-context'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 
@@ -67,6 +75,7 @@ import {
   updateAllChannelsBalance,
   updateChannelBalance,
 } from './api'
+import { useChannels } from './components/channels-provider'
 import { ChannelsTable } from './components/channels-table'
 import { CHANNEL_STATUS } from './constants'
 import {
@@ -89,15 +98,15 @@ type EnterpriseChannelsCenterProps = {
 
 type SummaryTone = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose'
 
-type DetailTab = 'overview' | 'models' | 'events' | 'routing'
+type DetailTab =
+  | 'overview'
+  | 'balance'
+  | 'models'
+  | 'routing'
+  | 'events'
+  | 'sla'
 
 const EMPTY_CHANNEL_ITEMS: EnterpriseChannelItem[] = []
-
-const RANGE_OPTIONS = [
-  { label: '近 7 天', value: 7 },
-  { label: '近 30 天', value: 30 },
-  { label: '近 90 天', value: 90 },
-] as const
 
 const toneStyles: Record<
   SummaryTone,
@@ -158,7 +167,16 @@ function splitModels(models: string): string[] {
 
 function formatTimestamp(timestamp: number): string {
   if (timestamp <= 0) return '未检查'
-  return dayjs.unix(timestamp).fromNow()
+  const now = dayjs()
+  const target = dayjs.unix(timestamp)
+  const minutes = now.diff(target, 'minute')
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = now.diff(target, 'hour')
+  if (hours < 24) return `${hours} 小时前`
+  const days = now.diff(target, 'day')
+  if (days < 30) return `${days} 天前`
+  return target.format('MM-DD HH:mm')
 }
 
 function statusConfig(item: EnterpriseChannelItem): {
@@ -354,12 +372,9 @@ function DetailMetric({
 export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { setOpen, setCurrentRow } = useChannels()
+  const { range, rangeLabel } = useEnterpriseConsole()
   const [activeTab, setActiveTab] = useState('enterprise')
-  const [rangeDays, setRangeDays] = useState<number>(7)
-  const range = useMemo(() => {
-    const end = Math.floor(Date.now() / 1000)
-    return { start: end - rangeDays * 24 * 60 * 60, end }
-  }, [rangeDays])
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('all')
   const [supplier, setSupplier] = useState('all')
@@ -371,6 +386,10 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   const [detailTab, setDetailTab] = useState<DetailTab>('overview')
   const [exportingChannels, setExportingChannels] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const rangeDays = useMemo(() => {
+    const seconds = Math.max(0, range.end - range.start)
+    return Math.max(1, Math.ceil(seconds / (24 * 60 * 60)))
+  }, [range.end, range.start])
 
   const queryParams = useMemo(
     () => ({
@@ -668,48 +687,13 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
           onValueChange={setActiveTab}
           className='flex h-full min-h-0 flex-col gap-2.5'
         >
-          <div className='flex shrink-0 flex-col gap-2'>
+          <div className='flex shrink-0 flex-col'>
             <EnterprisePageHeader
               eyebrow='资源与路由'
               title='渠道与供应商中心'
-              description='统一管理上游供应商、渠道健康度、余额、模型覆盖和路由优先级。'
+              description='统一管理上游供应商、渠道健康度、配额与模型覆盖。'
               actions={
                 <>
-                  {props.retryBadge}
-                  <div className='flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
-                    <CalendarDays className='size-3.5 text-slate-400' />
-                    <NativeSelect
-                      value={String(rangeDays)}
-                      className='h-6 w-[96px] border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0'
-                      onChange={(event) => {
-                        setRangeDays(Number(event.target.value))
-                        setPage(1)
-                      }}
-                    >
-                      {RANGE_OPTIONS.map((option) => (
-                        <NativeSelectOption
-                          key={option.value}
-                          value={String(option.value)}
-                        >
-                          {option.label}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  <Button
-                    size='sm'
-                    variant='outline'
-                    onClick={() => centerQuery.refetch()}
-                    disabled={centerQuery.isFetching}
-                  >
-                    <RefreshCw
-                      className={cn(
-                        'size-3.5',
-                        centerQuery.isFetching && 'animate-spin'
-                      )}
-                    />
-                    刷新
-                  </Button>
                   <Button
                     size='sm'
                     variant='outline'
@@ -728,28 +712,67 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                     <Download className='size-3.5' />
                     {exportingChannels ? '导出中' : '导出报表'}
                   </Button>
-                  {props.actions}
+                  <Button
+                    size='sm'
+                    className='bg-blue-600 text-white hover:bg-blue-700'
+                    onClick={() => {
+                      setCurrentRow(null)
+                      setOpen('create-channel')
+                    }}
+                  >
+                    <Plus className='size-3.5' />
+                    新增渠道
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          size='icon-sm'
+                          variant='outline'
+                          aria-label='更多渠道操作'
+                        />
+                      }
+                    >
+                      <MoreHorizontal className='size-3.5' />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align='end'
+                      className='w-44 rounded-md border-slate-200'
+                    >
+                      <DropdownMenuItem
+                        className='text-xs'
+                        onClick={() => void centerQuery.refetch()}
+                      >
+                        <RefreshCw className='size-3.5' />
+                        刷新数据
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className='text-xs'
+                        onClick={() => void testAllEnabledChannels()}
+                      >
+                        <TestTube2 className='size-3.5' />
+                        全量健康检查
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className='text-xs'
+                        onClick={() => setActiveTab('classic')}
+                      >
+                        <Gauge className='size-3.5' />
+                        经典配置
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
               }
             />
-            <TabsList className='h-8 w-fit rounded-md bg-slate-100 p-0.5'>
-              <TabsTrigger
-                value='enterprise'
-                className='h-7 rounded px-3 text-xs'
-              >
-                运营视图
-              </TabsTrigger>
-              <TabsTrigger value='classic' className='h-7 rounded px-3 text-xs'>
-                经典配置
-              </TabsTrigger>
-            </TabsList>
           </div>
 
           <TabsContent
             value='enterprise'
             className='min-h-0 flex-1 overflow-auto pb-4'
           >
-            <div className='grid min-h-full gap-3 xl:grid-cols-[minmax(0,1fr)_344px]'>
+            <div className='grid min-h-full gap-2.5 xl:grid-cols-[minmax(0,1fr)_344px]'>
               <div className='flex min-w-0 flex-col gap-2.5'>
                 <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5'>
                   <ChannelSummaryCard
@@ -906,13 +929,14 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                         重置筛选
                       </Button>
                       <span className='whitespace-nowrap'>
-                        共 {total} 条 · 第 {data?.page ?? page}/{totalPages} 页
+                        {rangeLabel} · 共 {total} 条 · 第 {data?.page ?? page}/
+                        {totalPages} 页
                       </span>
                     </div>
                   </div>
                 </EnterprisePanel>
 
-                <EnterprisePanel className='min-w-0 flex-1' bodyClassName='p-0'>
+                <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
                   <div className='flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white px-3 py-2'>
                     <div className='flex flex-wrap items-center gap-2 text-xs'>
                       <span className='font-medium text-slate-900'>
@@ -1008,8 +1032,13 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                       </Button>
                     </div>
                   </div>
-                  <div className='max-h-[calc(100vh-350px)] min-h-[430px] overflow-auto'>
-                    <Table className='min-w-[1120px]'>
+                  <div
+                    className={cn(
+                      'max-h-[calc(100vh-350px)] overflow-auto',
+                      items.length <= 4 ? 'min-h-[220px]' : 'min-h-[430px]'
+                    )}
+                  >
+                    <Table className='min-w-[920px]'>
                       <TableHeader className='sticky top-0 z-10 bg-slate-50/95 backdrop-blur'>
                         <TableRow className='h-9'>
                           <TableHead className='w-9 px-2'>
@@ -1300,18 +1329,21 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                         </div>
                       </div>
 
-                      <div className='flex gap-1 overflow-x-auto border-b border-slate-100 px-3 py-2'>
+                      <div className='flex gap-0.5 overflow-x-auto border-b border-slate-100 px-2.5 py-2'>
                         {[
                           ['overview', '概览'],
+                          ['balance', '配额与余额'],
                           ['models', '支持模型'],
-                          ['events', '事件记录'],
                           ['routing', '路由策略'],
+                          ['events', '事件记录'],
+                          ['sla', 'SLA'],
                         ].map(([value, label]) => (
                           <button
                             key={value}
                             type='button'
                             className={cn(
                               'h-7 shrink-0 rounded px-2 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100',
+                              'px-1.5 text-[10px]',
                               detailTab === value && 'bg-blue-50 text-blue-600'
                             )}
                             onClick={() => setDetailTab(value as DetailTab)}
@@ -1360,9 +1392,9 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                                   )}
                                   helper={
                                     selected.balance_updated_time > 0
-                                      ? `余额 ${dayjs
-                                          .unix(selected.balance_updated_time)
-                                          .fromNow()}`
+                                      ? `余额 ${formatTimestamp(
+                                          selected.balance_updated_time
+                                        )}`
                                       : '余额未同步'
                                   }
                                 />
@@ -1377,6 +1409,90 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                               {supplierProfileContent}
                             </div>
                           </>
+                        )}
+
+                        {detailTab === 'balance' && (
+                          <div className='space-y-3'>
+                            <div>
+                              <div className='mb-2 flex items-center justify-between'>
+                                <h3 className='text-[13px] font-semibold text-slate-950'>
+                                  配额与余额
+                                </h3>
+                                <span className='text-[10px] text-slate-500'>
+                                  余额口径
+                                </span>
+                              </div>
+                              <div className='grid grid-cols-2 gap-2'>
+                                <DetailMetric
+                                  label='当前余额'
+                                  value={formatMoney(selected.balance)}
+                                  helper='USD'
+                                  tone={
+                                    selected.balance > 0 &&
+                                    selected.balance < 10
+                                      ? 'rose'
+                                      : 'emerald'
+                                  }
+                                />
+                                <DetailMetric
+                                  label='已用额度'
+                                  value={formatCompactNumber(
+                                    selected.used_quota
+                                  )}
+                                  helper='累计口径'
+                                  tone='blue'
+                                />
+                                <DetailMetric
+                                  label='路由权重'
+                                  value={`${selected.weight || 0}%`}
+                                  helper='同组分流'
+                                />
+                                <DetailMetric
+                                  label='余额同步'
+                                  value={
+                                    selected.balance_updated_time > 0
+                                      ? formatTimestamp(
+                                          selected.balance_updated_time
+                                        )
+                                      : '未同步'
+                                  }
+                                  helper='最后同步时间'
+                                />
+                              </div>
+                            </div>
+                            <div className='rounded-md border border-slate-200 bg-slate-50/60 p-2.5'>
+                              <div className='flex items-center justify-between text-[11px] text-slate-500'>
+                                <span>低余额阈值</span>
+                                <span
+                                  className={cn(
+                                    'font-semibold',
+                                    selected.balance > 0 &&
+                                      selected.balance < 10
+                                      ? 'text-rose-600'
+                                      : 'text-emerald-600'
+                                  )}
+                                >
+                                  {selected.balance > 0 && selected.balance < 10
+                                    ? '需补充余额'
+                                    : '余额正常'}
+                                </span>
+                              </div>
+                              <div className='mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200'>
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full',
+                                    selected.balance > 0 &&
+                                      selected.balance < 10
+                                      ? 'bg-rose-500'
+                                      : 'bg-emerald-500'
+                                  )}
+                                  style={{
+                                    width: `${Math.min(100, Math.max(4, selected.balance))}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
                         )}
 
                         {detailTab === 'models' && (
@@ -1507,6 +1623,66 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                             </p>
                           </div>
                         )}
+
+                        {detailTab === 'sla' && (
+                          <div className='space-y-3'>
+                            <div className='grid grid-cols-2 gap-2'>
+                              <DetailMetric
+                                label='成功率目标'
+                                value='98.00%'
+                                helper={`当前 ${formatPercent(selected.success_rate)}`}
+                                tone={
+                                  selected.success_rate >= 0.98
+                                    ? 'emerald'
+                                    : 'rose'
+                                }
+                              />
+                              <DetailMetric
+                                label='延迟 P95 目标'
+                                value='800ms'
+                                helper={`当前 ${selectedLatency.toFixed(0)}ms`}
+                                tone={
+                                  selectedLatency > 800 ? 'rose' : 'emerald'
+                                }
+                              />
+                              <DetailMetric
+                                label='错误事件'
+                                value={String(detail?.incidents.length ?? 0)}
+                                helper={`${rangeDays} 天窗口`}
+                                tone={
+                                  (detail?.incidents.length ?? 0) > 0
+                                    ? 'amber'
+                                    : 'emerald'
+                                }
+                              />
+                              <DetailMetric
+                                label='请求样本'
+                                value={formatCompactNumber(selected.requests)}
+                                helper='用于计算 SLA'
+                                tone='blue'
+                              />
+                            </div>
+                            <div className='rounded-md border border-slate-200 bg-white p-2.5'>
+                              <div className='flex items-center justify-between'>
+                                <span className='text-[12px] font-semibold text-slate-900'>
+                                  执行状态
+                                </span>
+                                <Badge
+                                  className={cn(
+                                    'h-5 rounded border-0 px-1.5 text-[10px]',
+                                    selectedStatus?.className
+                                  )}
+                                >
+                                  {selectedStatus?.label}
+                                </Badge>
+                              </div>
+                              <p className='mt-1.5 text-[11px] leading-5 text-slate-500'>
+                                成功率、延迟和错误事件来自当前全局时间窗口，
+                                与渠道列表和导出报表保持同一口径。
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className='mt-1 border-t border-slate-100 px-3 py-3'>
@@ -1561,6 +1737,18 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
             <EnterprisePanel
               title='经典渠道配置'
               description='保留原系统全部渠道增删改查、测试、余额更新、多 Key 管理和上游模型操作。'
+              action={
+                <div className='flex items-center gap-2'>
+                  {props.actions}
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={() => setActiveTab('enterprise')}
+                  >
+                    返回运营视图
+                  </Button>
+                </div>
+              }
               bodyClassName='p-0'
             >
               <ChannelsTable />
