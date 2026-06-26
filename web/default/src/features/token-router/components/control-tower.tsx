@@ -20,7 +20,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
-  CalendarClock,
   CheckCircle2,
   Clock3,
   Download,
@@ -36,7 +35,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import {
   Area,
   AreaChart,
@@ -50,7 +49,6 @@ import { toast } from 'sonner'
 import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -59,6 +57,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useEnterpriseConsole } from '@/context/enterprise-console-context'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 
@@ -76,19 +75,6 @@ import type {
   RoutingPolicyItem,
 } from '../control-tower-types'
 
-type RangeState = {
-  startTimestamp: number
-  endTimestamp: number
-  startInput: string
-  endInput: string
-}
-
-const RANGE_PRESETS = [
-  { key: '7d', label: '近 7 天', days: 7 },
-  { key: '30d', label: '近 30 天', days: 30 },
-  { key: 'month', label: '本月', days: 0 },
-] as const
-
 function formatCount(value: number): string {
   return new Intl.NumberFormat('zh-CN', { notation: 'compact' }).format(value)
 }
@@ -99,56 +85,12 @@ function formatPercent(value: number): string {
 
 function formatLatency(value: number): string {
   if (value <= 0) {
-    return '0 ms'
+    return '0ms'
   }
   if (value < 10) {
-    return `${value.toFixed(2)} ms`
+    return `${value.toFixed(2)}ms`
   }
-  return `${value.toFixed(0)} ms`
-}
-
-function formatInputValue(timestamp: number): string {
-  return dayjs.unix(timestamp).format('YYYY-MM-DD')
-}
-
-function createDefaultRange(): RangeState {
-  const endTimestamp = dayjs().endOf('day').unix()
-  const startTimestamp = dayjs().subtract(1, 'month').startOf('day').unix()
-  return {
-    startTimestamp,
-    endTimestamp,
-    startInput: formatInputValue(startTimestamp),
-    endInput: formatInputValue(endTimestamp),
-  }
-}
-
-function createPresetRange(days: number): RangeState {
-  const now = dayjs()
-  const endTimestamp = now.endOf('day').unix()
-  const startTimestamp =
-    days > 0
-      ? now
-          .subtract(days - 1, 'day')
-          .startOf('day')
-          .unix()
-      : now.startOf('month').unix()
-  return {
-    startTimestamp,
-    endTimestamp,
-    startInput: formatInputValue(startTimestamp),
-    endInput: formatInputValue(endTimestamp),
-  }
-}
-
-function parseDateInput(value: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null
-  }
-  const parsed = dayjs(value)
-  if (!parsed.isValid()) {
-    return null
-  }
-  return parsed.unix()
+  return `${value.toFixed(0)}ms`
 }
 
 function csvEscape(value: string | number): string {
@@ -400,12 +342,12 @@ function EventList(props: {
   )
 }
 
-function HealthRow(props: { provider: ProviderHealth; requestTotal: number }) {
+function HealthRow(props: { provider: ProviderHealth }) {
   const status = providerStatus(props.provider)
-  const trafficShare =
-    props.requestTotal > 0 ? props.provider.requests / props.requestTotal : 0
+  const latency =
+    props.provider.average_latency_ms || props.provider.response_time_ms
   return (
-    <div className='grid grid-cols-[minmax(0,1fr)_58px_58px] items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-slate-50'>
+    <div className='grid grid-cols-[minmax(0,1fr)_54px_48px_54px] items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-slate-50'>
       <div className='flex min-w-0 items-center gap-2'>
         <span className={cn('size-1.5 rounded-full', status.dotClassName)} />
         <div className='min-w-0'>
@@ -421,9 +363,10 @@ function HealthRow(props: { provider: ProviderHealth; requestTotal: number }) {
         {formatPercent(props.provider.success_rate)}
       </div>
       <div className='text-right text-[11px] text-slate-500'>
-        {trafficShare > 0
-          ? formatPercent(trafficShare)
-          : formatCount(props.provider.requests)}
+        {formatCount(props.provider.requests)}
+      </div>
+      <div className='text-right text-[11px] text-slate-500'>
+        {formatLatency(latency)}
       </div>
     </div>
   )
@@ -559,17 +502,13 @@ export function ControlTower(props: {
   onOpenRoutingPolicies?: () => void
 }) {
   const queryClient = useQueryClient()
-  const [range, setRange] = useState<RangeState>(() => createDefaultRange())
+  const { range, rangeLabel } = useEnterpriseConsole()
   const query = useQuery({
-    queryKey: [
-      'enterprise-control-tower',
-      range.startTimestamp,
-      range.endTimestamp,
-    ],
+    queryKey: ['enterprise-control-tower', range.start, range.end],
     queryFn: () =>
       getControlTower({
-        start_timestamp: range.startTimestamp,
-        end_timestamp: range.endTimestamp,
+        start_timestamp: range.start,
+        end_timestamp: range.end,
       }),
     refetchInterval: 60_000,
   })
@@ -591,10 +530,6 @@ export function ControlTower(props: {
     ...item,
     date: dayjs.unix(item.timestamp).format('MM-DD'),
   }))
-  const rangeText = `${dayjs.unix(range.startTimestamp).format('YYYY-MM-DD')} ~ ${dayjs
-    .unix(range.endTimestamp)
-    .format('YYYY-MM-DD')}`
-
   const invalidateControlTower = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['enterprise-control-tower'] }),
@@ -688,31 +623,6 @@ export function ControlTower(props: {
     },
   })
 
-  const updateRangeInput = (field: 'start' | 'end', value: string) => {
-    setRange((previous) => {
-      const parsed = parseDateInput(value)
-      if (parsed == null) {
-        return field === 'start'
-          ? { ...previous, startInput: value }
-          : { ...previous, endInput: value }
-      }
-      if (field === 'start') {
-        const startOfDay = dayjs.unix(parsed).startOf('day').unix()
-        return {
-          ...previous,
-          startInput: value,
-          startTimestamp: Math.min(startOfDay, previous.endTimestamp - 60),
-        }
-      }
-      const endOfDay = dayjs.unix(parsed).endOf('day').unix()
-      return {
-        ...previous,
-        endInput: value,
-        endTimestamp: Math.max(endOfDay, previous.startTimestamp + 60),
-      }
-    })
-  }
-
   return (
     <div className='flex flex-col gap-2 pb-4'>
       <EnterprisePageHeader
@@ -720,43 +630,6 @@ export function ControlTower(props: {
         description='路由策略、流量分配、SLA 与执行治理'
         actions={
           <div className='flex flex-wrap items-center justify-end gap-2'>
-            <div className='flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
-              <CalendarClock className='size-3.5 text-slate-500' />
-              <Input
-                type='text'
-                aria-label='开始时间'
-                placeholder='YYYY-MM-DD'
-                value={range.startInput}
-                onChange={(event) =>
-                  updateRangeInput('start', event.target.value)
-                }
-                className='h-6 w-[96px] rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
-              />
-              <span className='text-[11px] text-slate-400'>~</span>
-              <Input
-                type='text'
-                aria-label='结束时间'
-                placeholder='YYYY-MM-DD'
-                value={range.endInput}
-                onChange={(event) =>
-                  updateRangeInput('end', event.target.value)
-                }
-                className='h-6 w-[96px] rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
-              />
-            </div>
-            <div className='flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
-              {RANGE_PRESETS.map((preset) => (
-                <Button
-                  key={preset.key}
-                  variant='ghost'
-                  size='xs'
-                  className='rounded-none border-r border-slate-100 last:border-r-0'
-                  onClick={() => setRange(createPresetRange(preset.days))}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </div>
             <Button
               variant='outline'
               size='sm'
@@ -802,7 +675,7 @@ export function ControlTower(props: {
         <MetricTile
           title='活跃路由策略'
           value={formatCount(metrics?.active_policies ?? 0)}
-          helper={`统计范围 ${rangeText}`}
+          helper={rangeLabel}
           icon={Route}
           tone='blue'
           loading={query.isLoading}
@@ -1160,17 +1033,19 @@ export function ControlTower(props: {
             bodyClassName='p-2.5'
           >
             <div className='space-y-0.5'>
+              <div className='grid grid-cols-[minmax(0,1fr)_54px_48px_54px] gap-2 px-1.5 pb-1 text-right text-[10px] text-slate-400'>
+                <span className='text-left'>供应商</span>
+                <span>成功率</span>
+                <span>请求</span>
+                <span>延迟</span>
+              </div>
               {providers.length === 0 ? (
                 <div className='rounded-md border border-dashed border-slate-200 bg-slate-50/60 py-6 text-center text-xs text-slate-500'>
                   暂无健康数据
                 </div>
               ) : (
                 providers.map((provider) => (
-                  <HealthRow
-                    key={provider.channel_id}
-                    provider={provider}
-                    requestTotal={requestTotal}
-                  />
+                  <HealthRow key={provider.channel_id} provider={provider} />
                 ))
               )}
             </div>
