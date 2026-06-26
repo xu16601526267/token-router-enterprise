@@ -22,9 +22,11 @@ import {
   Check,
   ChevronDown,
   HelpCircle,
+  UserRound,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useLocation } from '@tanstack/react-router'
 
 import { ConfigDrawer } from '@/components/config-drawer'
 import { NotificationPopover } from '@/components/notification-popover'
@@ -293,18 +295,20 @@ function EnterpriseDateRangeControl({
 
 function EnterpriseHeaderContext() {
   const user = useAuthStore((state) => state.auth.user)
+  const pathname = useLocation({ select: (location) => location.pathname })
   const {
     workspaceId,
     setWorkspaceId,
   } = useEnterpriseConsole()
+  const isPersonalWorkbench = pathname.startsWith('/wallet')
   const isAdmin = (user?.role ?? 0) >= ROLE.ADMIN
   const rawGroup = user?.group?.trim()
-  const workspace =
-    rawGroup && rawGroup !== 'default'
-      ? rawGroup
-      : isAdmin
-        ? '趋境科技 / Enterprise'
-        : '个人工作区'
+  let workspace = '个人工作区'
+  if (rawGroup && rawGroup !== 'default') {
+    workspace = rawGroup
+  } else if (isAdmin) {
+    workspace = '趋境科技 / Enterprise'
+  }
   const tenantsQuery = useQuery({
     queryKey: ['enterprise-header-tenants'],
     queryFn: () => getPlatformTenants({ status: 'active' }),
@@ -334,6 +338,22 @@ function EnterpriseHeaderContext() {
   const controlClassName =
     'h-8 rounded-md border-slate-200/80 bg-white/90 px-2.5 text-[12px] font-medium text-slate-700 shadow-none hover:border-slate-300 hover:bg-white aria-expanded:bg-white'
   const selectedMarkClassName = 'ms-auto size-3.5 text-blue-600'
+
+  if (isPersonalWorkbench) {
+    return (
+      <div className='hidden min-w-0 items-center gap-2 lg:flex'>
+        <div
+          className={cn(
+            controlClassName,
+            'flex max-w-56 items-center justify-start gap-2'
+          )}
+        >
+          <UserRound className='size-3.5 shrink-0 text-blue-600' />
+          <span className='truncate'>个人工作台</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='hidden min-w-0 items-center gap-2 lg:flex'>

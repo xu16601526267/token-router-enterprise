@@ -24,6 +24,7 @@ import {
   BookOpen,
   Check,
   CircleDollarSign,
+  Code2,
   Copy,
   CreditCard,
   ExternalLink,
@@ -31,7 +32,10 @@ import {
   FlaskConical,
   KeyRound,
   LockKeyhole,
+  Mail,
+  ReceiptText,
   RefreshCw,
+  ShieldCheck,
   Sparkles,
   UserRound,
   Wallet,
@@ -47,19 +51,17 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { toast } from 'sonner'
 
-import {
-  EnterprisePageHeader,
-  EnterprisePanel,
-  EnterpriseStatCard,
-} from '@/components/enterprise'
+import { EnterprisePanel, EnterpriseStatCard } from '@/components/enterprise'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import type { QuotaDataItem } from '@/features/dashboard/types'
 import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
 import { getSelfSubscriptionFull } from '@/features/subscriptions/api'
-import { getUserBillingHistory } from '@/features/wallet/api'
+import { getTopupInfo, getUserBillingHistory } from '@/features/wallet/api'
+import { usePayment } from '@/features/wallet/hooks/use-payment'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import {
   formatCompactNumber,
@@ -133,22 +135,75 @@ function aggregateUsage(rows: QuotaDataItem[]) {
   }
 }
 
+function buildRanges() {
+  const now = new Date()
+  const end = Math.floor(now.getTime() / 1000)
+  const monthStart = Math.floor(
+    new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000
+  )
+
+  return {
+    month: { start: monthStart, end },
+    trend: { start: end - 7 * 24 * 60 * 60, end },
+  }
+}
+
+function formatPaymentStatus(status: string) {
+  if (status === 'success') return '已完成'
+  if (status === 'pending') return '处理中'
+  return '已过期'
+}
+
+function paymentStatusClass(status: string) {
+  if (status === 'success') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  }
+  if (status === 'pending') {
+    return 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+  return 'border-slate-200 bg-slate-50 text-slate-500'
+}
+
 export function PersonalWorkbench() {
   const user = useAuthStore((state) => state.auth.user)
   const { copyToClipboard, copiedText } = useCopyToClipboard({
     successMessage: '已复制到剪贴板',
   })
+  const { processing: paymentProcessing, processPayment } = usePayment()
   const [copyingKey, setCopyingKey] = useState(false)
-  const range = useMemo(() => {
-    const end = Math.floor(Date.now() / 1000)
-    return { start: end - 7 * 24 * 60 * 60, end }
-  }, [])
+  const [selectedTopupAmount, setSelectedTopupAmount] = useState<number | null>(
+    null
+  )
+  const ranges = useMemo(buildRanges, [])
 
-  const usageQuery = useQuery({
-    queryKey: ['personal-workbench-usage', range.start, range.end],
+  const trendUsageQuery = useQuery({
+    queryKey: [
+      'personal-workbench-trend-usage',
+      ranges.trend.start,
+      ranges.trend.end,
+    ],
     queryFn: () =>
       getUserQuotaDates(
-        { start_timestamp: range.start, end_timestamp: range.end },
+        {
+          start_timestamp: ranges.trend.start,
+          end_timestamp: ranges.trend.end,
+        },
+        false
+      ),
+    staleTime: 30_000,
+  })
+  const monthUsageQuery = useQuery({
+    queryKey: [
+      'personal-workbench-month-usage',
+      ranges.month.start,
+      ranges.month.end,
+    ],
+    queryFn: () =>
+      getUserQuotaDates(
+        {
+          start_timestamp: ranges.month.start,
+          end_timestamp: ranges.month.end,
+        },
         false
       ),
     staleTime: 30_000,
@@ -170,11 +225,17 @@ export function PersonalWorkbench() {
     staleTime: 60_000,
     retry: false,
   })
+  const topupInfoQuery = useQuery({
+    queryKey: ['personal-workbench-topup-info'],
+    queryFn: getTopupInfo,
+    staleTime: 60_000,
+    retry: false,
+  })
 
-  const usage = useMemo(
-    () => aggregateUsage(usageQuery.data?.data ?? []),
-    [usageQuery.data?.data]
-  )
+  const trendRows = trendUsageQuery.data?.data
+  const monthRows = monthUsageQuery.data?.data
+  const trendUsage = useMemo(() => aggregateUsage(trendRows ?? []), [trendRows])
+  const monthUsage = useMemo(() => aggregateUsage(monthRows ?? []), [monthRows])
   const keys = keysQuery.data?.data?.items ?? []
   const activeKeys = keys.filter((key) => key.status === 1)
   const preferredKey = activeKeys[0] ?? keys[0]
@@ -184,6 +245,39 @@ export function PersonalWorkbench() {
   )
   const billingItems = billingQuery.data?.data?.items ?? []
   const latestTopup = billingItems[0]
+  const topupInfo = topupInfoQuery.data?.data
+  const paymentMethods = topupInfo?.pay_methods ?? []
+  const amountOptions = useMemo(() => {
+    const presets = (topupInfo?.amount_options ?? [])
+      .filter((amount) => Number.isFinite(amount) && amount > 0)
+      .slice(0, 5)
+
+    if (presets.length > 0) return presets
+    if (topupInfo?.min_topup && topupInfo.min_topup > 0) {
+      return [topupInfo.min_topup]
+    }
+    return []
+  }, [topupInfo])
+  const activeTopupAmount =
+    selectedTopupAmount ?? amountOptions[1] ?? amountOptions[0] ?? 0
+  const primaryPaymentMethod =
+    paymentMethods[0]?.type ?? (topupInfo?.enable_stripe_topup ? 'stripe' : '')
+  const canTopup =
+    activeTopupAmount > 0 &&
+    primaryPaymentMethod.length > 0 &&
+    (topupInfo?.enable_online_topup || topupInfo?.enable_stripe_topup) &&
+    topupInfo?.payment_compliance_confirmed !== false
+  const recentActivities = useMemo(
+    () =>
+      [...(trendRows ?? [])]
+        .sort((a, b) => b.created_at - a.created_at)
+        .slice(0, 5),
+    [trendRows]
+  )
+  const modelTotalRequests = Math.max(
+    trendUsage.models.reduce((sum, model) => sum + model.requests, 0),
+    1
+  )
   const baseUrl =
     typeof window === 'undefined' ? '/v1' : `${window.location.origin}/v1`
 
@@ -201,44 +295,82 @@ export function PersonalWorkbench() {
     }
   }
 
-  return (
-    <div className='enterprise-dashboard space-y-3 pb-2'>
-      <EnterprisePageHeader
-        eyebrow='个人中心'
-        title={`你好，${user?.display_name || user?.username || '用户'}`}
-        description='管理个人额度、API Key、订阅和调用记录；企业管理员可在同一套系统中切换到完整经营驾驶舱。'
-        actions={
-          <>
-            <Badge
-              variant='outline'
-              className='bg-background/70 h-8 rounded-md px-3 text-xs font-normal'
-            >
-              当前分组 · {user?.group || '默认'}
-            </Badge>
-            <Button
-              variant='outline'
-              size='sm'
-              className='bg-background/70 h-8 rounded-md'
-              disabled={usageQuery.isFetching || keysQuery.isFetching}
-              onClick={() => {
-                void usageQuery.refetch()
-                void keysQuery.refetch()
-              }}
-            >
-              <RefreshCw
-                className={cn(
-                  'size-3.5',
-                  (usageQuery.isFetching || keysQuery.isFetching) &&
-                    'animate-spin'
-                )}
-              />
-              刷新
-            </Button>
-          </>
-        }
-      />
+  const handleStartPayment = async () => {
+    if (topupInfoQuery.isLoading) return
+    if (!topupInfo) {
+      toast.error('充值配置未加载')
+      return
+    }
+    if (!topupInfo.enable_online_topup && !topupInfo.enable_stripe_topup) {
+      toast.error('在线充值未启用')
+      return
+    }
+    if (topupInfo.payment_compliance_confirmed === false) {
+      toast.error('支付合规声明尚未确认')
+      return
+    }
+    if (!primaryPaymentMethod || activeTopupAmount <= 0) {
+      toast.error('未配置可用充值金额或支付方式')
+      return
+    }
+    await processPayment(activeTopupAmount, primaryPaymentMethod)
+  }
 
-      <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5'>
+  const refreshAll = () => {
+    void trendUsageQuery.refetch()
+    void monthUsageQuery.refetch()
+    void keysQuery.refetch()
+    void billingQuery.refetch()
+    void topupInfoQuery.refetch()
+  }
+
+  const refreshing =
+    trendUsageQuery.isFetching ||
+    monthUsageQuery.isFetching ||
+    keysQuery.isFetching ||
+    billingQuery.isFetching ||
+    topupInfoQuery.isFetching
+  let copyKeyButtonLabel = '复制 Key'
+  if (copyingKey) {
+    copyKeyButtonLabel = '读取中'
+  } else if (copiedText) {
+    copyKeyButtonLabel = '已复制'
+  }
+
+  return (
+    <div className='enterprise-dashboard space-y-2.5 px-0.5 pb-2 text-slate-950 sm:px-0'>
+      <div className='flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between'>
+        <div className='min-w-0'>
+          <h1 className='text-[22px] leading-7 font-semibold tracking-normal text-slate-950'>
+            个人工作台
+          </h1>
+          <p className='mt-0.5 text-[12px] leading-4 text-slate-500'>
+            个人额度、API Key、自助充值与快捷体验
+          </p>
+        </div>
+        <div className='flex flex-wrap items-center gap-2'>
+          <Badge
+            variant='outline'
+            className='h-7 rounded-md border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-600 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+          >
+            当前分组 · {user?.group || '默认'}
+          </Badge>
+          <Button
+            variant='outline'
+            size='sm'
+            className='h-7 rounded-md bg-white px-2.5 text-[11px]'
+            disabled={refreshing}
+            onClick={refreshAll}
+          >
+            <RefreshCw
+              className={cn('size-3.5', refreshing && 'animate-spin')}
+            />
+            刷新
+          </Button>
+        </div>
+      </div>
+
+      <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-5'>
         <EnterpriseStatCard
           title='可用额度'
           value={formatQuota(user?.quota ?? 0)}
@@ -247,12 +379,12 @@ export function PersonalWorkbench() {
           tone='blue'
         />
         <EnterpriseStatCard
-          title='近 7 天调用'
-          value={formatCompactNumber(usage.requests)}
-          helper={`${formatTokens(usage.tokens)} Tokens`}
+          title='本月调用'
+          value={formatCompactNumber(monthUsage.requests)}
+          helper={`${formatTokens(monthUsage.tokens)} Tokens`}
           icon={Zap}
           tone='emerald'
-          loading={usageQuery.isLoading}
+          loading={monthUsageQuery.isLoading}
         />
         <EnterpriseStatCard
           title='活跃 API Key'
@@ -276,11 +408,11 @@ export function PersonalWorkbench() {
         />
         <EnterpriseStatCard
           title='订阅状态'
-          value={activeSubscription ? '使用中' : '未订阅'}
+          value={activeSubscription ? '使用中' : '免费版'}
           helper={
             activeSubscription
               ? `有效期至 ${formatTimestampToDate(activeSubscription.subscription.end_time)}`
-              : '可按需购买订阅计划'
+              : '升级享更多权益'
           }
           icon={CreditCard}
           tone={activeSubscription ? 'emerald' : 'slate'}
@@ -288,35 +420,35 @@ export function PersonalWorkbench() {
         />
       </div>
 
-      <div className='grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]'>
+      <div className='grid gap-2 xl:grid-cols-[minmax(0,1.05fr)_260px_minmax(0,0.9fr)]'>
         <EnterprisePanel
-          title='我的 API 接入'
-          description='密钥默认脱敏展示，复制时通过安全接口临时读取。'
+          title='我的 API Key'
+          description='默认密钥脱敏展示，复制时通过安全接口读取'
           action={
             <Button
               variant='ghost'
               size='sm'
-              className='h-7 px-2 text-xs'
+              className='h-7 px-2 text-[11px] text-blue-600'
               render={<Link to='/keys' />}
             >
-              管理全部密钥
+              管理全部
               <ArrowRight className='size-3.5' />
             </Button>
           }
           bodyClassName='space-y-3'
         >
-          <div className='bg-primary/[0.035] rounded-md border p-3'>
-            <div className='flex flex-col justify-between gap-3 sm:flex-row sm:items-center'>
+          <div className='rounded-md border border-blue-100 bg-blue-50/55 p-3'>
+            <div className='flex flex-col gap-3 md:flex-row md:items-center md:justify-between'>
               <div className='min-w-0'>
-                <div className='flex items-center gap-2'>
-                  <span className='bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md'>
+                <div className='flex items-center gap-2.5'>
+                  <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-white text-blue-600 ring-1 ring-blue-100'>
                     <KeyRound className='size-4' />
                   </span>
-                  <div>
-                    <p className='text-sm font-semibold'>
+                  <div className='min-w-0'>
+                    <p className='truncate text-[13px] font-semibold text-slate-950'>
                       {preferredKey?.name || '尚未创建 API Key'}
                     </p>
-                    <p className='text-muted-foreground mt-0.5 font-mono text-[11px]'>
+                    <p className='mt-0.5 truncate font-mono text-[11px] text-slate-500'>
                       {preferredKey?.key || '创建密钥后即可开始调用'}
                     </p>
                   </div>
@@ -325,7 +457,7 @@ export function PersonalWorkbench() {
               {preferredKey ? (
                 <Button
                   size='sm'
-                  className='h-8 rounded-md'
+                  className='h-8 rounded-md px-3 text-[12px]'
                   disabled={copyingKey}
                   onClick={() => void handleCopyKey()}
                 >
@@ -334,16 +466,12 @@ export function PersonalWorkbench() {
                   ) : (
                     <Copy className='size-3.5' />
                   )}
-                  {copyingKey
-                    ? '读取中'
-                    : copiedText
-                      ? '已复制'
-                      : '复制完整 Key'}
+                  {copyKeyButtonLabel}
                 </Button>
               ) : (
                 <Button
                   size='sm'
-                  className='h-8 rounded-md'
+                  className='h-8 rounded-md px-3 text-[12px]'
                   render={<Link to='/keys' />}
                 >
                   创建 API Key
@@ -352,18 +480,19 @@ export function PersonalWorkbench() {
             </div>
           </div>
 
-          <div className='grid gap-3 sm:grid-cols-2'>
-            <div className='bg-background/55 rounded-md border p-3.5'>
-              <p className='text-muted-foreground text-[11px] font-medium'>
+          <div className='grid gap-2 md:grid-cols-2'>
+            <div className='rounded-md border border-slate-100 bg-slate-50/55 p-3'>
+              <p className='text-[11px] font-medium text-slate-500'>
                 Base URL
               </p>
               <div className='mt-2 flex items-center gap-2'>
-                <code className='bg-muted min-w-0 flex-1 truncate rounded-md px-2.5 py-2 text-[11px]'>
+                <code className='min-w-0 flex-1 truncate rounded-md bg-white px-2 py-1.5 text-[11px] text-slate-700 ring-1 ring-slate-100'>
                   {baseUrl}
                 </code>
                 <Button
                   variant='outline'
                   size='icon-sm'
+                  className='rounded-md bg-white'
                   onClick={() => void copyToClipboard(baseUrl)}
                   aria-label='复制 Base URL'
                 >
@@ -371,83 +500,137 @@ export function PersonalWorkbench() {
                 </Button>
               </div>
             </div>
-            <div className='bg-background/55 rounded-md border p-3.5'>
-              <p className='text-muted-foreground text-[11px] font-medium'>
+            <div className='rounded-md border border-slate-100 bg-slate-50/55 p-3'>
+              <p className='text-[11px] font-medium text-slate-500'>
                 密钥权限
               </p>
               <div className='mt-2 flex flex-wrap gap-1.5'>
-                <Badge variant='secondary' className='text-[10px]'>
+                <Badge variant='secondary' className='rounded px-1.5 text-[10px]'>
                   {preferredKey?.group || '默认分组'}
                 </Badge>
-                <Badge variant='secondary' className='text-[10px]'>
+                <Badge variant='secondary' className='rounded px-1.5 text-[10px]'>
                   {preferredKey?.model_limits_enabled
                     ? '限制模型'
-                    : '全部授权模型'}
+                    : '全部模型'}
                 </Badge>
-                <Badge variant='secondary' className='text-[10px]'>
-                  {preferredKey?.allow_ips ? '已配置 IP 白名单' : '未限制 IP'}
+                <Badge variant='secondary' className='rounded px-1.5 text-[10px]'>
+                  {preferredKey?.allow_ips ? 'IP 白名单' : '未限制 IP'}
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className='grid gap-2 sm:grid-cols-3'>
-            <a
-              href='/playground'
-              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-md border px-3.5 py-3 transition-colors'
-            >
-              <FlaskConical className='size-4 text-blue-600' />
-              <div className='min-w-0 flex-1'>
-                <p className='text-xs font-semibold'>在线调试台</p>
-                <p className='text-muted-foreground truncate text-[10px]'>
-                  立即验证模型调用
+          <div className='grid gap-2 md:grid-cols-3'>
+            {[
+              {
+                title: '剩余额度',
+                value: preferredKey?.unlimited_quota
+                  ? '不限额'
+                  : formatQuota(preferredKey?.remain_quota ?? 0),
+              },
+              {
+                title: '已用额度',
+                value: formatQuota(preferredKey?.used_quota ?? 0),
+              },
+              {
+                title: '最近访问',
+                value: preferredKey?.accessed_time
+                  ? formatTimestampToDate(preferredKey.accessed_time)
+                  : '暂无',
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className='rounded-md border border-slate-100 bg-white px-3 py-2'
+              >
+                <p className='text-[10px] text-slate-500'>{item.title}</p>
+                <p className='mt-1 truncate text-[12px] font-semibold text-slate-900'>
+                  {item.value}
                 </p>
               </div>
-              <ArrowRight className='text-muted-foreground size-3.5' />
-            </a>
-            <a
-              href='/pricing'
-              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-md border px-3.5 py-3 transition-colors'
-            >
-              <BookOpen className='size-4 text-violet-600' />
-              <div className='min-w-0 flex-1'>
-                <p className='text-xs font-semibold'>模型与价格</p>
-                <p className='text-muted-foreground truncate text-[10px]'>
-                  查看可用模型
-                </p>
-              </div>
-              <ArrowRight className='text-muted-foreground size-3.5' />
-            </a>
-            <a
-              href='/wallet'
-              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-md border px-3.5 py-3 transition-colors'
-            >
-              <Wallet className='size-4 text-emerald-600' />
-              <div className='min-w-0 flex-1'>
-                <p className='text-xs font-semibold'>充值与账单</p>
-                <p className='text-muted-foreground truncate text-[10px]'>
-                  管理余额和记录
-                </p>
-              </div>
-              <ArrowRight className='text-muted-foreground size-3.5' />
-            </a>
+            ))}
           </div>
         </EnterprisePanel>
 
         <EnterprisePanel
-          title='近 7 天用量趋势'
-          description={`共 ${formatCompactNumber(usage.requests)} 次请求 · ${formatTokens(usage.tokens)} Tokens`}
-          bodyClassName='h-[340px] px-2 pb-2 pt-4 sm:px-3'
+          title='快速入口'
+          description='常用工具'
+          bodyClassName='space-y-2'
         >
-          {usage.trend.length > 0 ? (
+          {[
+            {
+              title: 'Playground',
+              desc: '在线验证模型调用',
+              icon: FlaskConical,
+              tone: 'text-blue-600 bg-blue-50 ring-blue-100',
+              href: '/playground',
+            },
+            {
+              title: 'API 文档',
+              desc: '查看接口与模型路径',
+              icon: BookOpen,
+              tone: 'text-violet-600 bg-violet-50 ring-violet-100',
+              href: '/models',
+            },
+            {
+              title: 'SDK & 示例',
+              desc: '复制 OpenAI 兼容地址',
+              icon: Code2,
+              tone: 'text-emerald-600 bg-emerald-50 ring-emerald-100',
+              href: '/pricing',
+            },
+          ].map((entry) => {
+            const Icon = entry.icon
+            return (
+              <a
+                key={entry.title}
+                href={entry.href}
+                className='group flex items-center gap-2.5 rounded-md border border-slate-100 bg-white px-3 py-2.5 transition-colors hover:border-blue-200 hover:bg-blue-50/35'
+              >
+                <span
+                  className={cn(
+                    'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+                    entry.tone
+                  )}
+                >
+                  <Icon className='size-4' />
+                </span>
+                <span className='min-w-0 flex-1'>
+                  <span className='block truncate text-[12px] font-semibold text-slate-900'>
+                    {entry.title}
+                  </span>
+                  <span className='mt-0.5 block truncate text-[10px] text-slate-500'>
+                    {entry.desc}
+                  </span>
+                </span>
+                <ArrowRight className='size-3.5 text-slate-400 group-hover:text-blue-600' />
+              </a>
+            )
+          })}
+        </EnterprisePanel>
+
+        <EnterprisePanel
+          title='用量趋势'
+          description={`近 7 天 · ${formatCompactNumber(trendUsage.requests)} 次请求`}
+          action={
+            <Badge
+              variant='outline'
+              className='h-6 rounded-md bg-white px-2 text-[11px] font-medium'
+            >
+              近 7 天
+            </Badge>
+          }
+          bodyClassName='h-[272px] px-2 pb-2 pt-3 sm:px-3'
+        >
+          {trendUsage.trend.length > 0 ? (
             <ResponsiveContainer
               width='100%'
               height='100%'
-              initialDimension={{ width: 520, height: 340 }}
+              initialDimension={{ width: 420, height: 260 }}
             >
               <AreaChart
-                data={usage.trend}
-                margin={{ top: 12, right: 14, left: 0, bottom: 4 }}
+                data={trendUsage.trend}
+                margin={{ top: 8, right: 10, left: -6, bottom: 0 }}
               >
                 <defs>
                   <linearGradient
@@ -457,40 +640,40 @@ export function PersonalWorkbench() {
                     x2='0'
                     y2='1'
                   >
-                    <stop offset='5%' stopColor='#6366f1' stopOpacity={0.28} />
+                    <stop offset='5%' stopColor='#3b82f6' stopOpacity={0.26} />
                     <stop
                       offset='95%'
-                      stopColor='#6366f1'
-                      stopOpacity={0.015}
+                      stopColor='#3b82f6'
+                      stopOpacity={0.025}
                     />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
                   vertical={false}
-                  stroke='var(--border)'
-                  strokeOpacity={0.75}
+                  stroke='#e2e8f0'
+                  strokeDasharray='4 8'
                 />
                 <XAxis
                   dataKey='label'
                   axisLine={false}
                   tickLine={false}
                   dy={8}
-                  tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  width={46}
+                  width={40}
                   tickFormatter={(value) => formatCompactNumber(Number(value))}
-                  tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                 />
                 <ChartTooltip
                   contentStyle={{
-                    borderRadius: 12,
-                    border: '1px solid var(--border)',
-                    background: 'var(--popover)',
-                    color: 'var(--popover-foreground)',
-                    boxShadow: '0 14px 35px rgb(15 23 42 / 0.12)',
+                    borderRadius: 6,
+                    border: '1px solid #e2e8f0',
+                    background: '#fff',
+                    color: '#0f172a',
+                    boxShadow: '0 12px 28px rgb(15 23 42 / 0.12)',
                     fontSize: 12,
                   }}
                   formatter={(value, name) => [
@@ -502,129 +685,197 @@ export function PersonalWorkbench() {
                   type='monotone'
                   dataKey='requests'
                   name='请求量'
-                  stroke='#6366f1'
-                  strokeWidth={2.2}
+                  stroke='#2563eb'
+                  strokeWidth={2}
                   fill='url(#personalUsageGradient)'
                 />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
             <div className='flex h-full flex-col items-center justify-center text-center'>
-              <Sparkles className='text-muted-foreground/40 mb-3 size-8' />
-              <p className='text-sm font-medium'>还没有调用记录</p>
-              <p className='text-muted-foreground mt-1 text-xs'>
-                创建 API Key 并发起请求后，这里会展示真实趋势。
+              <Sparkles className='mb-2 size-7 text-slate-300' />
+              <p className='text-[13px] font-medium text-slate-900'>
+                还没有调用记录
+              </p>
+              <p className='mt-1 text-[11px] text-slate-500'>
+                创建 API Key 并发起请求后展示真实趋势。
               </p>
             </div>
           )}
         </EnterprisePanel>
       </div>
 
-      <div className='grid gap-3 xl:grid-cols-3'>
-        <EnterprisePanel title='常用模型' description='按近 7 天请求量排序'>
-          {usage.models.length > 0 ? (
-            <div className='space-y-3'>
-              {usage.models.map((model, index) => (
-                <div
-                  key={model.name}
-                  className='bg-background/50 flex items-center gap-3 rounded-md border p-3'
-                >
-                  <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-[10px] font-semibold text-violet-600'>
-                    {index + 1}
-                  </span>
-                  <div className='min-w-0 flex-1'>
-                    <p className='truncate text-xs font-semibold'>
-                      {model.name}
-                    </p>
-                    <p className='text-muted-foreground mt-0.5 text-[10px]'>
-                      {formatTokens(model.tokens)} Tokens
-                    </p>
-                  </div>
-                  <span className='text-xs font-semibold tabular-nums'>
-                    {formatCompactNumber(model.requests)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className='text-muted-foreground flex min-h-52 items-center justify-center text-sm'>
-              暂无模型用量
-            </div>
-          )}
-        </EnterprisePanel>
-
+      <div className='grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(250px,0.72fr)]'>
         <EnterprisePanel
-          title='最近充值记录'
-          description='仅展示当前账户的真实支付记录'
-          action={
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-7 px-2 text-xs'
-              render={<Link to='/wallet' />}
-            >
-              查看全部
-              <ArrowRight className='size-3.5' />
-            </Button>
-          }
+          title='最近活动'
+          description='来自个人用量聚合记录'
+          bodyClassName='p-0'
         >
-          {billingItems.length > 0 ? (
-            <div className='divide-border/60 divide-y'>
-              {billingItems.slice(0, 5).map((record) => (
-                <div
-                  key={record.id}
-                  className='flex items-center gap-3 py-3 first:pt-0 last:pb-0'
-                >
-                  <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600'>
-                    <CircleDollarSign className='size-4' />
-                  </span>
-                  <div className='min-w-0 flex-1'>
-                    <p className='truncate text-xs font-medium'>
-                      {record.payment_method || '余额充值'}
-                    </p>
-                    <p className='text-muted-foreground mt-0.5 text-[10px]'>
-                      {formatTimestampToDate(record.create_time)}
-                    </p>
-                  </div>
-                  <div className='text-right'>
-                    <p className='text-xs font-semibold'>
-                      {formatCurrencyUSD(record.money)}
-                    </p>
-                    <Badge
-                      variant='outline'
-                      className={cn(
-                        'mt-1 text-[9px]',
-                        record.status === 'success'
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600'
-                          : 'border-amber-500/20 bg-amber-500/10 text-amber-600'
-                      )}
-                    >
-                      {record.status === 'success'
-                        ? '已完成'
-                        : record.status === 'pending'
-                          ? '处理中'
-                          : '已过期'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+          {recentActivities.length > 0 ? (
+            <div className='overflow-x-auto'>
+              <table className='w-full min-w-[620px] text-left text-[12px]'>
+                <thead className='border-b border-slate-100 bg-slate-50/70 text-[11px] text-slate-500'>
+                  <tr>
+                    <th className='px-3 py-2 font-medium'>时间</th>
+                    <th className='px-3 py-2 font-medium'>类型</th>
+                    <th className='px-3 py-2 font-medium'>对象</th>
+                    <th className='px-3 py-2 text-right font-medium'>消耗</th>
+                    <th className='px-3 py-2 text-right font-medium'>状态</th>
+                  </tr>
+                </thead>
+                <tbody className='divide-y divide-slate-100'>
+                  {recentActivities.map((item) => {
+                    const activityKey =
+                      item.id == null
+                        ? `${item.created_at}-${item.model_name ?? 'unknown'}-${item.count ?? 0}-${item.quota ?? 0}`
+                        : String(item.id)
+
+                    return (
+                      <tr key={activityKey}>
+                        <td className='px-3 py-2.5 text-slate-500'>
+                          {formatTimestampToDate(item.created_at)}
+                        </td>
+                        <td className='px-3 py-2.5 font-medium text-slate-900'>
+                          模型调用
+                        </td>
+                        <td className='max-w-[220px] truncate px-3 py-2.5 text-slate-600'>
+                          {item.model_name || '未分类模型'}
+                        </td>
+                        <td className='px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900'>
+                          {formatQuota(item.quota ?? 0)}
+                        </td>
+                        <td className='px-3 py-2.5 text-right'>
+                          <Badge className='rounded border-emerald-200 bg-emerald-50 px-1.5 text-[10px] text-emerald-700 shadow-none'>
+                            成功
+                          </Badge>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <div className='flex min-h-52 flex-col items-center justify-center text-center'>
-              <FileClock className='text-muted-foreground/40 mb-3 size-8' />
-              <p className='text-sm font-medium'>暂无充值记录</p>
-              <p className='text-muted-foreground mt-1 text-xs'>
-                充值完成后将在此展示。
+            <div className='flex min-h-[210px] flex-col items-center justify-center text-center'>
+              <FileClock className='mb-2 size-7 text-slate-300' />
+              <p className='text-[13px] font-medium text-slate-900'>
+                暂无活动记录
+              </p>
+              <p className='mt-1 text-[11px] text-slate-500'>
+                真实请求产生后会自动出现在这里。
               </p>
             </div>
           )}
         </EnterprisePanel>
 
         <EnterprisePanel
-          title='账户与安全'
-          description='来自当前登录账户的真实配置状态'
+          title='最近账单'
+          description='当前账户充值订单'
+          action={
+            <span className='text-[11px] text-slate-500'>
+              共 {formatNumber(billingQuery.data?.data?.total ?? 0)} 条
+            </span>
+          }
+          bodyClassName='space-y-2.5'
         >
-          <div className='space-y-3'>
+          {billingItems.length > 0 ? (
+            billingItems.slice(0, 5).map((record) => (
+              <div
+                key={record.id}
+                className='flex items-center gap-2.5 rounded-md border border-slate-100 bg-white p-2.5'
+              >
+                <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100'>
+                  <ReceiptText className='size-4' />
+                </span>
+                <div className='min-w-0 flex-1'>
+                  <p className='truncate text-[12px] font-semibold text-slate-900'>
+                    {record.payment_method || '余额充值'}
+                  </p>
+                  <p className='mt-0.5 truncate text-[10px] text-slate-500'>
+                    {formatTimestampToDate(record.create_time)}
+                  </p>
+                </div>
+                <div className='shrink-0 text-right'>
+                  <p className='text-[12px] font-semibold tabular-nums text-slate-900'>
+                    {formatCurrencyUSD(record.money)}
+                  </p>
+                  <Badge
+                    variant='outline'
+                    className={cn(
+                      'mt-1 rounded px-1.5 text-[10px]',
+                      paymentStatusClass(record.status)
+                    )}
+                  >
+                    {formatPaymentStatus(record.status)}
+                  </Badge>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className='flex min-h-[210px] flex-col items-center justify-center text-center'>
+              <FileClock className='mb-2 size-7 text-slate-300' />
+              <p className='text-[13px] font-medium text-slate-900'>
+                暂无账单记录
+              </p>
+              <p className='mt-1 text-[11px] text-slate-500'>
+                充值成功后会显示订单状态。
+              </p>
+            </div>
+          )}
+        </EnterprisePanel>
+
+        <div className='grid gap-2'>
+          <EnterprisePanel
+            title='充值中心'
+            description='按系统配置展示可用金额'
+            bodyClassName='space-y-2.5'
+          >
+            {amountOptions.length > 0 ? (
+              <div className='grid grid-cols-3 gap-1.5'>
+                {amountOptions.map((amount) => {
+                  const active = amount === activeTopupAmount
+                  return (
+                    <button
+                      key={amount}
+                      type='button'
+                      className={cn(
+                        'h-8 rounded-md border px-2 text-[12px] font-semibold transition-colors',
+                        active
+                          ? 'border-blue-300 bg-blue-50 text-blue-700'
+                          : 'border-slate-100 bg-white text-slate-700 hover:border-blue-200'
+                      )}
+                      onClick={() => setSelectedTopupAmount(amount)}
+                    >
+                      ${amount}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className='rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500'>
+                暂未配置在线充值金额
+              </div>
+            )}
+            <Button
+              className='h-8 w-full rounded-md text-[12px]'
+              disabled={!canTopup || paymentProcessing}
+              onClick={() => void handleStartPayment()}
+            >
+              <CircleDollarSign className='size-3.5' />
+              {paymentProcessing ? '处理中' : '立即充值'}
+            </Button>
+            <p className='text-[10px] leading-4 text-slate-500'>
+              {primaryPaymentMethod
+                ? `默认支付方式：${paymentMethods[0]?.name || primaryPaymentMethod}`
+                : '请先在系统设置中配置支付方式'}
+            </p>
+          </EnterprisePanel>
+
+          <EnterprisePanel
+            title='账户安全'
+            description='当前登录账户状态'
+            bodyClassName='space-y-2'
+          >
             {[
               {
                 label: '登录账户',
@@ -633,38 +884,33 @@ export function PersonalWorkbench() {
                 state: '正常',
               },
               {
-                label: '邮箱',
+                label: '邮箱绑定',
                 value: user?.email || '未绑定',
-                icon: BadgeCheck,
+                icon: Mail,
                 state: user?.email ? '已绑定' : '待完善',
               },
               {
                 label: '访问分组',
                 value: user?.group || '默认分组',
-                icon: LockKeyhole,
+                icon: ShieldCheck,
                 state: '已生效',
               },
               {
-                label: 'API Key 状态',
+                label: 'API Key',
                 value: `${activeKeys.length} 个可用`,
-                icon: KeyRound,
+                icon: LockKeyhole,
                 state: activeKeys.length > 0 ? '正常' : '待创建',
               },
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div
-                  key={item.label}
-                  className='bg-background/50 flex items-center gap-3 rounded-md border p-3'
-                >
-                  <span className='bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md'>
-                    <Icon className='size-4' />
+                <div key={item.label} className='flex items-center gap-2'>
+                  <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-50 text-slate-500 ring-1 ring-slate-100'>
+                    <Icon className='size-3.5' />
                   </span>
                   <div className='min-w-0 flex-1'>
-                    <p className='text-muted-foreground text-[10px]'>
-                      {item.label}
-                    </p>
-                    <p className='mt-0.5 truncate text-xs font-medium'>
+                    <p className='text-[10px] text-slate-500'>{item.label}</p>
+                    <p className='truncate text-[12px] font-medium text-slate-900'>
                       {item.value}
                     </p>
                   </div>
@@ -674,16 +920,105 @@ export function PersonalWorkbench() {
                 </div>
               )
             })}
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-8 w-full rounded-md bg-white text-[12px]'
+              render={<Link to='/profile' />}
+            >
+              进入账户设置
+              <ExternalLink className='size-3.5' />
+            </Button>
+          </EnterprisePanel>
+        </div>
+      </div>
+
+      <div className='grid gap-2 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]'>
+        <EnterprisePanel
+          title='常用模型（已授权）'
+          description='按近 7 天请求量排序'
+        >
+          {trendUsage.models.length > 0 ? (
+            <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-3'>
+              {trendUsage.models.slice(0, 6).map((model, index) => {
+                const percent = Math.round(
+                  (model.requests / modelTotalRequests) * 100
+                )
+                return (
+                  <div
+                    key={model.name}
+                    className='rounded-md border border-slate-100 bg-white p-3'
+                  >
+                    <div className='flex items-center gap-2.5'>
+                      <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-violet-50 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-100'>
+                        {index + 1}
+                      </span>
+                      <div className='min-w-0 flex-1'>
+                        <p className='truncate text-[12px] font-semibold text-slate-900'>
+                          {model.name}
+                        </p>
+                        <p className='mt-0.5 text-[10px] text-slate-500'>
+                          {formatTokens(model.tokens)} Tokens
+                        </p>
+                      </div>
+                      <span className='text-[12px] font-semibold tabular-nums text-slate-900'>
+                        {formatCompactNumber(model.requests)}
+                      </span>
+                    </div>
+                    <div className='mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+                      <div
+                        className='h-full rounded-full bg-blue-500'
+                        style={{ width: `${Math.max(percent, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className='flex min-h-28 items-center justify-center text-[12px] text-slate-500'>
+              暂无模型用量
+            </div>
+          )}
+        </EnterprisePanel>
+
+        <EnterprisePanel title='快捷操作' description='围绕个人调用链路'>
+          <div className='grid gap-2 sm:grid-cols-2'>
+            <Button
+              variant='outline'
+              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              disabled={!preferredKey || copyingKey}
+              onClick={() => void handleCopyKey()}
+            >
+              <Copy className='size-4 text-blue-600' />
+              复制默认 Key
+            </Button>
+            <Button
+              variant='outline'
+              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              render={<Link to='/playground' />}
+            >
+              <FlaskConical className='size-4 text-violet-600' />
+              去 Playground
+            </Button>
+            <Button
+              variant='outline'
+              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              onClick={() => void handleStartPayment()}
+              disabled={!canTopup || paymentProcessing}
+            >
+              <CircleDollarSign className='size-4 text-emerald-600' />
+              快速充值
+            </Button>
+            <Button
+              variant='outline'
+              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              render={<Link to='/profile' />}
+            >
+              <BadgeCheck className='size-4 text-slate-600' />
+              更新资料
+            </Button>
           </div>
-          <Button
-            variant='outline'
-            size='sm'
-            className='mt-4 w-full rounded-md'
-            render={<Link to='/profile' />}
-          >
-            进入账户设置
-            <ExternalLink className='size-3.5' />
-          </Button>
         </EnterprisePanel>
       </div>
     </div>
