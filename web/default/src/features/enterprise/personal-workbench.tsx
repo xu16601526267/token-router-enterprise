@@ -271,7 +271,7 @@ export function PersonalWorkbench() {
     () =>
       [...(trendRows ?? [])]
         .sort((a, b) => b.created_at - a.created_at)
-        .slice(0, 5),
+        .slice(0, 4),
     [trendRows]
   )
   const modelTotalRequests = Math.max(
@@ -338,7 +338,7 @@ export function PersonalWorkbench() {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-2.5 px-0.5 pb-2 text-slate-950 sm:px-0'>
+    <div className='enterprise-dashboard space-y-2 px-0.5 pb-2 text-slate-950 sm:px-0'>
       <div className='flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between'>
         <div className='min-w-0'>
           <h1 className='text-[22px] leading-7 font-semibold tracking-normal text-slate-950'>
@@ -420,7 +420,7 @@ export function PersonalWorkbench() {
         />
       </div>
 
-      <div className='grid gap-2 xl:grid-cols-[minmax(0,1.05fr)_260px_minmax(0,0.9fr)]'>
+      <div className='grid gap-2 xl:grid-cols-[minmax(360px,0.95fr)_232px_minmax(420px,1.05fr)]'>
         <EnterprisePanel
           title='我的 API Key'
           description='默认密钥脱敏展示，复制时通过安全接口读取'
@@ -435,13 +435,13 @@ export function PersonalWorkbench() {
               <ArrowRight className='size-3.5' />
             </Button>
           }
-          bodyClassName='space-y-3'
+          bodyClassName='space-y-2'
         >
-          <div className='rounded-md border border-blue-100 bg-blue-50/55 p-3'>
-            <div className='flex flex-col gap-3 md:flex-row md:items-center md:justify-between'>
+          <div className='rounded-md border border-blue-100 bg-blue-50/55 p-2.5'>
+            <div className='flex flex-col gap-2 md:flex-row md:items-center md:justify-between'>
               <div className='min-w-0'>
                 <div className='flex items-center gap-2.5'>
-                  <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-white text-blue-600 ring-1 ring-blue-100'>
+                  <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-white text-blue-600 ring-1 ring-blue-100'>
                     <KeyRound className='size-4' />
                   </span>
                   <div className='min-w-0'>
@@ -457,7 +457,7 @@ export function PersonalWorkbench() {
               {preferredKey ? (
                 <Button
                   size='sm'
-                  className='h-8 rounded-md px-3 text-[12px]'
+                  className='h-7 rounded-md px-2.5 text-[12px]'
                   disabled={copyingKey}
                   onClick={() => void handleCopyKey()}
                 >
@@ -471,7 +471,7 @@ export function PersonalWorkbench() {
               ) : (
                 <Button
                   size='sm'
-                  className='h-8 rounded-md px-3 text-[12px]'
+                  className='h-7 rounded-md px-2.5 text-[12px]'
                   render={<Link to='/keys' />}
                 >
                   创建 API Key
@@ -481,10 +481,8 @@ export function PersonalWorkbench() {
           </div>
 
           <div className='grid gap-2 md:grid-cols-2'>
-            <div className='rounded-md border border-slate-100 bg-slate-50/55 p-3'>
-              <p className='text-[11px] font-medium text-slate-500'>
-                Base URL
-              </p>
+            <div className='rounded-md border border-slate-100 bg-slate-50/55 p-2.5'>
+              <p className='text-[11px] font-medium text-slate-500'>Base URL</p>
               <div className='mt-2 flex items-center gap-2'>
                 <code className='min-w-0 flex-1 truncate rounded-md bg-white px-2 py-1.5 text-[11px] text-slate-700 ring-1 ring-slate-100'>
                   {baseUrl}
@@ -500,62 +498,36 @@ export function PersonalWorkbench() {
                 </Button>
               </div>
             </div>
-            <div className='rounded-md border border-slate-100 bg-slate-50/55 p-3'>
-              <p className='text-[11px] font-medium text-slate-500'>
-                密钥权限
-              </p>
+            <div className='rounded-md border border-slate-100 bg-slate-50/55 p-2.5'>
+              <p className='text-[11px] font-medium text-slate-500'>密钥权限</p>
               <div className='mt-2 flex flex-wrap gap-1.5'>
-                <Badge variant='secondary' className='rounded px-1.5 text-[10px]'>
+                <Badge
+                  variant='secondary'
+                  className='rounded px-1.5 text-[10px]'
+                >
                   {preferredKey?.group || '默认分组'}
                 </Badge>
-                <Badge variant='secondary' className='rounded px-1.5 text-[10px]'>
-                  {preferredKey?.model_limits_enabled
-                    ? '限制模型'
-                    : '全部模型'}
+                <Badge
+                  variant='secondary'
+                  className='rounded px-1.5 text-[10px]'
+                >
+                  {preferredKey?.model_limits_enabled ? '限制模型' : '全部模型'}
                 </Badge>
-                <Badge variant='secondary' className='rounded px-1.5 text-[10px]'>
+                <Badge
+                  variant='secondary'
+                  className='rounded px-1.5 text-[10px]'
+                >
                   {preferredKey?.allow_ips ? 'IP 白名单' : '未限制 IP'}
                 </Badge>
               </div>
             </div>
-          </div>
-
-          <div className='grid gap-2 md:grid-cols-3'>
-            {[
-              {
-                title: '剩余额度',
-                value: preferredKey?.unlimited_quota
-                  ? '不限额'
-                  : formatQuota(preferredKey?.remain_quota ?? 0),
-              },
-              {
-                title: '已用额度',
-                value: formatQuota(preferredKey?.used_quota ?? 0),
-              },
-              {
-                title: '最近访问',
-                value: preferredKey?.accessed_time
-                  ? formatTimestampToDate(preferredKey.accessed_time)
-                  : '暂无',
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className='rounded-md border border-slate-100 bg-white px-3 py-2'
-              >
-                <p className='text-[10px] text-slate-500'>{item.title}</p>
-                <p className='mt-1 truncate text-[12px] font-semibold text-slate-900'>
-                  {item.value}
-                </p>
-              </div>
-            ))}
           </div>
         </EnterprisePanel>
 
         <EnterprisePanel
           title='快速入口'
           description='常用工具'
-          bodyClassName='space-y-2'
+          bodyClassName='space-y-1.5'
         >
           {[
             {
@@ -585,11 +557,11 @@ export function PersonalWorkbench() {
               <a
                 key={entry.title}
                 href={entry.href}
-                className='group flex items-center gap-2.5 rounded-md border border-slate-100 bg-white px-3 py-2.5 transition-colors hover:border-blue-200 hover:bg-blue-50/35'
+                className='group flex items-center gap-2 rounded-md border border-slate-100 bg-white px-2.5 py-2 transition-colors hover:border-blue-200 hover:bg-blue-50/35'
               >
                 <span
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+                    'flex size-7 shrink-0 items-center justify-center rounded-md ring-1',
                     entry.tone
                   )}
                 >
@@ -620,13 +592,13 @@ export function PersonalWorkbench() {
               近 7 天
             </Badge>
           }
-          bodyClassName='h-[272px] px-2 pb-2 pt-3 sm:px-3'
+          bodyClassName='h-[176px] px-2 pb-2 pt-2.5 sm:px-3'
         >
           {trendUsage.trend.length > 0 ? (
             <ResponsiveContainer
               width='100%'
               height='100%'
-              initialDimension={{ width: 420, height: 260 }}
+              initialDimension={{ width: 420, height: 170 }}
             >
               <AreaChart
                 data={trendUsage.trend}
@@ -716,11 +688,11 @@ export function PersonalWorkbench() {
               <table className='w-full min-w-[620px] text-left text-[12px]'>
                 <thead className='border-b border-slate-100 bg-slate-50/70 text-[11px] text-slate-500'>
                   <tr>
-                    <th className='px-3 py-2 font-medium'>时间</th>
-                    <th className='px-3 py-2 font-medium'>类型</th>
-                    <th className='px-3 py-2 font-medium'>对象</th>
-                    <th className='px-3 py-2 text-right font-medium'>消耗</th>
-                    <th className='px-3 py-2 text-right font-medium'>状态</th>
+                    <th className='px-3 py-1.5 font-medium'>时间</th>
+                    <th className='px-3 py-1.5 font-medium'>类型</th>
+                    <th className='px-3 py-1.5 font-medium'>对象</th>
+                    <th className='px-3 py-1.5 text-right font-medium'>消耗</th>
+                    <th className='px-3 py-1.5 text-right font-medium'>状态</th>
                   </tr>
                 </thead>
                 <tbody className='divide-y divide-slate-100'>
@@ -732,19 +704,19 @@ export function PersonalWorkbench() {
 
                     return (
                       <tr key={activityKey}>
-                        <td className='px-3 py-2.5 text-slate-500'>
+                        <td className='px-3 py-2 text-slate-500'>
                           {formatTimestampToDate(item.created_at)}
                         </td>
-                        <td className='px-3 py-2.5 font-medium text-slate-900'>
+                        <td className='px-3 py-2 font-medium text-slate-900'>
                           模型调用
                         </td>
-                        <td className='max-w-[220px] truncate px-3 py-2.5 text-slate-600'>
+                        <td className='max-w-[220px] truncate px-3 py-2 text-slate-600'>
                           {item.model_name || '未分类模型'}
                         </td>
-                        <td className='px-3 py-2.5 text-right font-semibold tabular-nums text-slate-900'>
+                        <td className='px-3 py-2 text-right font-semibold text-slate-900 tabular-nums'>
                           {formatQuota(item.quota ?? 0)}
                         </td>
-                        <td className='px-3 py-2.5 text-right'>
+                        <td className='px-3 py-2 text-right'>
                           <Badge className='rounded border-emerald-200 bg-emerald-50 px-1.5 text-[10px] text-emerald-700 shadow-none'>
                             成功
                           </Badge>
@@ -756,7 +728,7 @@ export function PersonalWorkbench() {
               </table>
             </div>
           ) : (
-            <div className='flex min-h-[210px] flex-col items-center justify-center text-center'>
+            <div className='flex min-h-[156px] flex-col items-center justify-center text-center'>
               <FileClock className='mb-2 size-7 text-slate-300' />
               <p className='text-[13px] font-medium text-slate-900'>
                 暂无活动记录
@@ -776,15 +748,15 @@ export function PersonalWorkbench() {
               共 {formatNumber(billingQuery.data?.data?.total ?? 0)} 条
             </span>
           }
-          bodyClassName='space-y-2.5'
+          bodyClassName='space-y-1.5'
         >
           {billingItems.length > 0 ? (
-            billingItems.slice(0, 5).map((record) => (
+            billingItems.slice(0, 4).map((record) => (
               <div
                 key={record.id}
-                className='flex items-center gap-2.5 rounded-md border border-slate-100 bg-white p-2.5'
+                className='flex items-center gap-2 rounded-md border border-slate-100 bg-white p-2'
               >
-                <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100'>
+                <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100'>
                   <ReceiptText className='size-4' />
                 </span>
                 <div className='min-w-0 flex-1'>
@@ -796,7 +768,7 @@ export function PersonalWorkbench() {
                   </p>
                 </div>
                 <div className='shrink-0 text-right'>
-                  <p className='text-[12px] font-semibold tabular-nums text-slate-900'>
+                  <p className='text-[12px] font-semibold text-slate-900 tabular-nums'>
                     {formatCurrencyUSD(record.money)}
                   </p>
                   <Badge
@@ -812,7 +784,7 @@ export function PersonalWorkbench() {
               </div>
             ))
           ) : (
-            <div className='flex min-h-[210px] flex-col items-center justify-center text-center'>
+            <div className='flex min-h-[156px] flex-col items-center justify-center text-center'>
               <FileClock className='mb-2 size-7 text-slate-300' />
               <p className='text-[13px] font-medium text-slate-900'>
                 暂无账单记录
@@ -828,10 +800,10 @@ export function PersonalWorkbench() {
           <EnterprisePanel
             title='充值中心'
             description='按系统配置展示可用金额'
-            bodyClassName='space-y-2.5'
+            bodyClassName='space-y-1.5 px-2.5 py-2'
           >
             {amountOptions.length > 0 ? (
-              <div className='grid grid-cols-3 gap-1.5'>
+              <div className='grid grid-cols-5 gap-1'>
                 {amountOptions.map((amount) => {
                   const active = amount === activeTopupAmount
                   return (
@@ -839,7 +811,7 @@ export function PersonalWorkbench() {
                       key={amount}
                       type='button'
                       className={cn(
-                        'h-8 rounded-md border px-2 text-[12px] font-semibold transition-colors',
+                        'h-[26px] rounded-md border px-1 text-[11px] font-semibold transition-colors',
                         active
                           ? 'border-blue-300 bg-blue-50 text-blue-700'
                           : 'border-slate-100 bg-white text-slate-700 hover:border-blue-200'
@@ -857,7 +829,7 @@ export function PersonalWorkbench() {
               </div>
             )}
             <Button
-              className='h-8 w-full rounded-md text-[12px]'
+              className='h-[26px] w-full rounded-md text-[11px]'
               disabled={!canTopup || paymentProcessing}
               onClick={() => void handleStartPayment()}
             >
@@ -874,7 +846,18 @@ export function PersonalWorkbench() {
           <EnterprisePanel
             title='账户安全'
             description='当前登录账户状态'
-            bodyClassName='space-y-2'
+            action={
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-6 px-1.5 text-[11px] text-blue-600'
+                render={<Link to='/profile' />}
+              >
+                设置
+                <ExternalLink className='size-3' />
+              </Button>
+            }
+            bodyClassName='space-y-1 px-2.5 py-2'
           >
             {[
               {
@@ -904,31 +887,25 @@ export function PersonalWorkbench() {
             ].map((item) => {
               const Icon = item.icon
               return (
-                <div key={item.label} className='flex items-center gap-2'>
-                  <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-50 text-slate-500 ring-1 ring-slate-100'>
-                    <Icon className='size-3.5' />
+                <div
+                  key={item.label}
+                  className='flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-slate-100 bg-white px-1.5'
+                >
+                  <span className='flex size-5 shrink-0 items-center justify-center rounded bg-slate-50 text-slate-500 ring-1 ring-slate-100'>
+                    <Icon className='size-3' />
                   </span>
-                  <div className='min-w-0 flex-1'>
-                    <p className='text-[10px] text-slate-500'>{item.label}</p>
-                    <p className='truncate text-[12px] font-medium text-slate-900'>
-                      {item.value}
-                    </p>
-                  </div>
+                  <span className='shrink-0 text-[10px] text-slate-500'>
+                    {item.label}
+                  </span>
+                  <span className='min-w-0 flex-1 truncate text-[11px] font-medium text-slate-900'>
+                    {item.value}
+                  </span>
                   <span className='shrink-0 text-[10px] font-medium text-emerald-600'>
                     {item.state}
                   </span>
                 </div>
               )
             })}
-            <Button
-              variant='outline'
-              size='sm'
-              className='h-8 w-full rounded-md bg-white text-[12px]'
-              render={<Link to='/profile' />}
-            >
-              进入账户设置
-              <ExternalLink className='size-3.5' />
-            </Button>
           </EnterprisePanel>
         </div>
       </div>
@@ -937,9 +914,10 @@ export function PersonalWorkbench() {
         <EnterprisePanel
           title='常用模型（已授权）'
           description='按近 7 天请求量排序'
+          bodyClassName='p-2.5'
         >
           {trendUsage.models.length > 0 ? (
-            <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-3'>
+            <div className='grid gap-1.5 md:grid-cols-2 xl:grid-cols-3'>
               {trendUsage.models.slice(0, 6).map((model, index) => {
                 const percent = Math.round(
                   (model.requests / modelTotalRequests) * 100
@@ -947,10 +925,10 @@ export function PersonalWorkbench() {
                 return (
                   <div
                     key={model.name}
-                    className='rounded-md border border-slate-100 bg-white p-3'
+                    className='rounded-md border border-slate-100 bg-white p-2'
                   >
-                    <div className='flex items-center gap-2.5'>
-                      <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-violet-50 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-100'>
+                    <div className='flex items-center gap-2'>
+                      <span className='flex size-6 shrink-0 items-center justify-center rounded-md bg-violet-50 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-100'>
                         {index + 1}
                       </span>
                       <div className='min-w-0 flex-1'>
@@ -961,11 +939,11 @@ export function PersonalWorkbench() {
                           {formatTokens(model.tokens)} Tokens
                         </p>
                       </div>
-                      <span className='text-[12px] font-semibold tabular-nums text-slate-900'>
+                      <span className='text-[12px] font-semibold text-slate-900 tabular-nums'>
                         {formatCompactNumber(model.requests)}
                       </span>
                     </div>
-                    <div className='mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+                    <div className='mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100'>
                       <div
                         className='h-full rounded-full bg-blue-500'
                         style={{ width: `${Math.max(percent, 4)}%` }}
@@ -976,17 +954,21 @@ export function PersonalWorkbench() {
               })}
             </div>
           ) : (
-            <div className='flex min-h-28 items-center justify-center text-[12px] text-slate-500'>
+            <div className='flex min-h-20 items-center justify-center text-[12px] text-slate-500'>
               暂无模型用量
             </div>
           )}
         </EnterprisePanel>
 
-        <EnterprisePanel title='快捷操作' description='围绕个人调用链路'>
-          <div className='grid gap-2 sm:grid-cols-2'>
+        <EnterprisePanel
+          title='快捷操作'
+          description='围绕个人调用链路'
+          bodyClassName='p-2.5'
+        >
+          <div className='grid gap-1.5 sm:grid-cols-2'>
             <Button
               variant='outline'
-              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              className='h-8 justify-start rounded-md bg-white text-[12px]'
               disabled={!preferredKey || copyingKey}
               onClick={() => void handleCopyKey()}
             >
@@ -995,7 +977,7 @@ export function PersonalWorkbench() {
             </Button>
             <Button
               variant='outline'
-              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              className='h-8 justify-start rounded-md bg-white text-[12px]'
               render={<Link to='/playground' />}
             >
               <FlaskConical className='size-4 text-violet-600' />
@@ -1003,7 +985,7 @@ export function PersonalWorkbench() {
             </Button>
             <Button
               variant='outline'
-              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              className='h-8 justify-start rounded-md bg-white text-[12px]'
               onClick={() => void handleStartPayment()}
               disabled={!canTopup || paymentProcessing}
             >
@@ -1012,7 +994,7 @@ export function PersonalWorkbench() {
             </Button>
             <Button
               variant='outline'
-              className='h-10 justify-start rounded-md bg-white text-[12px]'
+              className='h-8 justify-start rounded-md bg-white text-[12px]'
               render={<Link to='/profile' />}
             >
               <BadgeCheck className='size-4 text-slate-600' />
