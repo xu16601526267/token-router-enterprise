@@ -42,9 +42,23 @@ func TestMain(m *testing.M) {
 		&model.Token{},
 		&model.Log{},
 		&model.Channel{},
+		&model.Ability{},
 		&model.Supplier{},
 		&model.SupplierAgreement{},
 		&model.UsageLedger{},
+		&model.Tenant{},
+		&model.TenantMember{},
+		&model.TenantEndCustomer{},
+		&model.TenantApp{},
+		&model.TenantModelPolicy{},
+		&model.FrontChannel{},
+		&model.BillingConfig{},
+		&model.CreditAccount{},
+		&model.BillingStatement{},
+		&model.PaymentRecord{},
+		&model.Invoice{},
+		&model.TenantRoutingPreference{},
+		&model.AuditLog{},
 		&model.SupplyCapacity{},
 		&model.SupplyCapacityTelemetry{},
 		&model.SupplyTelemetryAgent{},
@@ -63,11 +77,52 @@ func TestMain(m *testing.M) {
 
 func truncate(t *testing.T) {
 	t.Helper()
+	model.DB.Exec("DELETE FROM audit_logs")
+	model.DB.Exec("DELETE FROM tenant_routing_preferences")
+	model.DB.Exec("DELETE FROM invoices")
+	model.DB.Exec("DELETE FROM payment_records")
+	model.DB.Exec("DELETE FROM billing_statements")
+	model.DB.Exec("DELETE FROM credit_accounts")
+	model.DB.Exec("DELETE FROM billing_configs")
+	model.DB.Exec("DELETE FROM front_channels")
+	model.DB.Exec("DELETE FROM tenant_model_policies")
+	model.DB.Exec("DELETE FROM tenant_apps")
+	model.DB.Exec("DELETE FROM tenant_end_customers")
+	model.DB.Exec("DELETE FROM tenant_members")
+	model.DB.Exec("DELETE FROM tenants")
+	model.DB.Exec("DELETE FROM tasks")
+	model.DB.Exec("DELETE FROM users")
+	model.DB.Exec("DELETE FROM tokens")
+	model.DB.Exec("DELETE FROM logs")
+	model.DB.Exec("DELETE FROM abilities")
+	model.DB.Exec("DELETE FROM channels")
+	model.DB.Exec("DELETE FROM supplier_agreements")
+	model.DB.Exec("DELETE FROM usage_ledgers")
+	model.DB.Exec("DELETE FROM supply_telemetry_agents")
+	model.DB.Exec("DELETE FROM supply_capacity_telemetries")
+	model.DB.Exec("DELETE FROM supply_capacities")
+	model.DB.Exec("DELETE FROM suppliers")
+	model.DB.Exec("DELETE FROM top_ups")
+	model.DB.Exec("DELETE FROM user_subscriptions")
 	t.Cleanup(func() {
+		model.DB.Exec("DELETE FROM audit_logs")
+		model.DB.Exec("DELETE FROM tenant_routing_preferences")
+		model.DB.Exec("DELETE FROM invoices")
+		model.DB.Exec("DELETE FROM payment_records")
+		model.DB.Exec("DELETE FROM billing_statements")
+		model.DB.Exec("DELETE FROM credit_accounts")
+		model.DB.Exec("DELETE FROM billing_configs")
+		model.DB.Exec("DELETE FROM front_channels")
+		model.DB.Exec("DELETE FROM tenant_model_policies")
+		model.DB.Exec("DELETE FROM tenant_apps")
+		model.DB.Exec("DELETE FROM tenant_end_customers")
+		model.DB.Exec("DELETE FROM tenant_members")
+		model.DB.Exec("DELETE FROM tenants")
 		model.DB.Exec("DELETE FROM tasks")
 		model.DB.Exec("DELETE FROM users")
 		model.DB.Exec("DELETE FROM tokens")
 		model.DB.Exec("DELETE FROM logs")
+		model.DB.Exec("DELETE FROM abilities")
 		model.DB.Exec("DELETE FROM channels")
 		model.DB.Exec("DELETE FROM supplier_agreements")
 		model.DB.Exec("DELETE FROM usage_ledgers")

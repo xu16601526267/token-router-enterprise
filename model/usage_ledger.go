@@ -6,6 +6,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -17,6 +18,9 @@ type UsageLedger struct {
 	ChannelId           int    `json:"channel_id" gorm:"index"`
 	UserId              int    `json:"user_id" gorm:"index"`
 	TokenId             int    `json:"token_id" gorm:"index"`
+	TenantId            int    `json:"tenant_id" gorm:"index;default:0"`
+	EndCustomerId       int    `json:"end_customer_id" gorm:"index;default:0"`
+	AppId               int    `json:"app_id" gorm:"index;default:0"`
 	ModelName           string `json:"model_name" gorm:"size:128;default:'';index"`
 	PromptTokens        int    `json:"prompt_tokens" gorm:"default:0"`
 	FreshPromptTokens   int    `json:"fresh_prompt_tokens" gorm:"default:0"`
@@ -25,6 +29,10 @@ type UsageLedger struct {
 	CompletionTokens    int    `json:"completion_tokens" gorm:"default:0"`
 	SellQuota           int    `json:"sell_quota" gorm:"default:0"`
 	CostQuota           int    `json:"cost_quota" gorm:"default:0"`
+	BillingMode         string `json:"billing_mode" gorm:"size:32;default:'';index"`
+	BillingPeriod       string `json:"billing_period" gorm:"size:32;default:'';index"`
+	PriceSnapshot       string `json:"price_snapshot" gorm:"type:text"`
+	PostpaidQuota       int    `json:"postpaid_quota" gorm:"default:0"`
 	CacheHit            bool   `json:"cache_hit" gorm:"default:false;index"`
 	LatencyMs           int    `json:"latency_ms" gorm:"default:0"`
 	Status              string `json:"status" gorm:"size:32;default:'success';index"`
@@ -40,6 +48,8 @@ func (l *UsageLedger) normalize() {
 	l.Status = strings.TrimSpace(l.Status)
 	l.SlaTier = strings.TrimSpace(l.SlaTier)
 	l.SupplyNode = strings.TrimSpace(l.SupplyNode)
+	l.BillingMode = strings.TrimSpace(l.BillingMode)
+	l.BillingPeriod = strings.TrimSpace(l.BillingPeriod)
 	if l.Status == "" {
 		l.Status = "success"
 	}
@@ -58,11 +68,24 @@ func (l *UsageLedger) normalize() {
 }
 
 func (l *UsageLedger) InsertIdempotent() error {
+	_, err := l.InsertIdempotentRowsAffected()
+	return err
+}
+
+func (l *UsageLedger) InsertIdempotentRowsAffected() (int64, error) {
+	return l.InsertIdempotentRowsAffectedTx(DB)
+}
+
+func (l *UsageLedger) InsertIdempotentRowsAffectedTx(tx *gorm.DB) (int64, error) {
+	if tx == nil {
+		return 0, errors.New("usage ledger db is required")
+	}
 	l.normalize()
 	if l.RequestId == "" {
-		return errors.New("usage ledger request_id is required")
+		return 0, errors.New("usage ledger request_id is required")
 	}
-	return DB.Clauses(clause.OnConflict{DoNothing: true}).Create(l).Error
+	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(l)
+	return result.RowsAffected, result.Error
 }
 
 func GetUsageLedgerByRequestID(requestId string) (*UsageLedger, error) {
@@ -75,16 +98,21 @@ func GetUsageLedgerByRequestID(requestId string) (*UsageLedger, error) {
 }
 
 type UsageLedgerFilters struct {
-	RequestId  string
-	SessionId  string
-	SupplierId int
-	ChannelId  int
-	UserId     int
-	TokenId    int
-	ModelName  string
-	Status     string
-	StartTime  int64
-	EndTime    int64
+	RequestId     string
+	SessionId     string
+	SupplierId    int
+	ChannelId     int
+	UserId        int
+	TokenId       int
+	TenantId      int
+	AppId         int
+	EndCustomerId int
+	BillingMode   string
+	BillingPeriod string
+	ModelName     string
+	Status        string
+	StartTime     int64
+	EndTime       int64
 }
 
 func SearchUsageLedgers(filters UsageLedgerFilters, offset int, limit int) ([]*UsageLedger, int64, error) {
@@ -106,6 +134,21 @@ func SearchUsageLedgers(filters UsageLedgerFilters, offset int, limit int) ([]*U
 	}
 	if filters.TokenId > 0 {
 		db = db.Where("token_id = ?", filters.TokenId)
+	}
+	if filters.TenantId > 0 {
+		db = db.Where("tenant_id = ?", filters.TenantId)
+	}
+	if filters.AppId > 0 {
+		db = db.Where("app_id = ?", filters.AppId)
+	}
+	if filters.EndCustomerId > 0 {
+		db = db.Where("end_customer_id = ?", filters.EndCustomerId)
+	}
+	if filters.BillingMode != "" {
+		db = db.Where("billing_mode = ?", strings.TrimSpace(filters.BillingMode))
+	}
+	if filters.BillingPeriod != "" {
+		db = db.Where("billing_period = ?", strings.TrimSpace(filters.BillingPeriod))
 	}
 	if filters.ModelName != "" {
 		db = db.Where("model_name = ?", strings.TrimSpace(filters.ModelName))

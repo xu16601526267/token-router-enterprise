@@ -279,6 +279,11 @@ func TokenAuthReadOnly() func(c *gin.Context) {
 		c.Set("id", token.UserId)
 		c.Set("token_id", token.Id)
 		c.Set("token_key", token.Key)
+		c.Set(string(constant.ContextKeyTenantId), token.TenantId)
+		c.Set(string(constant.ContextKeyTenantAppId), token.AppId)
+		c.Set(string(constant.ContextKeyTenantEndCustomerId), token.EndCustomerId)
+		c.Set(string(constant.ContextKeyTokenOwnerScope), token.OwnerScope)
+		c.Set(string(constant.ContextKeyTenantModelPolicyId), token.ModelPolicyId)
 		c.Next()
 	}
 }
@@ -427,6 +432,7 @@ func TokenAuth() func(c *gin.Context) {
 		if err != nil {
 			return
 		}
+		model.TouchTokenLastUsed(token)
 		c.Next()
 	}
 }
@@ -440,6 +446,49 @@ func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) e
 	c.Set("token_key", token.Key)
 	c.Set("token_name", token.Name)
 	c.Set("token_unlimited_quota", token.UnlimitedQuota)
+	ownerScope := strings.TrimSpace(token.OwnerScope)
+	if ownerScope == "" {
+		ownerScope = model.TokenOwnerScopePersonal
+	}
+	common.SetContextKey(c, constant.ContextKeyTokenOwnerScope, ownerScope)
+	common.SetContextKey(c, constant.ContextKeyTenantId, token.TenantId)
+	common.SetContextKey(c, constant.ContextKeyTenantAppId, token.AppId)
+	common.SetContextKey(c, constant.ContextKeyTenantEndCustomerId, token.EndCustomerId)
+	common.SetContextKey(c, constant.ContextKeyTenantModelPolicyId, token.ModelPolicyId)
+	if token.TenantId > 0 {
+		active, err := model.IsTenantActive(token.TenantId)
+		if err != nil || !active {
+			abortWithOpenAiMessage(c, http.StatusForbidden, "tenant is disabled or not found", types.ErrorCodeAccessDenied)
+			return fmt.Errorf("tenant is disabled or not found")
+		}
+		if token.AppId > 0 {
+			var app model.TenantApp
+			if err := model.DB.Where("id = ? AND tenant_id = ?", token.AppId, token.TenantId).First(&app).Error; err != nil {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "tenant app is unavailable", types.ErrorCodeAccessDenied)
+				return fmt.Errorf("tenant app is unavailable")
+			}
+			if strings.TrimSpace(app.Status) != "" && app.Status != model.TenantStatusActive {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "tenant app is disabled", types.ErrorCodeAccessDenied)
+				return fmt.Errorf("tenant app is disabled")
+			}
+		}
+		if token.EndCustomerId > 0 {
+			var customer model.TenantEndCustomer
+			if err := model.DB.Where("id = ? AND tenant_id = ?", token.EndCustomerId, token.TenantId).First(&customer).Error; err != nil {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "tenant end customer is unavailable", types.ErrorCodeAccessDenied)
+				return fmt.Errorf("tenant end customer is unavailable")
+			}
+			if strings.TrimSpace(customer.Status) != "" && customer.Status != model.TenantStatusActive {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "tenant end customer is disabled", types.ErrorCodeAccessDenied)
+				return fmt.Errorf("tenant end customer is disabled")
+			}
+		}
+		billingMode := model.BillingModePrepaid
+		if config, err := model.GetBillingConfigByTenantId(token.TenantId); err == nil && strings.TrimSpace(config.BillingMode) != "" {
+			billingMode = config.BillingMode
+		}
+		common.SetContextKey(c, constant.ContextKeyTenantBillingMode, billingMode)
+	}
 	if !token.UnlimitedQuota {
 		c.Set("token_quota", token.RemainQuota)
 	}

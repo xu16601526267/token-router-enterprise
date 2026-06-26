@@ -294,7 +294,9 @@ func recordUsageWithMeta(relayInfo *relaycommon.RelayInfo, usage *dto.Usage, sel
 		SupplyNode:          meta.SupplyNode,
 		CreatedAt:           meta.CreatedAt,
 	}
-	if err := ledger.InsertIdempotent(); err != nil {
+	DecorateTenantLedger(ledger, relayInfo)
+	_, err = insertUsageLedgerWithTenantCredit(ledger)
+	if err != nil {
 		return nil, err
 	}
 	saved, err := model.GetUsageLedgerByRequestID(meta.RequestID)
@@ -302,6 +304,24 @@ func recordUsageWithMeta(relayInfo *relaycommon.RelayInfo, usage *dto.Usage, sel
 		return ledger, nil
 	}
 	return saved, nil
+}
+
+func insertUsageLedgerWithTenantCredit(ledger *model.UsageLedger) (int64, error) {
+	var rowsAffected int64
+	err := retryTenantDBWrite(func() error {
+		return model.DB.Transaction(func(tx *gorm.DB) error {
+			affected, err := ledger.InsertIdempotentRowsAffectedTx(tx)
+			if err != nil {
+				return err
+			}
+			rowsAffected = affected
+			if affected == 0 {
+				return nil
+			}
+			return applyTenantLedgerCreditTx(tx, ledger)
+		})
+	})
+	return rowsAffected, err
 }
 
 func RecordUsage(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, sellQuota int) (*model.UsageLedger, error) {

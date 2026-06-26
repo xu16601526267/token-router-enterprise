@@ -19,6 +19,17 @@ const (
 	ContextKeyTokenModelLimitEnabled ContextKey = "token_model_limit_enabled"
 	ContextKeyTokenModelLimit        ContextKey = "token_model_limit"
 	ContextKeyTokenCrossGroupRetry   ContextKey = "token_cross_group_retry"
+	ContextKeyTokenOwnerScope        ContextKey = "token_owner_scope"
+
+	/* tenant related keys */
+	ContextKeyScopeType             ContextKey = "scope_type"
+	ContextKeyTenantId              ContextKey = "tenant_id"
+	ContextKeyTenantAppId           ContextKey = "tenant_app_id"
+	ContextKeyTenantEndCustomerId   ContextKey = "tenant_end_customer_id"
+	ContextKeyTenantModelPolicyId   ContextKey = "tenant_model_policy_id"
+	ContextKeyTenantMemberRole      ContextKey = "tenant_member_role"
+	ContextKeyTenantBillingMode     ContextKey = "tenant_billing_mode"
+	ContextKeyTenantPrepaidConsumed ContextKey = "tenant_prepaid_consumed"
 
 	/* channel related keys */
 	ContextKeyChannelId                ContextKey = "channel_id"

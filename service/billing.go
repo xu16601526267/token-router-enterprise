@@ -17,6 +17,13 @@ const (
 // PreConsumeBilling 根据用户计费偏好创建 BillingSession 并执行预扣费。
 // 会话存储在 relayInfo.Billing 上，供后续 Settle / Refund 使用。
 func PreConsumeBilling(c *gin.Context, preConsumedQuota int, relayInfo *relaycommon.RelayInfo) *types.NewAPIError {
+	if tenantSession, apiErr := PrepareTenantBillingSession(c, preConsumedQuota, relayInfo); tenantSession != nil || apiErr != nil {
+		if apiErr != nil {
+			return apiErr
+		}
+		relayInfo.Billing = tenantSession
+		return nil
+	}
 	session, apiErr := NewBillingSession(c, relayInfo, preConsumedQuota)
 	if apiErr != nil {
 		return apiErr
@@ -35,6 +42,15 @@ func SettleBilling(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, actualQuo
 	if relayInfo.Billing != nil {
 		preConsumed := relayInfo.Billing.GetPreConsumedQuota()
 		delta := actualQuota - preConsumed
+		if relayInfo.BillingSource == BillingSourceTenantPostpaid || relayInfo.BillingSource == BillingSourceTenantMixed {
+			logger.LogInfo(ctx, fmt.Sprintf("企业授信结算：tenant=%d actual=%s prepaid=%s postpaid=%s",
+				relayInfo.TenantId,
+				logger.FormatQuota(actualQuota),
+				logger.FormatQuota(preConsumed),
+				logger.FormatQuota(TenantPostpaidQuota(relayInfo.TenantBillingMode, actualQuota, preConsumed)),
+			))
+			return relayInfo.Billing.Settle(actualQuota)
+		}
 
 		if delta > 0 {
 			logger.LogInfo(ctx, fmt.Sprintf("预扣费后补扣费：%s（实际消耗：%s，预扣费：%s）",

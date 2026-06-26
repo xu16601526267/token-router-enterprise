@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -28,6 +29,14 @@ type Token struct {
 	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
 	Group              string         `json:"group" gorm:"default:''"`
 	CrossGroupRetry    bool           `json:"cross_group_retry"` // 跨分组重试，仅auto分组有效
+	TenantId           int            `json:"tenant_id" gorm:"index;default:0"`
+	AppId              int            `json:"app_id" gorm:"index;default:0"`
+	EndCustomerId      int            `json:"end_customer_id" gorm:"index;default:0"`
+	OwnerScope         string         `json:"owner_scope" gorm:"size:32;default:'personal';index"`
+	ModelPolicyId      int            `json:"model_policy_id" gorm:"index;default:0"`
+	RateLimit          string         `json:"rate_limit" gorm:"size:128;default:''"`
+	RotationStatus     string         `json:"rotation_status" gorm:"size:32;default:'';index"`
+	LastUsedAt         int64          `json:"last_used_at" gorm:"bigint;default:0;index"`
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
@@ -229,6 +238,28 @@ func ValidateUserToken(key string) (token *Token, err error) {
 	return nil, fmt.Errorf("%w: %v", ErrDatabase, err)
 }
 
+func TouchTokenLastUsed(token *Token) {
+	if token == nil || token.Id <= 0 {
+		return
+	}
+	now := common.GetTimestamp()
+	if token.LastUsedAt > 0 && now-token.LastUsedAt < 60 {
+		return
+	}
+	token.LastUsedAt = now
+	if common.RedisEnabled && token.Key != "" {
+		_ = cacheSetTokenField(token.Key, "LastUsedAt", strconv.FormatInt(now, 10))
+	}
+	gopool.Go(func() {
+		err := DB.Model(&Token{}).
+			Where("id = ? AND (last_used_at = 0 OR last_used_at < ?)", token.Id, now-60).
+			Update("last_used_at", now).Error
+		if err != nil {
+			common.SysLog("failed to update token last_used_at: " + err.Error())
+		}
+	})
+}
+
 func GetTokenByIds(id int, userId int) (*Token, error) {
 	if id == 0 || userId == 0 {
 		return nil, errors.New("id 或 userId 为空！")
@@ -299,7 +330,9 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "cross_group_retry",
+		"tenant_id", "app_id", "end_customer_id", "owner_scope", "model_policy_id", "rate_limit",
+		"rotation_status", "last_used_at").Updates(token).Error
 	return err
 }
 

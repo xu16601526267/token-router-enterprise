@@ -89,6 +89,12 @@ type RelayInfo struct {
 	TokenId           int
 	TokenKey          string
 	TokenGroup        string
+	TenantId          int
+	AppId             int
+	EndCustomerId     int
+	OwnerScope        string
+	ModelPolicyId     int
+	TenantBillingMode string
 	UserId            int
 	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
 	UserGroup         string // 用户所在分组
@@ -473,10 +479,16 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 
 		OriginModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 
-		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
-		TokenKey:       common.GetContextKeyString(c, constant.ContextKeyTokenKey),
-		TokenUnlimited: common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
-		TokenGroup:     tokenGroup,
+		TokenId:           common.GetContextKeyInt(c, constant.ContextKeyTokenId),
+		TokenKey:          common.GetContextKeyString(c, constant.ContextKeyTokenKey),
+		TokenUnlimited:    common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
+		TokenGroup:        tokenGroup,
+		TenantId:          common.GetContextKeyInt(c, constant.ContextKeyTenantId),
+		AppId:             common.GetContextKeyInt(c, constant.ContextKeyTenantAppId),
+		EndCustomerId:     common.GetContextKeyInt(c, constant.ContextKeyTenantEndCustomerId),
+		OwnerScope:        common.GetContextKeyString(c, constant.ContextKeyTokenOwnerScope),
+		ModelPolicyId:     common.GetContextKeyInt(c, constant.ContextKeyTenantModelPolicyId),
+		TenantBillingMode: common.GetContextKeyString(c, constant.ContextKeyTenantBillingMode),
 
 		isFirstResponse: true,
 		RelayMode:       relayconstant.Path2RelayMode(c.Request.URL.Path),

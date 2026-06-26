@@ -24,6 +24,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/status", controller.GetStatus)
 		apiRouter.GET("/uptime/status", controller.GetUptimeKumaStatus)
 		apiRouter.GET("/models", middleware.UserAuth(), controller.DashboardListModels)
+		apiRouter.GET("/workspaces", middleware.UserAuth(), controller.GetMyWorkspaces)
 		apiRouter.GET("/status/test", middleware.AdminAuth(), controller.TestStatus)
 		apiRouter.GET("/notice", controller.GetNotice)
 		apiRouter.GET("/user-agreement", controller.GetUserAgreement)
@@ -341,6 +342,61 @@ func SetApiRouter(router *gin.Engine) {
 			enterpriseRoute.GET("/billing", controller.GetEnterpriseBilling)
 			enterpriseRoute.GET("/billing/export", controller.ExportEnterpriseBilling)
 			enterpriseRoute.POST("/billing/settlements/generate", controller.GenerateEnterpriseBillingSettlement)
+		}
+
+		platformTenantRoute := apiRouter.Group("/platform/tenants")
+		platformTenantRoute.Use(middleware.AdminAuth())
+		{
+			platformTenantRoute.GET("/", controller.GetPlatformTenants)
+			platformTenantRoute.POST("/", controller.CreatePlatformTenant)
+			platformTenantRoute.GET("/:tenant_id", controller.GetPlatformTenant360)
+			platformTenantRoute.PATCH("/:tenant_id/status", controller.UpdatePlatformTenantStatus)
+			platformTenantRoute.PUT("/:tenant_id/billing_config", controller.UpdatePlatformTenantBillingConfig)
+			platformTenantRoute.GET("/:tenant_id/model_policies", controller.GetPlatformTenantModelPolicies)
+			platformTenantRoute.POST("/:tenant_id/model_policies", controller.UpsertPlatformTenantModelPolicy)
+		}
+
+		frontChannelRoute := apiRouter.Group("/front_channels")
+		frontChannelRoute.Use(middleware.AdminAuth())
+		{
+			frontChannelRoute.GET("/", controller.GetPlatformFrontChannels)
+			frontChannelRoute.POST("/", controller.CreatePlatformFrontChannel)
+			frontChannelRoute.PUT("/:id", controller.UpdatePlatformFrontChannel)
+		}
+
+		scopedAuditRoute := apiRouter.Group("/audit_logs/scoped")
+		scopedAuditRoute.Use(middleware.AdminAuth())
+		{
+			scopedAuditRoute.GET("/", controller.GetScopedAuditLogs)
+		}
+
+		tenantRoute := apiRouter.Group("/tenant/:tenant_id")
+		tenantRoute.Use(middleware.UserAuth())
+		{
+			tenantRoute.GET("/overview", middleware.TenantReadAuth(), controller.GetTenantOverview)
+			tenantRoute.GET("/members", middleware.TenantReadAuth(), controller.GetTenantMembers)
+			tenantRoute.POST("/members", middleware.TenantOwnerAdminAuth(), controller.CreateTenantMember)
+			tenantRoute.PUT("/members/:id", middleware.TenantOwnerAdminAuth(), controller.UpdateTenantMember)
+			tenantRoute.GET("/end_customers", middleware.TenantReadAuth(), controller.GetTenantEndCustomers)
+			tenantRoute.POST("/end_customers", middleware.TenantOwnerAdminAuth(), controller.CreateTenantEndCustomer)
+			tenantRoute.PUT("/end_customers/:id", middleware.TenantOwnerAdminAuth(), controller.UpdateTenantEndCustomer)
+			tenantRoute.GET("/apps", middleware.TenantReadAuth(), controller.GetTenantApps)
+			tenantRoute.POST("/apps", middleware.TenantWriteAuth(), controller.CreateTenantApp)
+			tenantRoute.PUT("/apps/:id", middleware.TenantWriteAuth(), controller.UpdateTenantApp)
+			tenantRoute.GET("/model_policies", middleware.TenantReadAuth(), controller.GetTenantModelPolicies)
+			tenantRoute.GET("/api_keys", middleware.TenantReadAuth(), controller.GetTenantAPIKeys)
+			tenantRoute.POST("/api_keys", middleware.TenantWriteAuth(), controller.CreateTenantAPIKey)
+			tenantRoute.PATCH("/api_keys/:id/status", middleware.TenantWriteAuth(), controller.UpdateTenantAPIKeyStatus)
+			tenantRoute.GET("/usage_ledgers", middleware.TenantReadAuth(), controller.GetTenantUsageLedgers)
+			tenantRoute.GET("/billing/statements", middleware.TenantFinanceAuth(), controller.GetTenantBillingStatements)
+			tenantRoute.GET("/billing/statements/:statement_id", middleware.TenantFinanceAuth(), controller.GetTenantBillingStatementDetail)
+			tenantRoute.POST("/billing/statements/generate", middleware.TenantFinanceAuth(), controller.GenerateTenantBillingStatement)
+			tenantRoute.POST("/billing/statements/:statement_id/confirm", middleware.TenantFinanceAuth(), controller.ConfirmTenantBillingStatement)
+			tenantRoute.POST("/billing/statements/:statement_id/payment", middleware.TenantFinanceAuth(), controller.RegisterTenantBillingPayment)
+			tenantRoute.GET("/routing_preferences", middleware.TenantReadAuth(), controller.GetTenantRoutingPreferences)
+			tenantRoute.POST("/routing_preferences", middleware.TenantWriteAuth(), controller.CreateTenantRoutingPreference)
+			tenantRoute.POST("/routing_preferences/:id/review", middleware.TenantOwnerAdminAuth(), controller.ReviewTenantRoutingPreference)
+			tenantRoute.GET("/audit_logs", middleware.TenantReadAuth(), controller.GetTenantAuditLogs)
 		}
 
 		logRoute.GET("/token", middleware.CORS(), middleware.TokenAuthReadOnly(), controller.GetLogByKey)
