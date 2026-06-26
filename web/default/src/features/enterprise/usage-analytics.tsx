@@ -369,9 +369,9 @@ function UsageLogTable(props: {
 
   return (
     <>
-      <div className='overflow-x-auto'>
+      <div className='max-h-[250px] overflow-auto'>
         <Table className='w-full table-fixed text-[11px] [&_td]:h-7 [&_td]:px-2 [&_td]:py-1 [&_td]:text-[11px] [&_td_*]:text-[11px] [&_th]:h-7 [&_th]:px-2 [&_th]:text-[11px] [&_th_*]:text-[11px]'>
-          <TableHeader className='bg-slate-50'>
+          <TableHeader className='sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_rgb(226_232_240)]'>
             <TableRow>
               <TableHead className='w-[11%]'>请求 ID</TableHead>
               <TableHead className='w-[9%]'>时间</TableHead>
