@@ -96,6 +96,7 @@ type EnterpriseAPIKeySecret struct {
 type EnterpriseChannelSummary struct {
 	EnabledChannels    int64   `json:"enabled_channels"`
 	HealthySuppliers   int64   `json:"healthy_suppliers"`
+	TotalSuppliers     int64   `json:"total_suppliers"`
 	AverageSuccessRate float64 `json:"average_success_rate"`
 	AverageLatencyMs   float64 `json:"average_latency_ms"`
 	TotalBalance       float64 `json:"total_balance"`

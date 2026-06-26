@@ -21,6 +21,7 @@ type EnterpriseChannelFilters struct {
 	Keyword    string
 	Status     int
 	SupplierId int
+	Type       int
 	Group      string
 	Page       int
 	PageSize   int
@@ -94,6 +95,9 @@ func enterpriseApplyChannelFilters(query *gorm.DB, filters EnterpriseChannelFilt
 	if filters.SupplierId > 0 {
 		query = query.Where("channels.supplier_id = ?", filters.SupplierId)
 	}
+	if filters.Type > 0 {
+		query = query.Where("channels.type = ?", filters.Type)
+	}
 	if filters.Group != "" {
 		query = query.Where("channels."+model.CommonGroupColumn()+" = ?", filters.Group)
 	}
@@ -151,6 +155,12 @@ func GetEnterpriseChannelCenterWithFilters(startTimestamp int64, endTimestamp in
 		Find(&channels).Error; err != nil {
 		return nil, err
 	}
+	var summaryChannels []model.Channel
+	summaryQuery := enterpriseApplyChannelFilters(model.DB.Model(&model.Channel{}).
+		Joins("LEFT JOIN suppliers ON suppliers.id = channels.supplier_id"), filters)
+	if err := summaryQuery.Select("channels.*").Find(&summaryChannels).Error; err != nil {
+		return nil, err
+	}
 	var suppliers []model.Supplier
 	if err := model.DB.Find(&suppliers).Error; err != nil {
 		return nil, err
@@ -164,14 +174,26 @@ func GetEnterpriseChannelCenterWithFilters(startTimestamp int64, endTimestamp in
 		return nil, err
 	}
 	items := make([]dto.EnterpriseChannelItem, 0, len(channels))
-	summary := dto.EnterpriseChannelSummary{}
-	var successWeight int64
-	var latencyWeight int64
 	for _, channel := range channels {
 		item := enterpriseChannelItem(channel, supplierMap[channel.SupplierId], aggregates[channel.Id])
 		items = append(items, item)
+	}
+
+	summary := dto.EnterpriseChannelSummary{}
+	var successWeight int64
+	var latencyWeight int64
+	supplierIds := make(map[int]struct{})
+	healthySupplierIds := make(map[int]struct{})
+	for _, channel := range summaryChannels {
+		item := enterpriseChannelItem(channel, supplierMap[channel.SupplierId], aggregates[channel.Id])
 		if channel.Status == common.ChannelStatusEnabled {
 			summary.EnabledChannels++
+		}
+		if channel.SupplierId > 0 {
+			supplierIds[channel.SupplierId] = struct{}{}
+			if supplierMap[channel.SupplierId].Status == common.ChannelStatusEnabled {
+				healthySupplierIds[channel.SupplierId] = struct{}{}
+			}
 		}
 		summary.TotalBalance += channel.Balance
 		if channel.Status == common.ChannelStatusEnabled && channel.Balance > 0 && channel.Balance < 10 {
@@ -186,11 +208,8 @@ func GetEnterpriseChannelCenterWithFilters(startTimestamp int64, endTimestamp in
 			latencyWeight += item.Requests
 		}
 	}
-	for _, supplier := range suppliers {
-		if supplier.Status == common.ChannelStatusEnabled {
-			summary.HealthySuppliers++
-		}
-	}
+	summary.TotalSuppliers = int64(len(supplierIds))
+	summary.HealthySuppliers = int64(len(healthySupplierIds))
 	if successWeight > 0 {
 		summary.AverageSuccessRate /= float64(successWeight)
 	}

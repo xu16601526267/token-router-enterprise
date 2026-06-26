@@ -120,10 +120,12 @@ func GetEnterpriseChannels(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
 	status, _ := strconv.Atoi(c.Query("status"))
 	supplierId, _ := strconv.Atoi(c.Query("supplier_id"))
+	channelType, _ := strconv.Atoi(c.Query("type"))
 	data, err := service.GetEnterpriseChannelCenterWithFilters(startTimestamp, endTimestamp, service.EnterpriseChannelFilters{
 		Keyword:    strings.TrimSpace(c.Query("keyword")),
 		Status:     status,
 		SupplierId: supplierId,
+		Type:       channelType,
 		Group:      strings.TrimSpace(c.Query("group")),
 		Page:       enterprisePositiveInt(c, "page", 1, 1000000),
 		PageSize:   enterprisePositiveInt(c, "page_size", 50, 500),
@@ -141,10 +143,12 @@ func ExportEnterpriseChannels(c *gin.Context) {
 	startTimestamp, endTimestamp := parseEnterpriseOverviewRange(c)
 	status, _ := strconv.Atoi(c.Query("status"))
 	supplierId, _ := strconv.Atoi(c.Query("supplier_id"))
+	channelType, _ := strconv.Atoi(c.Query("type"))
 	body, err := service.BuildEnterpriseChannelsCSV(startTimestamp, endTimestamp, service.EnterpriseChannelFilters{
 		Keyword:    strings.TrimSpace(c.Query("keyword")),
 		Status:     status,
 		SupplierId: supplierId,
+		Type:       channelType,
 		Group:      strings.TrimSpace(c.Query("group")),
 		SortBy:     strings.TrimSpace(c.Query("sort_by")),
 		SortOrder:  strings.TrimSpace(c.Query("sort_order")),

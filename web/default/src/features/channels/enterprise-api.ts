@@ -30,6 +30,7 @@ type RangeQuery = {
   keyword?: string
   status?: number
   supplier_id?: number
+  type?: number
   group?: string
   page?: number
   page_size?: number

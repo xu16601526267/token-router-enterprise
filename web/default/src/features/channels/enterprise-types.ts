@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 export type EnterpriseChannelSummary = {
   enabled_channels: number
   healthy_suppliers: number
+  total_suppliers: number
   average_success_rate: number
   average_latency_ms: number
   total_balance: number

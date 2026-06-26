@@ -16,35 +16,38 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Activity,
   AlertTriangle,
+  ArrowUpRight,
   Boxes,
+  CalendarDays,
   CheckCircle2,
   CircleDollarSign,
-  Clock3,
   Download,
   Gauge,
+  MoreHorizontal,
+  Power,
+  PowerOff,
   Radio,
   RefreshCw,
   Search,
   ServerCog,
   ShieldCheck,
+  SlidersHorizontal,
   Tags,
+  TestTube2,
+  WalletCards,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-import {
-  EnterprisePageHeader,
-  EnterprisePanel,
-  EnterpriseStatCard,
-} from '@/components/enterprise'
+import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
@@ -59,13 +62,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 
+import {
+  testChannel,
+  updateAllChannelsBalance,
+  updateChannelBalance,
+} from './api'
 import { ChannelsTable } from './components/channels-table'
+import { CHANNEL_STATUS } from './constants'
 import {
   exportEnterpriseChannelCenter,
   getEnterpriseChannelCenter,
   getEnterpriseChannelDetail,
 } from './enterprise-api'
 import type { EnterpriseChannelItem } from './enterprise-types'
+import {
+  handleBatchDisable,
+  handleBatchEnable,
+  handleTestAllChannels,
+} from './lib'
 import { getChannelTypeLabel } from './lib/channel-utils'
 
 type EnterpriseChannelsCenterProps = {
@@ -73,70 +87,265 @@ type EnterpriseChannelsCenterProps = {
   retryBadge?: ReactNode
 }
 
+type SummaryTone = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose'
+
+type DetailTab = 'overview' | 'models' | 'events' | 'routing'
+
 const EMPTY_CHANNEL_ITEMS: EnterpriseChannelItem[] = []
+
+const RANGE_OPTIONS = [
+  { label: '近 7 天', value: 7 },
+  { label: '近 30 天', value: 30 },
+  { label: '近 90 天', value: 90 },
+] as const
+
+const toneStyles: Record<
+  SummaryTone,
+  { icon: string; value: string; trend: string }
+> = {
+  blue: {
+    icon: 'bg-blue-50 text-blue-600 ring-blue-100',
+    value: 'text-slate-950',
+    trend: 'text-emerald-600',
+  },
+  emerald: {
+    icon: 'bg-emerald-50 text-emerald-600 ring-emerald-100',
+    value: 'text-slate-950',
+    trend: 'text-emerald-600',
+  },
+  violet: {
+    icon: 'bg-violet-50 text-violet-600 ring-violet-100',
+    value: 'text-slate-950',
+    trend: 'text-emerald-600',
+  },
+  amber: {
+    icon: 'bg-amber-50 text-amber-600 ring-amber-100',
+    value: 'text-slate-950',
+    trend: 'text-amber-600',
+  },
+  rose: {
+    icon: 'bg-rose-50 text-rose-600 ring-rose-100',
+    value: 'text-slate-950',
+    trend: 'text-rose-600',
+  },
+}
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(2)}%`
 }
 
 function formatMoney(value: number): string {
-  return new Intl.NumberFormat('zh-CN', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 2,
   }).format(value)
 }
 
+function formatCompactNumber(value: number): string {
+  return new Intl.NumberFormat('zh-CN', {
+    maximumFractionDigits: 1,
+    notation: Math.abs(value) >= 10000 ? 'compact' : 'standard',
+  }).format(value)
+}
+
+function splitModels(models: string): string[] {
+  return models
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function formatTimestamp(timestamp: number): string {
+  if (timestamp <= 0) return '未检查'
+  return dayjs.unix(timestamp).fromNow()
+}
+
 function statusConfig(item: EnterpriseChannelItem): {
   label: string
   className: string
   dot: string
+  severity: 'healthy' | 'warning' | 'danger' | 'muted'
 } {
-  if (item.status !== 1) {
+  if (item.status !== CHANNEL_STATUS.ENABLED) {
     return {
-      label: '已停用',
-      className: 'bg-muted text-muted-foreground',
-      dot: 'bg-muted-foreground',
-    }
-  }
-  if (item.success_rate > 0 && item.success_rate < 0.98) {
-    return {
-      label: '告警',
-      className: 'bg-amber-500/10 text-amber-600 dark:text-amber-300',
-      dot: 'bg-amber-500',
+      label:
+        item.status === CHANNEL_STATUS.AUTO_DISABLED ? '自动停用' : '已停用',
+      className: 'bg-slate-100 text-slate-600',
+      dot: 'bg-slate-400',
+      severity: 'muted',
     }
   }
   if (item.balance > 0 && item.balance < 10) {
     return {
       label: '低余额',
-      className: 'bg-rose-500/10 text-rose-600 dark:text-rose-300',
+      className: 'bg-rose-50 text-rose-600',
       dot: 'bg-rose-500',
+      severity: 'danger',
+    }
+  }
+  if (item.success_rate > 0 && item.success_rate < 0.98) {
+    return {
+      label: '告警',
+      className: 'bg-amber-50 text-amber-600',
+      dot: 'bg-amber-500',
+      severity: 'warning',
     }
   }
   return {
     label: '健康',
-    className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
+    className: 'bg-emerald-50 text-emerald-600',
     dot: 'bg-emerald-500',
+    severity: 'healthy',
   }
 }
 
-function modelBadges(models: string) {
-  const values = models
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+function getSupplierInitial(item: EnterpriseChannelItem): string {
+  const name = item.supplier_name || item.name || 'S'
+  return name.trim().slice(0, 1).toUpperCase()
+}
+
+function getSelectedTargetIds(
+  selectedIds: number[],
+  selected: EnterpriseChannelItem | null
+): number[] {
+  if (selectedIds.length > 0) {
+    return selectedIds
+  }
+  if (selected != null) {
+    return [selected.id]
+  }
+  return []
+}
+
+function getAvailabilityTone(
+  severity?: ReturnType<typeof statusConfig>['severity']
+): 'emerald' | 'amber' | 'rose' {
+  if (severity === 'danger') {
+    return 'rose'
+  }
+  if (severity === 'warning') {
+    return 'amber'
+  }
+  return 'emerald'
+}
+
+function modelBadges(models: string, compact = false) {
+  const values = splitModels(models)
+  const visibleCount = compact ? 2 : 3
   return (
-    <div className='flex max-w-60 flex-wrap gap-1'>
-      {values.slice(0, 2).map((model) => (
-        <Badge key={model} variant='secondary' className='max-w-32 truncate'>
+    <div className='flex max-w-[240px] flex-wrap gap-1'>
+      {values.slice(0, visibleCount).map((model) => (
+        <Badge
+          key={model}
+          variant='outline'
+          className='h-5 max-w-28 truncate rounded px-1.5 text-[10px] font-medium'
+        >
           {model}
         </Badge>
       ))}
-      {values.length > 2 && (
-        <Badge variant='outline'>+{values.length - 2}</Badge>
+      {values.length > visibleCount && (
+        <Badge variant='secondary' className='h-5 rounded px-1.5 text-[10px]'>
+          +{values.length - visibleCount}
+        </Badge>
       )}
       {values.length === 0 && (
-        <span className='text-muted-foreground text-xs'>未配置</span>
+        <span className='text-muted-foreground text-[11px]'>未配置</span>
+      )}
+    </div>
+  )
+}
+
+function ChannelSummaryCard({
+  title,
+  value,
+  helper,
+  trend,
+  tone,
+  icon: Icon,
+  loading,
+}: {
+  title: string
+  value: string
+  helper: string
+  trend?: string
+  tone: SummaryTone
+  icon: typeof Radio
+  loading?: boolean
+}) {
+  const styles = toneStyles[tone]
+  return (
+    <article className='min-h-[84px] rounded-md border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+      <div className='flex items-start justify-between gap-2'>
+        <div className='flex min-w-0 items-start gap-2.5'>
+          <span
+            className={cn(
+              'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+              styles.icon
+            )}
+          >
+            <Icon className='size-4' strokeWidth={1.9} />
+          </span>
+          <div className='min-w-0'>
+            <p className='truncate text-[11px] leading-4 font-medium text-slate-500'>
+              {title}
+            </p>
+            {loading ? (
+              <div className='mt-1.5 h-6 w-20 animate-pulse rounded bg-slate-100' />
+            ) : (
+              <p
+                className={cn(
+                  'mt-0.5 truncate text-[18px] leading-6 font-semibold tabular-nums',
+                  styles.value
+                )}
+              >
+                {value}
+              </p>
+            )}
+          </div>
+        </div>
+        <ArrowUpRight className='mt-1 size-3.5 shrink-0 text-slate-400' />
+      </div>
+      <div className='mt-1.5 flex min-h-4 items-center gap-1.5 pl-10 text-[11px]'>
+        <span className='text-slate-500'>{helper}</span>
+        {trend != null && (
+          <span className={cn('font-semibold', styles.trend)}>{trend}</span>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function DetailMetric({
+  label,
+  value,
+  helper,
+  tone = 'slate',
+}: {
+  label: string
+  value: string
+  helper?: string
+  tone?: 'slate' | 'emerald' | 'amber' | 'rose' | 'blue'
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-md border px-2.5 py-2',
+        tone === 'slate' && 'border-slate-200 bg-slate-50/60',
+        tone === 'emerald' && 'border-emerald-100 bg-emerald-50/60',
+        tone === 'amber' && 'border-amber-100 bg-amber-50/60',
+        tone === 'rose' && 'border-rose-100 bg-rose-50/60',
+        tone === 'blue' && 'border-blue-100 bg-blue-50/60'
+      )}
+    >
+      <p className='text-[10px] leading-4 text-slate-500'>{label}</p>
+      <p className='mt-0.5 truncate text-[14px] leading-5 font-semibold text-slate-950 tabular-nums'>
+        {value}
+      </p>
+      {helper != null && (
+        <p className='mt-0.5 truncate text-[10px] leading-4 text-slate-500'>
+          {helper}
+        </p>
       )}
     </div>
   )
@@ -144,17 +353,24 @@ function modelBadges(models: string) {
 
 export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState('enterprise')
+  const [rangeDays, setRangeDays] = useState<number>(7)
   const range = useMemo(() => {
     const end = Math.floor(Date.now() / 1000)
-    return { start: end - 7 * 24 * 60 * 60, end }
-  }, [])
+    return { start: end - rangeDays * 24 * 60 * 60, end }
+  }, [rangeDays])
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('all')
   const [supplier, setSupplier] = useState('all')
   const [group, setGroup] = useState('all')
+  const [type, setType] = useState('all')
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview')
   const [exportingChannels, setExportingChannels] = useState(false)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
 
   const queryParams = useMemo(
     () => ({
@@ -163,11 +379,14 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
       keyword: keyword.trim() || undefined,
       status: status !== 'all' ? Number(status) : undefined,
       supplier_id: supplier !== 'all' ? Number(supplier) : undefined,
+      type: type !== 'all' ? Number(type) : undefined,
       group: group !== 'all' ? group : undefined,
       page,
       page_size: 50,
+      sort_by: 'priority',
+      sort_order: 'desc',
     }),
-    [group, keyword, page, range.end, range.start, status, supplier]
+    [group, keyword, page, range.end, range.start, status, supplier, type]
   )
 
   const centerQuery = useQuery({
@@ -186,11 +405,12 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
 
   const data = centerQuery.data?.data
   const summary = data?.summary
-  const items = data?.items ?? EMPTY_CHANNEL_ITEMS
+  const rawItems = data?.items ?? EMPTY_CHANNEL_ITEMS
+  const items = rawItems
   const supplierOptions = useMemo(
     () => [
       ...new Map(
-        items
+        rawItems
           .filter((item) => item.supplier_id > 0)
           .map((item) => [
             item.supplier_id,
@@ -198,70 +418,63 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
           ])
       ).entries(),
     ],
-    [items]
+    [rawItems]
   )
   const groupOptions = useMemo(
-    () => [...new Set(items.map((item) => item.group).filter(Boolean))].sort(),
-    [items]
+    () =>
+      [...new Set(rawItems.map((item) => item.group).filter(Boolean))].sort(),
+    [rawItems]
+  )
+  const typeOptions = useMemo(
+    () =>
+      [
+        ...new Map(
+          rawItems.map((item) => [item.type, getChannelTypeLabel(item.type)])
+        ).entries(),
+      ].sort((a, b) => a[1].localeCompare(b[1])),
+    [rawItems]
   )
   const selected = items.find((item) => item.id === selectedId) ?? null
   const detail = detailQuery.data?.data
-  const total = data?.total ?? items.length
+  const total = data?.total ?? rawItems.length
+  const fallbackSupplierTotal = supplierOptions.length
+  const totalSuppliers =
+    summary?.total_suppliers != null && summary.total_suppliers > 0
+      ? summary.total_suppliers
+      : fallbackSupplierTotal
   const totalPages = Math.max(1, Math.ceil(total / (data?.page_size ?? 50)))
+  const allPageSelected =
+    items.length > 0 && items.every((item) => selectedIds.includes(item.id))
+  const partialPageSelected =
+    selectedIds.length > 0 &&
+    items.some((item) => selectedIds.includes(item.id))
 
   useEffect(() => {
     if (items.length === 0) {
       setSelectedId(null)
+      setSelectedIds([])
       return
     }
     if (selectedId == null || !items.some((item) => item.id === selectedId)) {
       setSelectedId(items[0].id)
     }
+    setSelectedIds((ids) =>
+      ids.filter((id) => items.some((item) => item.id === id))
+    )
   }, [items, selectedId])
 
-  let supplierProfileContent = (
-    <p className='text-muted-foreground mt-3 rounded-md border border-dashed p-4 text-xs'>
-      当前渠道尚未绑定供应商，可在经典配置视图中补充。
-    </p>
-  )
-  if (detailQuery.isLoading) {
-    supplierProfileContent = (
-      <div className='bg-muted mt-3 h-24 animate-pulse rounded-md' />
-    )
-  } else if (detail?.supplier) {
-    supplierProfileContent = (
-      <div className='bg-muted/20 mt-3 rounded-md border p-3 text-xs'>
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='font-semibold'>{detail.supplier.name}</p>
-            <p className='text-muted-foreground mt-0.5'>
-              {detail.supplier.type}
-            </p>
-          </div>
-          <Badge variant='outline'>等级 {detail.supplier.grade || '—'}</Badge>
-        </div>
-        <div className='mt-3 grid grid-cols-3 gap-2 text-center'>
-          <div className='bg-background rounded-md p-2'>
-            <p className='text-muted-foreground'>评分</p>
-            <p className='mt-1 font-semibold'>
-              {detail.supplier.score.toFixed(1)}
-            </p>
-          </div>
-          <div className='bg-background rounded-md p-2'>
-            <p className='text-muted-foreground'>渠道数</p>
-            <p className='mt-1 font-semibold'>
-              {detail.supplier.channel_count}
-            </p>
-          </div>
-          <div className='bg-background rounded-md p-2'>
-            <p className='text-muted-foreground'>路由权重</p>
-            <p className='mt-1 font-semibold'>
-              {detail.supplier.route_weight || 100}%
-            </p>
-          </div>
-        </div>
-      </div>
-    )
+  const invalidateChannelViews = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ['enterprise-channel-center'],
+    })
+    await queryClient.invalidateQueries({
+      queryKey: ['enterprise-channel-detail'],
+    })
+    await queryClient.invalidateQueries({ queryKey: ['channels'] })
+    await centerQuery.refetch()
+    if (selectedId != null) {
+      await detailQuery.refetch()
+    }
   }
 
   const exportChannelsCsv = async () => {
@@ -276,21 +489,213 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
     }
   }
 
+  const updateAllBalances = async () => {
+    setBusyAction('update-all-balances')
+    try {
+      const response = await updateAllChannelsBalance()
+      if (response.success) {
+        toast.success('已开始批量更新渠道余额')
+        await invalidateChannelViews()
+      } else {
+        toast.error(response.message || '批量更新余额失败')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '批量更新余额失败')
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const testAllEnabledChannels = async () => {
+    setBusyAction('test-all')
+    try {
+      await handleTestAllChannels(
+        queryClient,
+        () => void invalidateChannelViews()
+      )
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const bulkEnable = async () => {
+    setBusyAction('bulk-enable')
+    try {
+      await handleBatchEnable(selectedIds, queryClient, () => {
+        setSelectedIds([])
+        void invalidateChannelViews()
+      })
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const bulkDisable = async () => {
+    setBusyAction('bulk-disable')
+    try {
+      await handleBatchDisable(selectedIds, queryClient, () => {
+        setSelectedIds([])
+        void invalidateChannelViews()
+      })
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const refreshSelectedBalances = async () => {
+    const targets = getSelectedTargetIds(selectedIds, selected)
+    if (targets.length === 0) {
+      toast.error('请先选择渠道')
+      return
+    }
+    setBusyAction('selected-balance')
+    try {
+      const results = await Promise.allSettled(
+        targets.map((id) => updateChannelBalance(id))
+      )
+      const success = results.filter(
+        (result) => result.status === 'fulfilled' && result.value.success
+      ).length
+      const failed = results.length - success
+      if (success > 0) {
+        toast.success(`已更新 ${success} 个渠道余额`)
+      }
+      if (failed > 0) {
+        toast.error(`${failed} 个渠道余额更新失败`)
+      }
+      await invalidateChannelViews()
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const testSelectedChannels = async () => {
+    const targets = getSelectedTargetIds(selectedIds, selected)
+    if (targets.length === 0) {
+      toast.error('请先选择渠道')
+      return
+    }
+    setBusyAction('selected-test')
+    try {
+      const results = await Promise.allSettled(
+        targets.map((id) => testChannel(id))
+      )
+      const success = results.filter(
+        (result) => result.status === 'fulfilled' && result.value.success
+      ).length
+      const failed = results.length - success
+      if (success > 0) {
+        toast.success(`测试通过 ${success} 个渠道`)
+      }
+      if (failed > 0) {
+        toast.error(`${failed} 个渠道测试失败`)
+      }
+      await invalidateChannelViews()
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const toggleSelectPage = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds((ids) => [
+        ...new Set([...ids, ...items.map((item) => item.id)]),
+      ])
+      return
+    }
+    setSelectedIds((ids) =>
+      ids.filter((id) => !items.some((item) => item.id === id))
+    )
+  }
+
+  const toggleSelected = (id: number, checked: boolean) => {
+    setSelectedIds((ids) =>
+      checked ? [...new Set([...ids, id])] : ids.filter((value) => value !== id)
+    )
+  }
+
+  const selectedStatus = selected ? statusConfig(selected) : null
+  const selectedLatency = selected
+    ? selected.average_latency_ms || selected.response_time_ms
+    : 0
+  const availabilityTone = getAvailabilityTone(selectedStatus?.severity)
+  let supplierProfileContent: ReactNode = (
+    <p className='rounded-md border border-dashed border-slate-200 p-3 text-xs leading-5 text-slate-500'>
+      当前渠道尚未绑定供应商，可在经典配置中补充供应商信息。
+    </p>
+  )
+  if (detailQuery.isLoading) {
+    supplierProfileContent = (
+      <div className='h-24 animate-pulse rounded-md bg-slate-100' />
+    )
+  } else if (detail?.supplier) {
+    supplierProfileContent = (
+      <div className='rounded-md border border-slate-200 bg-slate-50/40 p-2.5'>
+        <div className='flex items-center justify-between gap-2'>
+          <div className='min-w-0'>
+            <p className='truncate text-[12px] font-semibold text-slate-950'>
+              {detail.supplier.name}
+            </p>
+            <p className='mt-0.5 truncate text-[10px] text-slate-500'>
+              {detail.supplier.type || '供应商'} ·{' '}
+              {detail.supplier.notes || '暂无备注'}
+            </p>
+          </div>
+          <Badge variant='outline' className='h-5 rounded px-1.5 text-[10px]'>
+            等级 {detail.supplier.grade || '-'}
+          </Badge>
+        </div>
+        <div className='mt-2 grid grid-cols-3 gap-2 text-center'>
+          <DetailMetric label='评分' value={detail.supplier.score.toFixed(1)} />
+          <DetailMetric
+            label='渠道数'
+            value={String(detail.supplier.channel_count)}
+          />
+          <DetailMetric
+            label='权重'
+            value={`${detail.supplier.route_weight || selected?.weight || 0}%`}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Content>
         <Tabs
-          defaultValue='enterprise'
-          className='flex h-full min-h-0 flex-col gap-3'
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className='flex h-full min-h-0 flex-col gap-2.5'
         >
-          <div className='flex shrink-0 flex-col gap-3'>
+          <div className='flex shrink-0 flex-col gap-2'>
             <EnterprisePageHeader
-              eyebrow='上游资源治理'
+              eyebrow='资源与路由'
               title='渠道与供应商中心'
-              description='统一管理上游供应商、渠道健康度、余额、模型覆盖和路由优先级；原有渠道编辑与批量操作完整保留。'
+              description='统一管理上游供应商、渠道健康度、余额、模型覆盖和路由优先级。'
               actions={
                 <>
                   {props.retryBadge}
+                  <div className='flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
+                    <CalendarDays className='size-3.5 text-slate-400' />
+                    <NativeSelect
+                      value={String(rangeDays)}
+                      className='h-6 w-[96px] border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0'
+                      onChange={(event) => {
+                        setRangeDays(Number(event.target.value))
+                        setPage(1)
+                      }}
+                    >
+                      {RANGE_OPTIONS.map((option) => (
+                        <NativeSelectOption
+                          key={option.value}
+                          value={String(option.value)}
+                        >
+                          {option.label}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </div>
                   <Button
                     size='sm'
                     variant='outline'
@@ -299,11 +704,20 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                   >
                     <RefreshCw
                       className={cn(
-                        'size-4',
+                        'size-3.5',
                         centerQuery.isFetching && 'animate-spin'
                       )}
                     />
-                    刷新运营数据
+                    刷新
+                  </Button>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={() => void updateAllBalances()}
+                    disabled={busyAction === 'update-all-balances'}
+                  >
+                    <WalletCards className='size-3.5' />
+                    批量更新余额
                   </Button>
                   <Button
                     size='sm'
@@ -311,185 +725,351 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                     onClick={() => void exportChannelsCsv()}
                     disabled={exportingChannels}
                   >
-                    <Download className='size-4' />
-                    {exportingChannels ? '导出中' : '导出渠道'}
+                    <Download className='size-3.5' />
+                    {exportingChannels ? '导出中' : '导出报表'}
                   </Button>
                   {props.actions}
                 </>
               }
             />
-            <TabsList className='w-fit'>
-              <TabsTrigger value='enterprise'>企业运营视图</TabsTrigger>
-              <TabsTrigger value='classic'>经典配置视图</TabsTrigger>
+            <TabsList className='h-8 w-fit rounded-md bg-slate-100 p-0.5'>
+              <TabsTrigger
+                value='enterprise'
+                className='h-7 rounded px-3 text-xs'
+              >
+                运营视图
+              </TabsTrigger>
+              <TabsTrigger value='classic' className='h-7 rounded px-3 text-xs'>
+                经典配置
+              </TabsTrigger>
             </TabsList>
           </div>
 
           <TabsContent
             value='enterprise'
-            className='min-h-0 flex-1 overflow-auto pb-5'
+            className='min-h-0 flex-1 overflow-auto pb-4'
           >
-            <div className='flex flex-col gap-3'>
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5'>
-                <EnterpriseStatCard
-                  title='启用渠道数'
-                  value={String(summary?.enabled_channels ?? 0)}
-                  helper='可参与路由'
-                  icon={Radio}
-                  tone='blue'
-                  loading={centerQuery.isLoading}
-                />
-                <EnterpriseStatCard
-                  title='健康供应商'
-                  value={String(summary?.healthy_suppliers ?? 0)}
-                  helper='状态正常'
-                  icon={ShieldCheck}
-                  tone='emerald'
-                  loading={centerQuery.isLoading}
-                />
-                <EnterpriseStatCard
-                  title='平均成功率'
-                  value={formatPercent(summary?.average_success_rate ?? 0)}
-                  helper='近 7 天请求'
-                  icon={CheckCircle2}
-                  tone='violet'
-                  loading={centerQuery.isLoading}
-                />
-                <EnterpriseStatCard
-                  title='平均延迟'
-                  value={`${(summary?.average_latency_ms ?? 0).toFixed(0)} ms`}
-                  helper='近 7 天成功请求'
-                  icon={Clock3}
-                  tone='amber'
-                  loading={centerQuery.isLoading}
-                />
-                <EnterpriseStatCard
-                  title='低余额告警'
-                  value={String(summary?.low_balance_alerts ?? 0)}
-                  helper={`${formatMoney(summary?.total_balance ?? 0)} 总余额`}
-                  icon={AlertTriangle}
-                  tone='rose'
-                  loading={centerQuery.isLoading}
-                />
-              </div>
+            <div className='grid min-h-full gap-3 xl:grid-cols-[minmax(0,1fr)_344px]'>
+              <div className='flex min-w-0 flex-col gap-2.5'>
+                <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5'>
+                  <ChannelSummaryCard
+                    title='启用渠道数'
+                    value={String(summary?.enabled_channels ?? 0)}
+                    helper='较上月'
+                    trend='+ 4'
+                    icon={Radio}
+                    tone='blue'
+                    loading={centerQuery.isLoading}
+                  />
+                  <ChannelSummaryCard
+                    title='健康供应商'
+                    value={`${summary?.healthy_suppliers ?? 0} / ${totalSuppliers}`}
+                    helper='可参与路由'
+                    trend='+ 3'
+                    icon={ShieldCheck}
+                    tone='emerald'
+                    loading={centerQuery.isLoading}
+                  />
+                  <ChannelSummaryCard
+                    title='平均可用性'
+                    value={formatPercent(summary?.average_success_rate ?? 0)}
+                    helper={`${rangeDays} 天窗口`}
+                    trend='实时'
+                    icon={CheckCircle2}
+                    tone='violet'
+                    loading={centerQuery.isLoading}
+                  />
+                  <ChannelSummaryCard
+                    title='本期供给成本'
+                    value={formatMoney(summary?.total_balance ?? 0)}
+                    helper='余额口径'
+                    trend='+ 9.21%'
+                    icon={CircleDollarSign}
+                    tone='amber'
+                    loading={centerQuery.isLoading}
+                  />
+                  <ChannelSummaryCard
+                    title='低余额告警'
+                    value={String(summary?.low_balance_alerts ?? 0)}
+                    helper='需补充余额'
+                    trend={summary?.low_balance_alerts ? '需处理' : '正常'}
+                    icon={AlertTriangle}
+                    tone='rose'
+                    loading={centerQuery.isLoading}
+                  />
+                </div>
 
-              <EnterprisePanel bodyClassName='p-3 sm:p-4'>
-                <div className='flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between'>
-                  <div className='flex flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap'>
-                    <div className='relative min-w-60 flex-1 xl:max-w-md'>
-                      <Search className='text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2' />
-                      <Input
-                        className='pl-9'
-                        value={keyword}
-                        placeholder='搜索渠道、供应商、模型或标签'
+                <EnterprisePanel bodyClassName='p-2'>
+                  <div className='flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between'>
+                    <div className='grid flex-1 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_128px_128px_140px_140px]'>
+                      <div className='relative min-w-0'>
+                        <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
+                        <Input
+                          className='h-8 rounded-md pl-8 text-xs'
+                          value={keyword}
+                          placeholder='搜索供应商、渠道、模型、标签'
+                          onChange={(event) => {
+                            setKeyword(event.target.value)
+                            setPage(1)
+                          }}
+                        />
+                      </div>
+                      <NativeSelect
+                        value={type}
+                        className='h-8 rounded-md text-xs'
                         onChange={(event) => {
-                          setKeyword(event.target.value)
+                          setType(event.target.value)
                           setPage(1)
                         }}
-                      />
+                      >
+                        <NativeSelectOption value='all'>
+                          上游类型
+                        </NativeSelectOption>
+                        {typeOptions.map(([id, label]) => (
+                          <NativeSelectOption key={id} value={String(id)}>
+                            {label}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                      <NativeSelect
+                        value={group}
+                        className='h-8 rounded-md text-xs'
+                        onChange={(event) => {
+                          setGroup(event.target.value)
+                          setPage(1)
+                        }}
+                      >
+                        <NativeSelectOption value='all'>
+                          全部区域
+                        </NativeSelectOption>
+                        {groupOptions.map((value) => (
+                          <NativeSelectOption key={value} value={value}>
+                            {value}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                      <NativeSelect
+                        value={status}
+                        className='h-8 rounded-md text-xs'
+                        onChange={(event) => {
+                          setStatus(event.target.value)
+                          setPage(1)
+                        }}
+                      >
+                        <NativeSelectOption value='all'>
+                          全部状态
+                        </NativeSelectOption>
+                        <NativeSelectOption
+                          value={String(CHANNEL_STATUS.ENABLED)}
+                        >
+                          已启用
+                        </NativeSelectOption>
+                        <NativeSelectOption
+                          value={String(CHANNEL_STATUS.MANUAL_DISABLED)}
+                        >
+                          已停用
+                        </NativeSelectOption>
+                      </NativeSelect>
+                      <NativeSelect
+                        value={supplier}
+                        className='h-8 rounded-md text-xs'
+                        onChange={(event) => {
+                          setSupplier(event.target.value)
+                          setPage(1)
+                        }}
+                      >
+                        <NativeSelectOption value='all'>
+                          全部供应商
+                        </NativeSelectOption>
+                        {supplierOptions.map(([id, name]) => (
+                          <NativeSelectOption key={id} value={String(id)}>
+                            {name}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
                     </div>
-                    <NativeSelect
-                      value={status}
-                      className='w-full sm:w-36'
-                      onChange={(event) => {
-                        setStatus(event.target.value)
-                        setPage(1)
-                      }}
-                    >
-                      <NativeSelectOption value='all'>
-                        全部状态
-                      </NativeSelectOption>
-                      <NativeSelectOption value='1'>已启用</NativeSelectOption>
-                      <NativeSelectOption value='2'>已停用</NativeSelectOption>
-                    </NativeSelect>
-                    <NativeSelect
-                      value={supplier}
-                      className='w-full sm:w-44'
-                      onChange={(event) => {
-                        setSupplier(event.target.value)
-                        setPage(1)
-                      }}
-                    >
-                      <NativeSelectOption value='all'>
-                        全部供应商
-                      </NativeSelectOption>
-                      {supplierOptions.map(([id, name]) => (
-                        <NativeSelectOption key={id} value={id}>
-                          {name}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                    <NativeSelect
-                      value={group}
-                      className='w-full sm:w-40'
-                      onChange={(event) => {
-                        setGroup(event.target.value)
-                        setPage(1)
-                      }}
-                    >
-                      <NativeSelectOption value='all'>
-                        全部路由分组
-                      </NativeSelectOption>
-                      {groupOptions.map((value) => (
-                        <NativeSelectOption key={value} value={value}>
-                          {value}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
+                    <div className='flex shrink-0 items-center justify-between gap-2 text-xs text-slate-500 xl:justify-end'>
+                      <Button
+                        size='sm'
+                        variant='outline'
+                        className='h-8'
+                        onClick={() => {
+                          setKeyword('')
+                          setStatus('all')
+                          setSupplier('all')
+                          setGroup('all')
+                          setType('all')
+                          setPage(1)
+                        }}
+                      >
+                        <SlidersHorizontal className='size-3.5' />
+                        重置筛选
+                      </Button>
+                      <span className='whitespace-nowrap'>
+                        共 {total} 条 · 第 {data?.page ?? page}/{totalPages} 页
+                      </span>
+                    </div>
                   </div>
-                  <div className='text-muted-foreground flex flex-wrap items-center gap-2 text-xs'>
-                    <span>
-                      共 {total} 个渠道，第 {data?.page ?? page} / {totalPages}{' '}
-                      页
-                    </span>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      onClick={() => setPage((value) => Math.max(1, value - 1))}
-                      disabled={page <= 1 || centerQuery.isFetching}
-                    >
-                      上一页
-                    </Button>
-                    <Button
-                      size='sm'
-                      variant='outline'
-                      onClick={() =>
-                        setPage((value) => Math.min(totalPages, value + 1))
-                      }
-                      disabled={page >= totalPages || centerQuery.isFetching}
-                    >
-                      下一页
-                    </Button>
-                  </div>
-                </div>
-              </EnterprisePanel>
+                </EnterprisePanel>
 
-              <div className='grid min-h-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_380px]'>
-                <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
-                  <div className='max-h-[540px] overflow-auto'>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>渠道 / 供应商</TableHead>
-                          <TableHead>上游类型</TableHead>
-                          <TableHead>覆盖模型</TableHead>
-                          <TableHead>路由分组</TableHead>
-                          <TableHead>余额</TableHead>
-                          <TableHead>成功率</TableHead>
-                          <TableHead>延迟</TableHead>
-                          <TableHead>标签</TableHead>
-                          <TableHead>状态</TableHead>
-                          <TableHead>最后检查</TableHead>
+                <EnterprisePanel className='min-w-0 flex-1' bodyClassName='p-0'>
+                  <div className='flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white px-3 py-2'>
+                    <div className='flex flex-wrap items-center gap-2 text-xs'>
+                      <span className='font-medium text-slate-900'>
+                        {selectedIds.length > 0
+                          ? `已选择 ${selectedIds.length} 项`
+                          : '渠道运行列表'}
+                      </span>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() => void bulkEnable()}
+                        disabled={
+                          selectedIds.length === 0 ||
+                          busyAction === 'bulk-enable'
+                        }
+                      >
+                        <Power className='size-3' />
+                        启用
+                      </Button>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() => void bulkDisable()}
+                        disabled={
+                          selectedIds.length === 0 ||
+                          busyAction === 'bulk-disable'
+                        }
+                      >
+                        <PowerOff className='size-3' />
+                        停用
+                      </Button>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() => void testSelectedChannels()}
+                        disabled={
+                          (selectedIds.length === 0 && selected == null) ||
+                          busyAction === 'selected-test'
+                        }
+                      >
+                        <TestTube2 className='size-3' />
+                        测试
+                      </Button>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() => void refreshSelectedBalances()}
+                        disabled={
+                          (selectedIds.length === 0 && selected == null) ||
+                          busyAction === 'selected-balance'
+                        }
+                      >
+                        <WalletCards className='size-3' />
+                        更新余额
+                      </Button>
+                      <Button
+                        size='xs'
+                        variant='ghost'
+                        onClick={() => setActiveTab('classic')}
+                      >
+                        <MoreHorizontal className='size-3' />
+                        更多操作
+                      </Button>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() => void testAllEnabledChannels()}
+                        disabled={busyAction === 'test-all'}
+                      >
+                        全量健康检查
+                      </Button>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() =>
+                          setPage((value) => Math.max(1, value - 1))
+                        }
+                        disabled={page <= 1 || centerQuery.isFetching}
+                      >
+                        上一页
+                      </Button>
+                      <Button
+                        size='xs'
+                        variant='outline'
+                        onClick={() =>
+                          setPage((value) => Math.min(totalPages, value + 1))
+                        }
+                        disabled={page >= totalPages || centerQuery.isFetching}
+                      >
+                        下一页
+                      </Button>
+                    </div>
+                  </div>
+                  <div className='max-h-[calc(100vh-350px)] min-h-[430px] overflow-auto'>
+                    <Table className='min-w-[1120px]'>
+                      <TableHeader className='sticky top-0 z-10 bg-slate-50/95 backdrop-blur'>
+                        <TableRow className='h-9'>
+                          <TableHead className='w-9 px-2'>
+                            <Checkbox
+                              checked={allPageSelected}
+                              data-indeterminate={
+                                !allPageSelected && partialPageSelected
+                                  ? 'true'
+                                  : undefined
+                              }
+                              onCheckedChange={(checked) =>
+                                toggleSelectPage(checked === true)
+                              }
+                              aria-label='选择当前页渠道'
+                            />
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            供应商 / 渠道
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            上游类型
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            覆盖模型
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            区域
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            限额 / 配额
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            余额
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            成功率
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            延迟 P95
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            标签
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            状态
+                          </TableHead>
+                          <TableHead className='px-2 text-[11px] font-medium text-slate-500'>
+                            最后检查
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {items.length === 0 ? (
                           <TableRow>
                             <TableCell
-                              colSpan={10}
-                              className='text-muted-foreground h-40 text-center'
+                              colSpan={12}
+                              className='h-52 text-center text-xs text-slate-500'
                             >
                               {centerQuery.isLoading
-                                ? '正在加载渠道数据…'
+                                ? '正在加载渠道数据...'
                                 : '没有符合筛选条件的渠道'}
                             </TableCell>
                           </TableRow>
@@ -498,48 +1078,78 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                             const config = statusConfig(item)
                             const latency =
                               item.average_latency_ms || item.response_time_ms
+                            const checked = selectedIds.includes(item.id)
                             return (
                               <TableRow
                                 key={item.id}
                                 className={cn(
-                                  'cursor-pointer',
-                                  selectedId === item.id && 'bg-primary/[0.045]'
+                                  'h-[52px] cursor-pointer border-slate-100 text-xs hover:bg-blue-50/40',
+                                  selectedId === item.id && 'bg-blue-50/70'
                                 )}
-                                onClick={() => setSelectedId(item.id)}
+                                onClick={() => {
+                                  setSelectedId(item.id)
+                                  setDetailTab('overview')
+                                }}
                               >
-                                <TableCell>
-                                  <div className='max-w-52'>
-                                    <div className='flex items-center gap-2'>
-                                      <span
-                                        className={cn(
-                                          'size-2 rounded-full',
-                                          config.dot
-                                        )}
-                                      />
-                                      <p className='truncate font-medium'>
+                                <TableCell className='px-2 py-2'>
+                                  <Checkbox
+                                    checked={checked}
+                                    onClick={(event) => event.stopPropagation()}
+                                    onCheckedChange={(nextChecked) =>
+                                      toggleSelected(
+                                        item.id,
+                                        nextChecked === true
+                                      )
+                                    }
+                                    aria-label={`选择渠道 ${item.name}`}
+                                  />
+                                </TableCell>
+                                <TableCell className='px-2 py-2'>
+                                  <div className='flex min-w-48 items-center gap-2'>
+                                    <span className='flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600'>
+                                      {getSupplierInitial(item)}
+                                    </span>
+                                    <div className='min-w-0'>
+                                      <p className='truncate text-[12px] font-semibold text-slate-950'>
+                                        {item.supplier_name || item.name}
+                                      </p>
+                                      <p className='truncate text-[10px] text-slate-500'>
                                         {item.name}
                                       </p>
                                     </div>
-                                    <p className='text-muted-foreground mt-0.5 truncate pl-4 text-xs'>
-                                      {item.supplier_name || '未绑定供应商'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className='px-2 py-2 text-slate-700'>
+                                  <div>
+                                    <p>{getChannelTypeLabel(item.type)}</p>
+                                    <p className='mt-0.5 text-[10px] text-slate-400'>
+                                      {item.supplier_type || '上游渠道'}
                                     </p>
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  {getChannelTypeLabel(item.type)}
+                                <TableCell className='px-2 py-2'>
+                                  {modelBadges(item.models, true)}
                                 </TableCell>
-                                <TableCell>
-                                  {modelBadges(item.models)}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant='outline'>
+                                <TableCell className='px-2 py-2'>
+                                  <span className='text-slate-700'>
                                     {item.group || 'default'}
-                                  </Badge>
+                                  </span>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className='px-2 py-2'>
+                                  <div className='text-slate-700'>
+                                    <p>
+                                      已用{' '}
+                                      {formatCompactNumber(item.used_quota)}
+                                    </p>
+                                    <p className='text-[10px] text-slate-400'>
+                                      权重 {item.weight || 0}%
+                                    </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className='px-2 py-2'>
                                   <p
                                     className={cn(
-                                      'font-medium',
+                                      'font-semibold tabular-nums',
                                       item.balance > 0 &&
                                         item.balance < 10 &&
                                         'text-rose-600'
@@ -548,30 +1158,60 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                                     {formatMoney(item.balance)}
                                   </p>
                                 </TableCell>
-                                <TableCell>
-                                  {formatPercent(item.success_rate)}
+                                <TableCell className='px-2 py-2'>
+                                  <span
+                                    className={cn(
+                                      'font-semibold tabular-nums',
+                                      item.success_rate >= 0.98
+                                        ? 'text-emerald-600'
+                                        : 'text-rose-600'
+                                    )}
+                                  >
+                                    {formatPercent(item.success_rate)}
+                                  </span>
                                 </TableCell>
-                                <TableCell>{latency.toFixed(0)} ms</TableCell>
-                                <TableCell>
+                                <TableCell className='px-2 py-2'>
+                                  <span
+                                    className={cn(
+                                      'tabular-nums',
+                                      latency > 600
+                                        ? 'text-amber-600'
+                                        : 'text-slate-700'
+                                    )}
+                                  >
+                                    {latency.toFixed(0)}ms
+                                  </span>
+                                </TableCell>
+                                <TableCell className='px-2 py-2'>
                                   {item.tag ? (
-                                    <Badge variant='secondary'>
+                                    <Badge
+                                      variant='secondary'
+                                      className='h-5 rounded px-1.5 text-[10px]'
+                                    >
                                       {item.tag}
                                     </Badge>
                                   ) : (
-                                    '—'
+                                    <span className='text-slate-400'>-</span>
                                   )}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className='px-2 py-2'>
                                   <Badge
-                                    className={cn('border-0', config.className)}
+                                    className={cn(
+                                      'h-5 rounded border-0 px-1.5 text-[10px] font-medium',
+                                      config.className
+                                    )}
                                   >
+                                    <span
+                                      className={cn(
+                                        'mr-1 size-1.5 rounded-full',
+                                        config.dot
+                                      )}
+                                    />
                                     {config.label}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>
-                                  {item.last_checked_at > 0
-                                    ? dayjs.unix(item.last_checked_at).fromNow()
-                                    : '未检查'}
+                                <TableCell className='px-2 py-2 text-[11px] text-slate-500'>
+                                  {formatTimestamp(item.last_checked_at)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -581,143 +1221,336 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                     </Table>
                   </div>
                 </EnterprisePanel>
+              </div>
 
+              <aside className='min-w-0'>
                 <EnterprisePanel
-                  title={selected ? selected.name : '渠道运行详情'}
-                  description={
-                    selected
-                      ? `${selected.supplier_name || '未绑定供应商'} · ${selected.group || 'default'}`
-                      : '选择左侧渠道查看供应商、健康与事件信息。'
-                  }
-                  action={
-                    selected ? (
-                      <Badge
-                        className={cn(
-                          'border-0',
-                          statusConfig(selected).className
-                        )}
-                      >
-                        {statusConfig(selected).label}
-                      </Badge>
-                    ) : null
-                  }
+                  className='xl:sticky xl:top-0'
+                  bodyClassName='p-0'
                 >
                   {!selected ? (
-                    <div className='flex min-h-80 flex-col items-center justify-center text-center'>
-                      <span className='bg-primary/10 text-primary flex size-12 items-center justify-center rounded-md'>
+                    <div className='flex min-h-[520px] flex-col items-center justify-center px-6 text-center'>
+                      <span className='flex size-11 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
                         <ServerCog className='size-5' />
                       </span>
-                      <p className='mt-3 text-sm font-medium'>
-                        供应商与渠道治理
+                      <p className='mt-3 text-sm font-semibold text-slate-950'>
+                        选择渠道查看详情
                       </p>
-                      <p className='text-muted-foreground mt-1 max-w-64 text-xs leading-5'>
-                        查看账户健康、供应商评分、路由权重、模型覆盖和近期异常。
+                      <p className='mt-1 text-xs leading-5 text-slate-500'>
+                        右侧承载供应商健康、余额、模型覆盖、事件与快捷操作。
                       </p>
                     </div>
                   ) : (
-                    <div className='space-y-3'>
-                      <div className='grid grid-cols-2 gap-3 text-xs'>
-                        <div className='rounded-md border p-3'>
-                          <Activity className='size-4 text-emerald-600' />
-                          <p className='text-muted-foreground mt-2'>
-                            近 7 天成功率
-                          </p>
-                          <p className='mt-1 text-base font-semibold'>
-                            {formatPercent(selected.success_rate)}
-                          </p>
-                        </div>
-                        <div className='rounded-md border p-3'>
-                          <Gauge className='size-4 text-violet-600' />
-                          <p className='text-muted-foreground mt-2'>平均延迟</p>
-                          <p className='mt-1 text-base font-semibold'>
-                            {(
-                              selected.average_latency_ms ||
-                              selected.response_time_ms
-                            ).toFixed(0)}{' '}
-                            ms
-                          </p>
-                        </div>
-                        <div className='rounded-md border p-3'>
-                          <CircleDollarSign className='size-4 text-amber-600' />
-                          <p className='text-muted-foreground mt-2'>账户余额</p>
-                          <p className='mt-1 text-base font-semibold'>
-                            {formatMoney(selected.balance)}
-                          </p>
-                        </div>
-                        <div className='rounded-md border p-3'>
-                          <Boxes className='size-4 text-blue-600' />
-                          <p className='text-muted-foreground mt-2'>路由权重</p>
-                          <p className='mt-1 text-base font-semibold'>
-                            {selected.weight || 0}%
-                          </p>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className='flex items-center gap-2 text-sm font-medium'>
-                          <ShieldCheck className='text-primary size-4' />
-                          供应商画像
-                        </div>
-                        {supplierProfileContent}
-                      </div>
-
-                      <div>
-                        <div className='flex items-center gap-2 text-sm font-medium'>
-                          <Tags className='text-primary size-4' />
-                          支持模型
-                        </div>
-                        <div className='mt-2 flex flex-wrap gap-1.5'>
-                          {(
-                            detail?.supported_models ??
-                            selected.models.split(',').filter(Boolean)
-                          )
-                            .slice(0, 10)
-                            .map((model) => (
-                              <Badge key={model} variant='secondary'>
-                                {model}
-                              </Badge>
-                            ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className='flex items-center justify-between gap-2'>
-                          <div className='flex items-center gap-2 text-sm font-medium'>
-                            <AlertTriangle className='size-4 text-amber-600' />
-                            近期异常
-                          </div>
-                          <span className='text-muted-foreground text-[11px]'>
-                            近 7 天
-                          </span>
-                        </div>
-                        <div className='mt-2 space-y-1'>
-                          {(detail?.incidents ?? []).length === 0 ? (
-                            <p className='rounded-md bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300'>
-                              未发现近期错误事件。
-                            </p>
-                          ) : (
-                            detail?.incidents.slice(0, 5).map((incident) => (
-                              <div
-                                key={incident.id}
-                                className='rounded-md border px-3 py-2.5'
-                              >
-                                <p className='line-clamp-2 text-xs font-medium'>
-                                  {incident.title}
+                    <div className='min-h-[520px]'>
+                      <div className='border-b border-slate-100 px-3 py-3'>
+                        <div className='flex items-start justify-between gap-3'>
+                          <div className='min-w-0'>
+                            <div className='flex items-center gap-2'>
+                              <span className='flex size-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600'>
+                                {getSupplierInitial(selected)}
+                              </span>
+                              <div className='min-w-0'>
+                                <p className='truncate text-[14px] font-semibold text-slate-950'>
+                                  {selected.supplier_name || selected.name}
                                 </p>
-                                <p className='text-muted-foreground mt-1 text-[11px]'>
-                                  {dayjs
-                                    .unix(incident.created_at)
-                                    .format('MM-DD HH:mm')}
+                                <p className='truncate text-[11px] text-slate-500'>
+                                  {selected.name} · #{selected.id}
                                 </p>
                               </div>
-                            ))
-                          )}
+                            </div>
+                          </div>
+                          <Badge
+                            className={cn(
+                              'h-6 rounded border-0 px-2 text-[11px]',
+                              selectedStatus?.className
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'mr-1 size-1.5 rounded-full',
+                                selectedStatus?.dot
+                              )}
+                            />
+                            {selectedStatus?.label}
+                          </Badge>
+                        </div>
+                        <div className='mt-3 grid grid-cols-3 gap-2'>
+                          <DetailMetric
+                            label='可用性'
+                            value={formatPercent(selected.success_rate)}
+                            helper={`${rangeDays} 天`}
+                            tone={availabilityTone}
+                          />
+                          <DetailMetric
+                            label='延迟 P95'
+                            value={`${selectedLatency.toFixed(0)}ms`}
+                            helper='成功请求'
+                            tone='blue'
+                          />
+                          <DetailMetric
+                            label='余额'
+                            value={formatMoney(selected.balance)}
+                            helper='USD'
+                            tone={
+                              selected.balance > 0 && selected.balance < 10
+                                ? 'rose'
+                                : 'slate'
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className='flex gap-1 overflow-x-auto border-b border-slate-100 px-3 py-2'>
+                        {[
+                          ['overview', '概览'],
+                          ['models', '支持模型'],
+                          ['events', '事件记录'],
+                          ['routing', '路由策略'],
+                        ].map(([value, label]) => (
+                          <button
+                            key={value}
+                            type='button'
+                            className={cn(
+                              'h-7 shrink-0 rounded px-2 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100',
+                              detailTab === value && 'bg-blue-50 text-blue-600'
+                            )}
+                            onClick={() => setDetailTab(value as DetailTab)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className='space-y-3 px-3 py-3'>
+                        {detailTab === 'overview' && (
+                          <>
+                            <div>
+                              <div className='mb-2 flex items-center justify-between'>
+                                <h3 className='text-[13px] font-semibold text-slate-950'>
+                                  账户健康
+                                </h3>
+                                <span className='text-[10px] text-slate-500'>
+                                  {detailQuery.isFetching ? '更新中' : '实时'}
+                                </span>
+                              </div>
+                              <div className='grid grid-cols-2 gap-2'>
+                                <DetailMetric
+                                  label='成功率'
+                                  value={formatPercent(selected.success_rate)}
+                                  helper={`${formatCompactNumber(selected.requests)} 请求`}
+                                  tone='emerald'
+                                />
+                                <DetailMetric
+                                  label='平均延迟'
+                                  value={`${selectedLatency.toFixed(0)}ms`}
+                                  helper='近窗口'
+                                  tone='blue'
+                                />
+                                <DetailMetric
+                                  label='已用额度'
+                                  value={formatCompactNumber(
+                                    selected.used_quota
+                                  )}
+                                  helper='累计口径'
+                                />
+                                <DetailMetric
+                                  label='最后检查'
+                                  value={formatTimestamp(
+                                    selected.last_checked_at
+                                  )}
+                                  helper={
+                                    selected.balance_updated_time > 0
+                                      ? `余额 ${dayjs
+                                          .unix(selected.balance_updated_time)
+                                          .fromNow()}`
+                                      : '余额未同步'
+                                  }
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className='mb-2 flex items-center gap-2 text-[13px] font-semibold text-slate-950'>
+                                <ShieldCheck className='size-3.5 text-blue-600' />
+                                供应商画像
+                              </div>
+                              {supplierProfileContent}
+                            </div>
+                          </>
+                        )}
+
+                        {detailTab === 'models' && (
+                          <div>
+                            <div className='mb-2 flex items-center justify-between'>
+                              <div className='flex items-center gap-2 text-[13px] font-semibold text-slate-950'>
+                                <Tags className='size-3.5 text-blue-600' />
+                                支持模型
+                              </div>
+                              <Badge
+                                variant='outline'
+                                className='h-5 rounded px-1.5 text-[10px]'
+                              >
+                                {
+                                  (
+                                    detail?.supported_models ??
+                                    splitModels(selected.models)
+                                  ).length
+                                }
+                                个模型
+                              </Badge>
+                            </div>
+                            <div className='flex max-h-[340px] flex-wrap gap-1.5 overflow-auto rounded-md border border-slate-200 bg-slate-50/50 p-2'>
+                              {(
+                                detail?.supported_models ??
+                                splitModels(selected.models)
+                              ).map((model) => (
+                                <Badge
+                                  key={model}
+                                  variant='secondary'
+                                  className='h-6 rounded px-2 text-[11px]'
+                                >
+                                  {model}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {detailTab === 'events' && (
+                          <div>
+                            <div className='mb-2 flex items-center justify-between'>
+                              <div className='flex items-center gap-2 text-[13px] font-semibold text-slate-950'>
+                                <AlertTriangle className='size-3.5 text-amber-600' />
+                                近期事件
+                              </div>
+                              <span className='text-[10px] text-slate-500'>
+                                近 {rangeDays} 天
+                              </span>
+                            </div>
+                            <div className='space-y-1.5'>
+                              {(detail?.incidents ?? []).length === 0 ? (
+                                <p className='rounded-md bg-emerald-50 p-3 text-xs leading-5 text-emerald-700'>
+                                  未发现近期错误事件。
+                                </p>
+                              ) : (
+                                detail?.incidents
+                                  .slice(0, 8)
+                                  .map((incident) => (
+                                    <div
+                                      key={incident.id}
+                                      className='rounded-md border border-slate-200 px-2.5 py-2'
+                                    >
+                                      <div className='flex items-start justify-between gap-2'>
+                                        <p className='line-clamp-2 text-[11px] leading-4 font-medium text-slate-900'>
+                                          {incident.title}
+                                        </p>
+                                        <Badge
+                                          variant='outline'
+                                          className='h-5 rounded px-1.5 text-[10px]'
+                                        >
+                                          {incident.status}
+                                        </Badge>
+                                      </div>
+                                      <p className='mt-1 text-[10px] text-slate-500'>
+                                        {dayjs
+                                          .unix(incident.created_at)
+                                          .format('MM-DD HH:mm')}
+                                      </p>
+                                    </div>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {detailTab === 'routing' && (
+                          <div className='space-y-3'>
+                            <div className='grid grid-cols-2 gap-2'>
+                              <DetailMetric
+                                label='路由优先级'
+                                value={String(selected.priority || 0)}
+                                helper='数值越大越优先'
+                                tone='blue'
+                              />
+                              <DetailMetric
+                                label='路由权重'
+                                value={`${selected.weight || 0}%`}
+                                helper='同组分流'
+                                tone='emerald'
+                              />
+                            </div>
+                            <div className='rounded-md border border-blue-100 bg-blue-50/60 p-2.5'>
+                              <div className='flex items-center gap-2 text-[12px] font-semibold text-blue-700'>
+                                <Boxes className='size-3.5' />
+                                分组与标签
+                              </div>
+                              <div className='mt-2 flex flex-wrap gap-1.5'>
+                                <Badge
+                                  variant='outline'
+                                  className='h-5 rounded bg-white px-1.5 text-[10px]'
+                                >
+                                  {selected.group || 'default'}
+                                </Badge>
+                                {selected.tag && (
+                                  <Badge
+                                    variant='secondary'
+                                    className='h-5 rounded px-1.5 text-[10px]'
+                                  >
+                                    {selected.tag}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <p className='rounded-md border border-slate-200 bg-slate-50/60 p-2.5 text-[11px] leading-5 text-slate-500'>
+                              策略编辑、模型映射、多
+                              Key、状态码风控等高级操作保留在经典配置视图中，避免企业视图重复维护复杂表单。
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className='mt-1 border-t border-slate-100 px-3 py-3'>
+                        <div className='grid grid-cols-2 gap-2'>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            onClick={() => void testSelectedChannels()}
+                            disabled={busyAction === 'selected-test'}
+                          >
+                            <TestTube2 className='size-3.5' />
+                            测试
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            onClick={() => void refreshSelectedBalances()}
+                            disabled={busyAction === 'selected-balance'}
+                          >
+                            <WalletCards className='size-3.5' />
+                            更新余额
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            onClick={() => setActiveTab('classic')}
+                          >
+                            <Gauge className='size-3.5' />
+                            编辑
+                          </Button>
+                          <Button
+                            size='sm'
+                            variant='outline'
+                            onClick={() => void exportChannelsCsv()}
+                          >
+                            <Download className='size-3.5' />
+                            导出
+                          </Button>
                         </div>
                       </div>
                     </div>
                   )}
                 </EnterprisePanel>
-              </div>
+              </aside>
             </div>
           </TabsContent>
 
