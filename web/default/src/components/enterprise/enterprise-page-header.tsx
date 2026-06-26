@@ -30,19 +30,19 @@ export function EnterprisePageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className='bg-card relative overflow-hidden rounded-2xl border px-5 py-5 shadow-[0_1px_2px_rgb(15_23_42/0.03),0_12px_36px_rgb(15_23_42/0.04)] sm:px-6 sm:py-6'>
-      <div className='absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--primary),color-mix(in_oklch,var(--primary)_40%,transparent),transparent)]' />
-      <div className='relative flex flex-col justify-between gap-4 sm:flex-row sm:items-end'>
+    <div className='enterprise-page-header bg-card relative overflow-hidden rounded-md border px-4 py-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:px-5'>
+      <div className='bg-primary absolute inset-y-0 left-0 w-1' />
+      <div className='relative flex flex-col justify-between gap-3 sm:flex-row sm:items-center'>
         <div className='min-w-0'>
           {eyebrow != null && (
-            <p className='text-primary mb-2 text-[11px] font-semibold tracking-[0.18em] uppercase'>
+            <p className='text-primary mb-1 text-[11px] font-semibold uppercase'>
               {eyebrow}
             </p>
           )}
-          <h1 className='text-foreground text-2xl font-semibold tracking-[-0.035em] sm:text-[28px]'>
+          <h1 className='text-foreground text-[20px] leading-7 font-semibold sm:text-[22px]'>
             {title}
           </h1>
-          <p className='text-muted-foreground mt-1.5 max-w-2xl text-sm leading-6'>
+          <p className='text-muted-foreground mt-1 max-w-3xl text-xs leading-5 sm:text-[13px]'>
             {description}
           </p>
         </div>

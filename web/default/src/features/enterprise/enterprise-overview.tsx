@@ -127,32 +127,32 @@ const metricToneClassName: Record<
 > = {
   blue: {
     icon: 'bg-blue-50 text-blue-700 ring-blue-100',
-    accent: 'from-blue-500 to-sky-400',
+    accent: 'bg-blue-500',
     trend: 'text-blue-700',
   },
   emerald: {
     icon: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
-    accent: 'from-emerald-500 to-teal-400',
+    accent: 'bg-emerald-500',
     trend: 'text-emerald-700',
   },
   amber: {
     icon: 'bg-amber-50 text-amber-700 ring-amber-100',
-    accent: 'from-amber-500 to-orange-400',
+    accent: 'bg-amber-500',
     trend: 'text-amber-700',
   },
   violet: {
     icon: 'bg-violet-50 text-violet-700 ring-violet-100',
-    accent: 'from-violet-500 to-indigo-400',
+    accent: 'bg-violet-500',
     trend: 'text-violet-700',
   },
   rose: {
     icon: 'bg-rose-50 text-rose-700 ring-rose-100',
-    accent: 'from-rose-500 to-red-400',
+    accent: 'bg-rose-500',
     trend: 'text-rose-700',
   },
   slate: {
     icon: 'bg-slate-100 text-slate-700 ring-slate-200',
-    accent: 'from-slate-500 to-slate-400',
+    accent: 'bg-slate-500',
     trend: 'text-slate-600',
   },
 }
@@ -414,7 +414,7 @@ function OverviewPanel({
   return (
     <section
       className={cn(
-        'overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04),0_16px_38px_rgb(15_23_42/0.05)]',
+        'overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]',
         className
       )}
     >
@@ -456,10 +456,10 @@ function MetricCard({
   const toneClass = metricToneClassName[tone]
 
   return (
-    <article className='group relative min-h-[132px] overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04),0_10px_24px_rgb(15_23_42/0.045)] transition-colors hover:border-blue-200'>
+    <article className='group relative min-h-[108px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200'>
       <div
         className={cn(
-          'absolute inset-x-0 top-0 h-0.5 bg-linear-to-r opacity-90',
+          'absolute inset-x-0 top-0 h-0.5 opacity-90',
           toneClass.accent
         )}
       />
@@ -469,14 +469,14 @@ function MetricCard({
           {loading ? (
             <div className='mt-3 h-8 w-24 animate-pulse rounded-md bg-slate-100' />
           ) : (
-            <p className='mt-2 truncate text-[28px] leading-none font-semibold tracking-tight text-slate-950 tabular-nums'>
+            <p className='mt-1.5 truncate text-[22px] leading-7 font-semibold text-slate-950 tabular-nums'>
               {value}
             </p>
           )}
         </div>
         <span
           className={cn(
-            'flex size-10 shrink-0 items-center justify-center rounded-lg ring-1',
+            'flex size-10 shrink-0 items-center justify-center rounded-md ring-1',
             toneClass.icon
           )}
         >
@@ -510,7 +510,7 @@ function EmptyChartState({
 }) {
   return (
     <div className='flex h-full min-h-56 flex-col items-center justify-center text-center'>
-      <span className='mb-3 flex size-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400'>
+      <span className='mb-3 flex size-11 items-center justify-center rounded-md bg-slate-100 text-slate-400'>
         <Icon className='size-5' />
       </span>
       <p className='text-sm font-semibold text-slate-800'>{title}</p>
@@ -535,7 +535,7 @@ function StatusRow({
   dotClassName: string
 }) {
   return (
-    <div className='flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2.5'>
+    <div className='flex items-start gap-3 rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2.5'>
       <span
         className={cn('mt-1.5 size-2 shrink-0 rounded-full', dotClassName)}
       />
@@ -571,9 +571,9 @@ function MiniAction({
   return (
     <Link
       to={to}
-      className='group flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-center shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200 hover:bg-blue-50/50 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
+      className='group flex min-h-20 flex-col items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-2 text-center shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200 hover:bg-blue-50/50 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
     >
-      <span className='flex size-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700 transition-colors group-hover:bg-blue-600 group-hover:text-white'>
+      <span className='flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700 transition-colors group-hover:bg-blue-600 group-hover:text-white'>
         <Icon className='size-4.5' />
       </span>
       <span className='text-xs font-medium text-slate-700'>{label}</span>
@@ -635,7 +635,7 @@ export function EnterpriseOverview() {
     <div className='enterprise-overview mx-auto max-w-[1586px] space-y-3 bg-[#f6f8fb] pb-4 text-slate-950 sm:space-y-4'>
       <header className='flex flex-col gap-3 px-1 pt-1 sm:flex-row sm:items-center sm:justify-between'>
         <div className='min-w-0'>
-          <h1 className='text-2xl leading-tight font-semibold tracking-tight text-slate-950 sm:text-[30px]'>
+          <h1 className='text-[22px] leading-7 font-semibold text-slate-950 sm:text-2xl'>
             企业总览
           </h1>
           <p className='mt-1 text-sm text-slate-500'>
@@ -645,7 +645,7 @@ export function EnterpriseOverview() {
         <div className='flex shrink-0 items-center gap-2'>
           <Button
             variant='outline'
-            className='h-9 rounded-lg border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+            className='h-9 rounded-md border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
           >
             <SlidersHorizontal className='size-3.5' />
             自定义视图
@@ -653,7 +653,7 @@ export function EnterpriseOverview() {
           <Button
             variant='outline'
             size='icon'
-            className='size-9 rounded-lg border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            className='size-9 rounded-md border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
             aria-label='更多操作'
           >
             <MoreHorizontal className='size-4' />
@@ -662,7 +662,7 @@ export function EnterpriseOverview() {
       </header>
 
       {overviewQuery.isError && (
-        <div className='flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 shadow-sm'>
+        <div className='flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 shadow-sm'>
           <AlertTriangle className='size-4 shrink-0' />
           企业聚合接口暂时不可用，请确认后端已更新并完成数据库迁移。其余管理页面不受影响。
         </div>
@@ -945,10 +945,10 @@ export function EnterpriseOverview() {
               return (
                 <div
                   key={item.label}
-                  className='flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2.5'
+                  className='flex items-center justify-between gap-3 rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2.5'
                 >
                   <div className='flex min-w-0 items-center gap-2.5'>
-                    <span className='flex size-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700'>
+                    <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
                       <Icon className='size-4' />
                     </span>
                     <span className='truncate text-sm font-medium text-slate-800'>
@@ -988,7 +988,7 @@ export function EnterpriseOverview() {
               <div
                 key={item.label}
                 className={cn(
-                  'rounded-lg px-2 py-3 text-center ring-1 ring-inset ring-black/5',
+                  'rounded-md px-2 py-3 text-center ring-1 ring-inset ring-black/5',
                   item.className
                 )}
               >
@@ -1322,17 +1322,17 @@ export function EnterpriseOverview() {
             return (
               <div
                 key={item.label}
-                className='rounded-lg border border-slate-100 bg-slate-50/70 p-3'
+                className='rounded-md border border-slate-100 bg-slate-50/70 p-3'
               >
                 <span
                   className={cn(
-                    'flex size-8 items-center justify-center rounded-lg',
+                    'flex size-8 items-center justify-center rounded-md',
                     item.className
                   )}
                 >
                   <Icon className='size-4' />
                 </span>
-                <p className='mt-3 text-xl font-semibold tracking-tight text-slate-950 tabular-nums'>
+                <p className='mt-3 text-xl font-semibold text-slate-950 tabular-nums'>
                   {item.value}
                 </p>
                 <p className='mt-0.5 text-[11px] font-medium text-slate-500'>
@@ -1341,7 +1341,7 @@ export function EnterpriseOverview() {
               </div>
             )
           })}
-          <div className='col-span-2 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-500'>
+          <div className='col-span-2 rounded-md border border-dashed border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-500'>
             当前毛利预估 {formatCurrencyUSD(metrics.estimated_gross_profit)}
             ，渠道健康度{' '}
             {formatPercentage(

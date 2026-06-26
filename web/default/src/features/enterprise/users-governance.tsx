@@ -130,20 +130,20 @@ function UserStatusBadge(props: { status: number }) {
 function PermissionCell(props: { allowed: boolean; partial?: boolean }) {
   if (props.allowed) {
     return (
-      <span className='mx-auto flex size-6 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600'>
+      <span className='mx-auto flex size-6 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600'>
         <Check className='size-3.5' />
       </span>
     )
   }
   if (props.partial) {
     return (
-      <span className='mx-auto flex size-6 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600'>
+      <span className='mx-auto flex size-6 items-center justify-center rounded-md bg-amber-500/10 text-amber-600'>
         <ShieldEllipsis className='size-3.5' />
       </span>
     )
   }
   return (
-    <span className='bg-muted text-muted-foreground mx-auto flex size-6 items-center justify-center rounded-lg'>
+    <span className='bg-muted text-muted-foreground mx-auto flex size-6 items-center justify-center rounded-md'>
       <CircleOff className='size-3.5' />
     </span>
   )
@@ -192,7 +192,7 @@ export function EnterpriseUsersGovernance(props: {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-4 pb-2 sm:space-y-5'>
+    <div className='enterprise-dashboard space-y-3 pb-2'>
       <EnterprisePageHeader
         eyebrow='组织治理'
         title='用户、团队与权限'
@@ -265,7 +265,7 @@ export function EnterpriseUsersGovernance(props: {
         />
       </div>
 
-      <div className='grid min-h-[680px] gap-4 xl:grid-cols-[240px_minmax(0,1fr)_330px]'>
+      <div className='grid min-h-[680px] gap-3 xl:grid-cols-[240px_minmax(0,1fr)_330px]'>
         <EnterprisePanel
           title='组织结构'
           description='按现有用户分组聚合'
@@ -276,7 +276,7 @@ export function EnterpriseUsersGovernance(props: {
               type='button'
               onClick={() => setActiveGroup('all')}
               className={cn(
-                'flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition-colors',
+                'flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-xs transition-colors',
                 activeGroup === 'all'
                   ? 'bg-primary/10 font-semibold text-primary'
                   : 'hover:bg-muted/60'
@@ -294,7 +294,7 @@ export function EnterpriseUsersGovernance(props: {
                 type='button'
                 onClick={() => setActiveGroup(group.name)}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs transition-colors',
+                  'flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-xs transition-colors',
                   activeGroup === group.name
                     ? 'bg-primary/10 font-semibold text-primary'
                     : 'hover:bg-muted/60'
@@ -310,7 +310,7 @@ export function EnterpriseUsersGovernance(props: {
               </button>
             ))}
           </div>
-          <div className='text-muted-foreground mt-5 rounded-xl border border-dashed p-3 text-[11px] leading-5'>
+          <div className='text-muted-foreground mt-5 rounded-md border border-dashed p-3 text-[11px] leading-5'>
             当前兼容旧系统的用户分组字段。后续可直接扩展为多级组织树，而不会影响现有账号。
           </div>
         </EnterprisePanel>
@@ -434,25 +434,25 @@ export function EnterpriseUsersGovernance(props: {
                   </div>
                 </div>
                 <dl className='mt-4 grid grid-cols-2 gap-3 text-xs'>
-                  <div className='bg-muted/40 rounded-xl p-3'>
+                  <div className='bg-muted/40 rounded-md p-3'>
                     <dt className='text-muted-foreground'>角色</dt>
                     <dd className='mt-1 font-semibold'>
                       {roleMeta(selectedUser.role).label}
                     </dd>
                   </div>
-                  <div className='bg-muted/40 rounded-xl p-3'>
+                  <div className='bg-muted/40 rounded-md p-3'>
                     <dt className='text-muted-foreground'>API Keys</dt>
                     <dd className='mt-1 font-semibold'>
                       {selectedUser.api_key_count}
                     </dd>
                   </div>
-                  <div className='bg-muted/40 rounded-xl p-3'>
+                  <div className='bg-muted/40 rounded-md p-3'>
                     <dt className='text-muted-foreground'>累计请求</dt>
                     <dd className='mt-1 font-semibold'>
                       {formatNumber(selectedUser.request_count)}
                     </dd>
                   </div>
-                  <div className='bg-muted/40 rounded-xl p-3'>
+                  <div className='bg-muted/40 rounded-md p-3'>
                     <dt className='text-muted-foreground'>可用额度</dt>
                     <dd className='mt-1 font-semibold'>
                       {formatLogQuota(selectedUser.quota)}
@@ -481,7 +481,7 @@ export function EnterpriseUsersGovernance(props: {
             title='权限策略矩阵'
             description='沿用现有角色模型，避免破坏历史权限'
           >
-            <div className='overflow-hidden rounded-xl border'>
+            <div className='overflow-hidden rounded-md border'>
               <Table>
                 <TableHeader>
                   <TableRow className='bg-muted/35'>
@@ -531,14 +531,14 @@ export function EnterpriseUsersGovernance(props: {
 
           <EnterprisePanel title='安全与合规'>
             <div className='space-y-3 text-xs'>
-              <div className='bg-muted/35 flex items-center justify-between rounded-xl p-3'>
+              <div className='bg-muted/35 flex items-center justify-between rounded-md p-3'>
                 <span className='flex items-center gap-2'>
                   <ShieldCheck className='size-4 text-violet-500' />
                   高权限账号
                 </span>
                 <Badge variant='outline'>{summary.admin_users}</Badge>
               </div>
-              <div className='bg-muted/35 flex items-center justify-between rounded-xl p-3'>
+              <div className='bg-muted/35 flex items-center justify-between rounded-md p-3'>
                 <span className='flex items-center gap-2'>
                   <Clock3 className='size-4 text-amber-500' />
                   30 天未登录
@@ -550,7 +550,7 @@ export function EnterpriseUsersGovernance(props: {
                   {staleUsers}
                 </Badge>
               </div>
-              <div className='bg-muted/35 flex items-center justify-between rounded-xl p-3'>
+              <div className='bg-muted/35 flex items-center justify-between rounded-md p-3'>
                 <span className='flex items-center gap-2'>
                   <CircleOff className='size-4 text-slate-500' />
                   停用账号

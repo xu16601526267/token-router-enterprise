@@ -184,7 +184,7 @@ function BreakdownList(props: {
         <div key={`${item.name}-${item.quota}`} className='space-y-2'>
           <div className='flex items-center justify-between gap-3 text-xs'>
             <div className='flex min-w-0 items-center gap-2.5'>
-              <span className='bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold'>
+              <span className='bg-muted text-muted-foreground flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold'>
                 {position + 1}
               </span>
               <span className='truncate font-medium'>{item.name}</span>
@@ -419,7 +419,7 @@ export function EnterpriseUsageAnalytics(props: {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-4 pb-2 sm:space-y-5'>
+    <div className='enterprise-dashboard space-y-3 pb-2'>
       <EnterprisePageHeader
         eyebrow='企业经营分析'
         title='用量日志与成本分析'
@@ -428,7 +428,7 @@ export function EnterpriseUsageAnalytics(props: {
           <>
             <Badge
               variant='outline'
-              className='bg-background/70 h-8 rounded-lg px-3 text-xs font-normal'
+              className='bg-background/70 h-8 rounded-md px-3 text-xs font-normal'
             >
               {dateRangeLabel}
             </Badge>
@@ -564,14 +564,14 @@ export function EnterpriseUsageAnalytics(props: {
         </div>
       </EnterprisePanel>
 
-      <div className='grid gap-4 xl:grid-cols-[minmax(0,1.75fr)_minmax(290px,.65fr)]'>
+      <div className='grid gap-3 xl:grid-cols-[minmax(0,1.75fr)_minmax(290px,.65fr)]'>
         <div className='grid min-w-0 gap-4 lg:grid-cols-2'>
           <EnterprisePanel
             className='lg:col-span-2'
             title='Tokens 与成本趋势'
             description='输入、输出 Token 和成本按天汇总'
             action={<Badge variant='secondary'>按天</Badge>}
-            bodyClassName='h-80 p-3 sm:p-5'
+            bodyClassName='h-80 p-3 sm:p-4'
           >
             {chartData.length === 0 ? (
               <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
@@ -744,7 +744,7 @@ export function EnterpriseUsageAnalytics(props: {
             className='lg:col-span-2'
             title='错误率与延迟趋势'
             description='识别服务质量波动和异常时段'
-            bodyClassName='h-64 p-3 sm:p-5'
+            bodyClassName='h-64 p-3 sm:p-4'
           >
             {chartData.length === 0 ? (
               <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
@@ -812,12 +812,12 @@ export function EnterpriseUsageAnalytics(props: {
               {anomalyItems.map((item) => (
                 <article
                   key={item.title}
-                  className='border-border/70 bg-background/55 rounded-xl border p-3.5'
+                  className='border-border/70 bg-background/55 rounded-md border p-3.5'
                 >
                   <div className='flex gap-3'>
                     <span
                       className={cn(
-                        'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl',
+                        'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md',
                         item.tone === 'rose' && 'bg-rose-500/10 text-rose-600',
                         item.tone === 'amber' &&
                           'bg-amber-500/10 text-amber-600',
@@ -844,7 +844,7 @@ export function EnterpriseUsageAnalytics(props: {
 
           <EnterprisePanel title='优化建议'>
             <div className='space-y-3'>
-              <div className='rounded-xl border border-blue-500/15 bg-blue-500/5 p-3.5'>
+              <div className='rounded-md border border-blue-500/15 bg-blue-500/5 p-3.5'>
                 <div className='flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300'>
                   <Sparkles className='size-4' />
                   提升缓存命中率
@@ -853,7 +853,7 @@ export function EnterpriseUsageAnalytics(props: {
                   对高频 Prompt 建立稳定缓存键，减少重复上游调用和成本。
                 </p>
               </div>
-              <div className='rounded-xl border border-violet-500/15 bg-violet-500/5 p-3.5'>
+              <div className='rounded-md border border-violet-500/15 bg-violet-500/5 p-3.5'>
                 <div className='flex items-center gap-2 text-xs font-semibold text-violet-700 dark:text-violet-300'>
                   <ArrowDownRight className='size-4' />
                   优化模型组合
@@ -862,7 +862,7 @@ export function EnterpriseUsageAnalytics(props: {
                   将低复杂度请求路由到更低成本模型，并保留高价值请求的质量兜底。
                 </p>
               </div>
-              <div className='rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3.5'>
+              <div className='rounded-md border border-emerald-500/15 bg-emerald-500/5 p-3.5'>
                 <div className='flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300'>
                   <ArrowUpRight className='size-4' />
                   建立部门预算线
@@ -876,14 +876,14 @@ export function EnterpriseUsageAnalytics(props: {
 
           <EnterprisePanel title='运行概况'>
             <div className='grid grid-cols-2 gap-3'>
-              <div className='bg-muted/40 rounded-xl p-3'>
+              <div className='bg-muted/40 rounded-md p-3'>
                 <Clock3 className='size-4 text-violet-500' />
                 <p className='mt-2 text-lg font-semibold'>
                   {formatNumber(metrics.average_latency_ms)} ms
                 </p>
                 <p className='text-muted-foreground text-[10px]'>平均延迟</p>
               </div>
-              <div className='bg-muted/40 rounded-xl p-3'>
+              <div className='bg-muted/40 rounded-md p-3'>
                 <UsersRound className='size-4 text-blue-500' />
                 <p className='mt-2 text-lg font-semibold'>
                   {formatNumber(usage.by_user.length)}

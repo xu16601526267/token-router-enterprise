@@ -443,7 +443,7 @@ export function EnterpriseBillingCenter(props: {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-4 pb-2 sm:space-y-5'>
+    <div className='enterprise-dashboard space-y-3 pb-2'>
       <EnterprisePageHeader
         eyebrow='组织与计费'
         title='计费与结算中心'
@@ -520,13 +520,13 @@ export function EnterpriseBillingCenter(props: {
         />
       </div>
 
-      <div className='grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,.65fr)]'>
+      <div className='grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,.65fr)]'>
         <div className='space-y-4'>
           <EnterprisePanel
             title='收支与毛利趋势'
             description='基于 Usage Ledger 的应收、应付与毛利数据'
             action={<Badge variant='secondary'>近 30 天</Badge>}
-            bodyClassName='h-80 p-3 sm:p-5'
+            bodyClassName='h-80 p-3 sm:p-4'
           >
             {trend.length === 0 ? (
               <div className='text-muted-foreground flex h-full items-center justify-center text-sm'>
@@ -593,7 +593,7 @@ export function EnterpriseBillingCenter(props: {
             )}
           </EnterprisePanel>
 
-          <div className='grid gap-4 md:grid-cols-3'>
+          <div className='grid gap-3 md:grid-cols-3'>
             <EnterprisePanel
               title='额度使用率'
               description='组织全部账户额度概况'
@@ -635,7 +635,7 @@ export function EnterpriseBillingCenter(props: {
               <div className='space-y-3'>
                 <div className='flex items-end justify-between'>
                   <div>
-                    <p className='text-2xl font-semibold'>
+                    <p className='text-xl font-semibold'>
                       {formatPercent(collectionProgress)}
                     </p>
                     <p className='text-muted-foreground text-[11px]'>
@@ -653,13 +653,13 @@ export function EnterpriseBillingCenter(props: {
                   />
                 </div>
                 <div className='grid grid-cols-2 gap-2 text-xs'>
-                  <div className='bg-muted/40 rounded-lg p-2'>
+                  <div className='bg-muted/40 rounded-md p-2'>
                     <p className='text-muted-foreground'>已完成</p>
                     <p className='mt-1 font-semibold'>
                       {formatCurrencyUSD(metrics.successful_top_up_amount)}
                     </p>
                   </div>
-                  <div className='bg-muted/40 rounded-lg p-2'>
+                  <div className='bg-muted/40 rounded-md p-2'>
                     <p className='text-muted-foreground'>待处理</p>
                     <p className='mt-1 font-semibold'>
                       {formatCurrencyUSD(metrics.pending_top_up_amount)}
@@ -672,14 +672,14 @@ export function EnterpriseBillingCenter(props: {
             <EnterprisePanel title='结算毛利' description='最近结算单累计毛利'>
               <div className='flex h-full flex-col justify-between gap-4'>
                 <div>
-                  <p className='text-2xl font-semibold tracking-tight'>
+                  <p className='text-xl font-semibold'>
                     {formatLogQuota(settlementGrossProfit)}
                   </p>
                   <p className='text-muted-foreground mt-1 text-xs'>
                     {data.settlements.length} 张结算单
                   </p>
                 </div>
-                <div className='text-muted-foreground rounded-xl border border-violet-500/15 bg-violet-500/5 p-3 text-[11px] leading-5'>
+                <div className='text-muted-foreground rounded-md border border-violet-500/15 bg-violet-500/5 p-3 text-[11px] leading-5'>
                   毛利来自结算单应收减应付，不包含支付通道手续费。
                 </div>
               </div>
@@ -691,7 +691,7 @@ export function EnterpriseBillingCenter(props: {
           <EnterprisePanel title='预算与结算预警'>
             <div className='space-y-3'>
               {usageRate >= 0.8 && (
-                <div className='rounded-xl border border-rose-500/15 bg-rose-500/5 p-3.5'>
+                <div className='rounded-md border border-rose-500/15 bg-rose-500/5 p-3.5'>
                   <p className='flex items-center gap-2 text-xs font-semibold text-rose-600'>
                     <AlertTriangle className='size-4' />
                     组织额度使用率超过 80%
@@ -702,7 +702,7 @@ export function EnterpriseBillingCenter(props: {
                 </div>
               )}
               {metrics.draft_settlements > 0 && (
-                <div className='rounded-xl border border-amber-500/15 bg-amber-500/5 p-3.5'>
+                <div className='rounded-md border border-amber-500/15 bg-amber-500/5 p-3.5'>
                   <p className='flex items-center gap-2 text-xs font-semibold text-amber-600'>
                     <FileText className='size-4' />
                     {metrics.draft_settlements} 张结算单待确认
@@ -713,7 +713,7 @@ export function EnterpriseBillingCenter(props: {
                 </div>
               )}
               {usageRate < 0.8 && metrics.draft_settlements === 0 && (
-                <div className='rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3.5'>
+                <div className='rounded-md border border-emerald-500/15 bg-emerald-500/5 p-3.5'>
                   <p className='flex items-center gap-2 text-xs font-semibold text-emerald-600'>
                     <Sparkles className='size-4' />
                     当前财务状态稳定
@@ -731,7 +731,7 @@ export function EnterpriseBillingCenter(props: {
               {data.recent_topups.slice(0, 6).map((topup) => (
                 <div
                   key={topup.id}
-                  className='bg-muted/35 flex items-center justify-between gap-3 rounded-xl p-3'
+                  className='bg-muted/35 flex items-center justify-between gap-3 rounded-md p-3'
                 >
                   <div className='min-w-0'>
                     <p className='truncate text-xs font-semibold'>
@@ -836,7 +836,7 @@ export function EnterpriseBillingCenter(props: {
               按客户或供应商生成当前周期结算单，重复生成会覆盖同周期草稿数据。
             </DialogDescription>
           </DialogHeader>
-          <div className='grid gap-4'>
+          <div className='grid gap-3'>
             <label className='grid gap-2 text-sm'>
               <span className='font-medium'>结算对象</span>
               <NativeSelect

@@ -29,12 +29,16 @@ type EnterpriseStatTone =
   | 'slate'
 
 const toneStyles: Record<EnterpriseStatTone, string> = {
-  blue: 'bg-blue-500/10 text-blue-600 dark:text-blue-300',
-  violet: 'bg-violet-500/10 text-violet-600 dark:text-violet-300',
-  emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
-  amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-300',
-  rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-300',
-  slate: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
+  blue: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20',
+  violet:
+    'bg-violet-50 text-violet-700 ring-violet-100 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/20',
+  emerald:
+    'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
+  amber:
+    'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+  rose: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20',
+  slate:
+    'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-500/10 dark:text-slate-300 dark:ring-slate-500/20',
 }
 
 type EnterpriseStatCardProps = {
@@ -59,31 +63,31 @@ export function EnterpriseStatCard({
   loading = false,
 }: EnterpriseStatCardProps) {
   return (
-    <article className='enterprise-stat-card group bg-card/95 relative min-h-28 overflow-hidden rounded-2xl border p-4 shadow-[0_1px_2px_rgb(15_23_42/0.03),0_10px_30px_rgb(15_23_42/0.035)] transition-transform duration-200 hover:-translate-y-0.5 sm:p-4.5'>
-      <div className='via-primary/25 pointer-events-none absolute inset-x-6 -top-px h-px bg-linear-to-r from-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100' />
+    <article className='enterprise-stat-card bg-card relative min-h-[92px] overflow-hidden rounded-md border p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
+      <div className='bg-primary/80 pointer-events-none absolute inset-y-0 left-0 w-0.5' />
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <p className='text-muted-foreground truncate text-xs font-medium'>
+          <p className='text-muted-foreground truncate text-[11px] font-medium'>
             {title}
           </p>
           {loading ? (
-            <div className='bg-muted mt-2 h-8 w-24 animate-pulse rounded-lg' />
+            <div className='bg-muted mt-2 h-7 w-24 animate-pulse rounded-md' />
           ) : (
-            <p className='text-foreground mt-1.5 truncate text-2xl font-semibold tracking-[-0.035em]'>
+            <p className='text-foreground mt-1 truncate text-[22px] leading-7 font-semibold tabular-nums'>
               {value}
             </p>
           )}
         </div>
         <span
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-xl',
+            'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
             toneStyles[tone]
           )}
         >
-          <Icon className='size-4.5' strokeWidth={1.8} />
+          <Icon className='size-4' strokeWidth={1.8} />
         </span>
       </div>
-      <div className='mt-3 flex min-h-4 items-center gap-1.5 text-[11px]'>
+      <div className='mt-2 flex min-h-4 items-center gap-1.5 text-[11px]'>
         {trend != null && (
           <span
             className={cn(

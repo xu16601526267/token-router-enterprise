@@ -240,6 +240,12 @@ function ApiKeyFormDialog(props: {
     key: K,
     value: ApiKeyFormState[K]
   ) => setForm((current) => ({ ...current, [key]: value }))
+  let submitLabel = '创建密钥'
+  if (props.saving) {
+    submitLabel = '保存中…'
+  } else if (props.editing) {
+    submitLabel = '保存修改'
+  }
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
@@ -254,7 +260,7 @@ function ApiKeyFormDialog(props: {
           </DialogDescription>
         </DialogHeader>
 
-        <div className='grid gap-4 sm:grid-cols-2'>
+        <div className='grid gap-3 sm:grid-cols-2'>
           <Field>
             <FieldLabel htmlFor='enterprise-key-user'>
               归属用户 / 客户
@@ -391,7 +397,7 @@ function ApiKeyFormDialog(props: {
             disabled={props.saving || !form.userId || !form.name.trim()}
             onClick={() => props.onSubmit(toInput(form))}
           >
-            {props.saving ? '保存中…' : props.editing ? '保存修改' : '创建密钥'}
+            {submitLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -419,12 +425,12 @@ function SecretDialog(props: {
             出于安全考虑，完整密钥只展示这一次。关闭后只能通过轮换生成新密钥。
           </DialogDescription>
         </DialogHeader>
-        <div className='rounded-xl border border-amber-500/25 bg-amber-500/5 p-4'>
+        <div className='rounded-md border border-amber-500/25 bg-amber-500/5 p-4'>
           <div className='flex items-start gap-3'>
             <AlertTriangle className='mt-0.5 size-5 shrink-0 text-amber-600' />
             <div className='min-w-0 flex-1'>
               <p className='text-sm font-medium'>{props.secret?.item.name}</p>
-              <code className='bg-background mt-3 block rounded-lg px-3 py-3 text-xs break-all'>
+              <code className='bg-background mt-3 block rounded-md px-3 py-3 text-xs break-all'>
                 {props.secret?.secret_key}
               </code>
             </div>
@@ -556,7 +562,7 @@ export function EnterpriseApiKeys() {
   return (
     <SectionPageLayout fixedContent>
       <SectionPageLayout.Content>
-        <div className='flex h-full min-h-0 flex-col gap-4 overflow-auto pb-5'>
+        <div className='flex h-full min-h-0 flex-col gap-3 overflow-auto pb-5'>
           <EnterprisePageHeader
             eyebrow='企业客户接入治理'
             title='接口密钥与客户接入'
@@ -683,7 +689,7 @@ export function EnterpriseApiKeys() {
             </div>
           </EnterprisePanel>
 
-          <div className='grid min-h-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]'>
+          <div className='grid min-h-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_360px]'>
             <EnterprisePanel bodyClassName='p-0' className='min-w-0'>
               <div className='overflow-x-auto'>
                 <Table>
@@ -858,7 +864,7 @@ export function EnterpriseApiKeys() {
             >
               {!selected ? (
                 <div className='flex min-h-72 flex-col items-center justify-center text-center'>
-                  <span className='bg-primary/10 text-primary flex size-12 items-center justify-center rounded-2xl'>
+                  <span className='bg-primary/10 text-primary flex size-12 items-center justify-center rounded-md'>
                     <KeyRound className='size-5' />
                   </span>
                   <p className='mt-3 text-sm font-medium'>企业密钥治理</p>
@@ -867,7 +873,7 @@ export function EnterpriseApiKeys() {
                   </p>
                 </div>
               ) : (
-                <div className='space-y-5'>
+                <div className='space-y-3'>
                   <div>
                     <p className='text-muted-foreground text-xs'>客户 / 用户</p>
                     <p className='mt-1 font-semibold'>
@@ -877,7 +883,7 @@ export function EnterpriseApiKeys() {
                       {selected.email}
                     </p>
                   </div>
-                  <div className='bg-muted/25 rounded-xl border p-3'>
+                  <div className='bg-muted/25 rounded-md border p-3'>
                     <p className='text-muted-foreground text-[11px]'>
                       Base URL
                     </p>
@@ -899,13 +905,13 @@ export function EnterpriseApiKeys() {
                     </div>
                   </div>
                   <div className='grid grid-cols-2 gap-3 text-xs'>
-                    <div className='rounded-xl border p-3'>
+                    <div className='rounded-md border p-3'>
                       <p className='text-muted-foreground'>路由分组</p>
                       <p className='mt-1 font-medium'>
                         {selected.group || '继承用户'}
                       </p>
                     </div>
-                    <div className='rounded-xl border p-3'>
+                    <div className='rounded-md border p-3'>
                       <p className='text-muted-foreground'>到期时间</p>
                       <p className='mt-1 font-medium'>
                         {selected.expired_time > 0
@@ -915,7 +921,7 @@ export function EnterpriseApiKeys() {
                           : '永不过期'}
                       </p>
                     </div>
-                    <div className='rounded-xl border p-3'>
+                    <div className='rounded-md border p-3'>
                       <p className='text-muted-foreground'>IP 白名单</p>
                       <p className='mt-1 font-medium'>
                         {selected.allow_ips
@@ -923,7 +929,7 @@ export function EnterpriseApiKeys() {
                           : '未限制'}
                       </p>
                     </div>
-                    <div className='rounded-xl border p-3'>
+                    <div className='rounded-md border p-3'>
                       <p className='text-muted-foreground'>跨组重试</p>
                       <p className='mt-1 font-medium'>
                         {selected.cross_group_retry ? '允许' : '不允许'}

@@ -210,17 +210,17 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   const totalPages = Math.max(1, Math.ceil(total / (data?.page_size ?? 50)))
 
   let supplierProfileContent = (
-    <p className='text-muted-foreground mt-3 rounded-xl border border-dashed p-4 text-xs'>
+    <p className='text-muted-foreground mt-3 rounded-md border border-dashed p-4 text-xs'>
       当前渠道尚未绑定供应商，可在经典配置视图中补充。
     </p>
   )
   if (detailQuery.isLoading) {
     supplierProfileContent = (
-      <div className='bg-muted mt-3 h-24 animate-pulse rounded-xl' />
+      <div className='bg-muted mt-3 h-24 animate-pulse rounded-md' />
     )
   } else if (detail?.supplier) {
     supplierProfileContent = (
-      <div className='bg-muted/20 mt-3 rounded-xl border p-3 text-xs'>
+      <div className='bg-muted/20 mt-3 rounded-md border p-3 text-xs'>
         <div className='flex items-center justify-between gap-3'>
           <div>
             <p className='font-semibold'>{detail.supplier.name}</p>
@@ -231,19 +231,19 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
           <Badge variant='outline'>等级 {detail.supplier.grade || '—'}</Badge>
         </div>
         <div className='mt-3 grid grid-cols-3 gap-2 text-center'>
-          <div className='bg-background rounded-lg p-2'>
+          <div className='bg-background rounded-md p-2'>
             <p className='text-muted-foreground'>评分</p>
             <p className='mt-1 font-semibold'>
               {detail.supplier.score.toFixed(1)}
             </p>
           </div>
-          <div className='bg-background rounded-lg p-2'>
+          <div className='bg-background rounded-md p-2'>
             <p className='text-muted-foreground'>渠道数</p>
             <p className='mt-1 font-semibold'>
               {detail.supplier.channel_count}
             </p>
           </div>
-          <div className='bg-background rounded-lg p-2'>
+          <div className='bg-background rounded-md p-2'>
             <p className='text-muted-foreground'>路由权重</p>
             <p className='mt-1 font-semibold'>
               {detail.supplier.route_weight || 100}%
@@ -271,9 +271,9 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
       <SectionPageLayout.Content>
         <Tabs
           defaultValue='enterprise'
-          className='flex h-full min-h-0 flex-col gap-4'
+          className='flex h-full min-h-0 flex-col gap-3'
         >
-          <div className='flex shrink-0 flex-col gap-4'>
+          <div className='flex shrink-0 flex-col gap-3'>
             <EnterprisePageHeader
               eyebrow='上游资源治理'
               title='渠道与供应商中心'
@@ -318,7 +318,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
             value='enterprise'
             className='min-h-0 flex-1 overflow-auto pb-5'
           >
-            <div className='flex flex-col gap-4'>
+            <div className='flex flex-col gap-3'>
               <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5'>
                 <EnterpriseStatCard
                   title='启用渠道数'
@@ -453,7 +453,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                 </div>
               </EnterprisePanel>
 
-              <div className='grid min-h-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_380px]'>
+              <div className='grid min-h-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_380px]'>
                 <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
                   <div className='overflow-x-auto'>
                     <Table>
@@ -594,7 +594,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                 >
                   {!selected ? (
                     <div className='flex min-h-80 flex-col items-center justify-center text-center'>
-                      <span className='bg-primary/10 text-primary flex size-12 items-center justify-center rounded-2xl'>
+                      <span className='bg-primary/10 text-primary flex size-12 items-center justify-center rounded-md'>
                         <ServerCog className='size-5' />
                       </span>
                       <p className='mt-3 text-sm font-medium'>
@@ -605,9 +605,9 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                       </p>
                     </div>
                   ) : (
-                    <div className='space-y-5'>
+                    <div className='space-y-3'>
                       <div className='grid grid-cols-2 gap-3 text-xs'>
-                        <div className='rounded-xl border p-3'>
+                        <div className='rounded-md border p-3'>
                           <Activity className='size-4 text-emerald-600' />
                           <p className='text-muted-foreground mt-2'>
                             近 7 天成功率
@@ -616,7 +616,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                             {formatPercent(selected.success_rate)}
                           </p>
                         </div>
-                        <div className='rounded-xl border p-3'>
+                        <div className='rounded-md border p-3'>
                           <Gauge className='size-4 text-violet-600' />
                           <p className='text-muted-foreground mt-2'>平均延迟</p>
                           <p className='mt-1 text-base font-semibold'>
@@ -627,14 +627,14 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                             ms
                           </p>
                         </div>
-                        <div className='rounded-xl border p-3'>
+                        <div className='rounded-md border p-3'>
                           <CircleDollarSign className='size-4 text-amber-600' />
                           <p className='text-muted-foreground mt-2'>账户余额</p>
                           <p className='mt-1 text-base font-semibold'>
                             {formatMoney(selected.balance)}
                           </p>
                         </div>
-                        <div className='rounded-xl border p-3'>
+                        <div className='rounded-md border p-3'>
                           <Boxes className='size-4 text-blue-600' />
                           <p className='text-muted-foreground mt-2'>路由权重</p>
                           <p className='mt-1 text-base font-semibold'>
@@ -682,14 +682,14 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                         </div>
                         <div className='mt-2 space-y-1'>
                           {(detail?.incidents ?? []).length === 0 ? (
-                            <p className='rounded-xl bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300'>
+                            <p className='rounded-md bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300'>
                               未发现近期错误事件。
                             </p>
                           ) : (
                             detail?.incidents.slice(0, 5).map((incident) => (
                               <div
                                 key={incident.id}
-                                className='rounded-xl border px-3 py-2.5'
+                                className='rounded-md border px-3 py-2.5'
                               >
                                 <p className='line-clamp-2 text-xs font-medium'>
                                   {incident.title}

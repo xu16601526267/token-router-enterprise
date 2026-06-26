@@ -78,6 +78,105 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+@layer components {
+  .enterprise-app-shell {
+    --app-header-height: 3rem;
+    --sidebar: oklch(0.205 0.045 264.5);
+    --sidebar-foreground: oklch(0.94 0.015 255);
+    --sidebar-accent: oklch(0.31 0.07 261);
+    --sidebar-accent-foreground: oklch(0.98 0.01 255);
+    --sidebar-border: oklch(0.29 0.048 264);
+    --sidebar-ring: oklch(0.58 0.18 260);
+  }
+
+  .enterprise-app-shell [data-slot='sidebar-inset'] {
+    background: #f6f8fb;
+  }
+
+  .enterprise-app-shell [data-slot='sidebar-inner'] {
+    border-right: 1px solid
+      color-mix(in oklch, var(--sidebar-border) 78%, black);
+  }
+
+  .enterprise-app-shell [data-sidebar='group-label'] {
+    height: 1.75rem;
+    padding-inline: 0.5rem;
+    color: color-mix(in oklch, var(--sidebar-foreground) 58%, transparent);
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-button'] {
+    min-height: 1.9rem;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .enterprise-app-shell [data-sidebar='menu-button'][data-active='true'] {
+    background: #1d4ed8;
+    color: #fff;
+    box-shadow: inset 2px 0 0 rgb(147 197 253 / 0.9);
+  }
+
+  .enterprise-app-shell [data-slot='button'],
+  .enterprise-app-shell [data-slot='input'],
+  .enterprise-app-shell [data-slot='select-trigger'],
+  .enterprise-app-shell [data-slot='badge'] {
+    border-radius: 6px;
+  }
+
+  .enterprise-dashboard,
+  .enterprise-overview {
+    color: #0f172a;
+    font-size: 13px;
+  }
+
+  .enterprise-dashboard [data-slot='table'],
+  .enterprise-dashboard [data-slot='table'] *,
+  .enterprise-overview table,
+  .enterprise-overview table * {
+    font-size: 12px;
+  }
+
+  .enterprise-dashboard [data-slot='table-head'],
+  .enterprise-overview th {
+    height: 34px;
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+  }
+
+  .enterprise-dashboard [data-slot='table-cell'],
+  .enterprise-overview td {
+    padding-block: 0.55rem;
+  }
+
+  .enterprise-dashboard .recharts-cartesian-axis-tick-value,
+  .enterprise-overview .recharts-cartesian-axis-tick-value {
+    font-size: 11px;
+  }
+}
+
+@layer utilities {
+  .enterprise-app-shell [data-slot='button'],
+  .enterprise-app-shell [data-slot='input'],
+  .enterprise-app-shell [data-slot='select-trigger'],
+  .enterprise-app-shell [data-slot='badge'],
+  .enterprise-dashboard .rounded-lg,
+  .enterprise-dashboard .rounded-xl,
+  .enterprise-dashboard .rounded-2xl,
+  .enterprise-overview .rounded-lg,
+  .enterprise-overview .rounded-xl,
+  .enterprise-overview .rounded-2xl {
+    border-radius: 6px !important;
+  }
+
+  .enterprise-dashboard [data-slot='button'][data-size='icon'],
+  .enterprise-overview [data-slot='button'][data-size='icon'] {
+    border-radius: 6px !important;
+  }
+}
+
 /* Vercel Geist-style skeleton shimmer */
 .skeleton-shimmer {
   background: linear-gradient(

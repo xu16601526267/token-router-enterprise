@@ -144,11 +144,11 @@ function EventList(props: {
         return (
           <div
             key={`${event.category}-${event.id}`}
-            className='hover:bg-muted/45 flex items-start gap-3 rounded-xl px-2.5 py-2.5 transition-colors'
+            className='hover:bg-muted/45 flex items-start gap-3 rounded-md px-2.5 py-2.5 transition-colors'
           >
             <span
               className={cn(
-                'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg',
+                'mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md',
                 eventTone(event.severity)
               )}
             >
@@ -182,14 +182,14 @@ function ProviderNode(props: { provider: ProviderHealth; index: number }) {
   const latency =
     props.provider.average_latency_ms || props.provider.response_time_ms
   return (
-    <div className='bg-background/85 relative flex items-center gap-3 rounded-xl border p-3 shadow-sm'>
+    <div className='bg-background/85 relative flex items-center gap-3 rounded-md border p-3 shadow-sm'>
       <span
         className={cn(
           'absolute -left-1.5 top-1/2 size-3 -translate-y-1/2 rounded-full border-2 border-background',
           props.index === 0 ? 'bg-primary' : 'bg-muted-foreground/45'
         )}
       />
-      <span className='bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-xl'>
+      <span className='bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-md'>
         <Bot className='size-4' aria-hidden='true' />
       </span>
       <div className='min-w-0 flex-1'>
@@ -355,7 +355,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
   })
 
   return (
-    <div className='flex flex-col gap-4 pb-5'>
+    <div className='flex flex-col gap-3 pb-5'>
       <EnterprisePageHeader
         eyebrow='企业级路由治理'
         title='智能路由控制塔'
@@ -424,7 +424,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
         />
       </div>
 
-      <div className='grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]'>
+      <div className='grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]'>
         <EnterprisePanel
           title='路由拓扑与实时流量'
           description='请求从租户入口经过策略匹配，再分配至健康的供应商与渠道。'
@@ -433,28 +433,28 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
               {formatCount(metrics?.requests ?? 0)} 请求
             </Badge>
           }
-          bodyClassName='p-4 sm:p-5'
+          bodyClassName='p-4 sm:p-4'
         >
-          <div className='grid min-h-[390px] items-center gap-5 lg:grid-cols-[minmax(180px,0.7fr)_52px_minmax(220px,0.9fr)_52px_minmax(280px,1.2fr)]'>
-            <div className='from-primary/8 via-background rounded-2xl border bg-gradient-to-br to-violet-500/8 p-4'>
-              <span className='bg-primary text-primary-foreground shadow-primary/20 flex size-10 items-center justify-center rounded-xl shadow-lg'>
+          <div className='grid min-h-[360px] items-center gap-3 lg:grid-cols-[minmax(180px,0.7fr)_44px_minmax(220px,0.9fr)_44px_minmax(280px,1.2fr)]'>
+            <div className='bg-background rounded-md border p-3'>
+              <span className='bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-md'>
                 <Network className='size-5' />
               </span>
-              <p className='mt-4 text-sm font-semibold'>企业客户端流量</p>
-              <p className='mt-1 text-2xl font-semibold tracking-tight'>
+              <p className='mt-3 text-sm font-semibold'>企业客户端流量</p>
+              <p className='mt-1 text-xl font-semibold tabular-nums'>
                 {formatCount(metrics?.requests ?? 0)}
               </p>
               <p className='text-muted-foreground text-xs'>近 7 天总请求</p>
-              <div className='mt-4 space-y-2 text-xs'>
-                <div className='bg-background/80 flex justify-between rounded-lg px-3 py-2'>
+              <div className='mt-3 space-y-2 text-xs'>
+                <div className='bg-background/80 flex justify-between rounded-md px-3 py-2'>
                   <span>接口调用</span>
                   <span className='font-medium'>62%</span>
                 </div>
-                <div className='bg-background/80 flex justify-between rounded-lg px-3 py-2'>
+                <div className='bg-background/80 flex justify-between rounded-md px-3 py-2'>
                   <span>内部服务</span>
                   <span className='font-medium'>28%</span>
                 </div>
-                <div className='bg-background/80 flex justify-between rounded-lg px-3 py-2'>
+                <div className='bg-background/80 flex justify-between rounded-md px-3 py-2'>
                   <span>在线调试</span>
                   <span className='font-medium'>10%</span>
                 </div>
@@ -462,31 +462,31 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
             </div>
 
             <div className='hidden items-center lg:flex'>
-              <div className='from-primary/20 to-primary h-px flex-1 bg-gradient-to-r' />
+              <div className='bg-primary/35 h-px flex-1' />
               <ArrowRight className='text-primary size-4' />
             </div>
 
-            <div className='border-primary/20 bg-primary/[0.035] rounded-2xl border p-4 shadow-[0_12px_40px_rgb(59_130_246/0.08)]'>
+            <div className='border-primary/20 bg-primary/[0.035] rounded-md border p-3'>
               <div className='flex items-start justify-between gap-2'>
-                <span className='flex size-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600'>
+                <span className='flex size-9 items-center justify-center rounded-md bg-violet-500/10 text-violet-600'>
                   <GitBranch className='size-5' />
                 </span>
                 <Badge className='border-0 bg-emerald-500/10 text-emerald-600'>
                   运行中
                 </Badge>
               </div>
-              <p className='mt-4 text-sm font-semibold'>智能路由策略</p>
+              <p className='mt-3 text-sm font-semibold'>智能路由策略</p>
               <p className='text-muted-foreground mt-1 truncate text-xs'>
                 {primaryPolicy?.name || '默认智能路由'}
               </p>
               <div className='mt-4 grid grid-cols-2 gap-2'>
-                <div className='bg-background/80 rounded-xl border p-3'>
+                <div className='bg-background/80 rounded-md border p-3'>
                   <p className='text-muted-foreground text-[11px]'>成功率</p>
                   <p className='mt-1 text-sm font-semibold'>
                     {formatPercent(metrics?.realtime_success_rate ?? 0)}
                   </p>
                 </div>
-                <div className='bg-background/80 rounded-xl border p-3'>
+                <div className='bg-background/80 rounded-md border p-3'>
                   <p className='text-muted-foreground text-[11px]'>
                     策略优先级
                   </p>
@@ -495,19 +495,19 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
                   </p>
                 </div>
               </div>
-              <div className='bg-background/55 text-muted-foreground mt-3 rounded-xl border border-dashed p-3 text-xs'>
+              <div className='bg-background/55 text-muted-foreground mt-3 rounded-md border border-dashed p-3 text-xs'>
                 加权路由 · 自动降级 · 区域感知 · SLA 守护
               </div>
             </div>
 
             <div className='hidden items-center lg:flex'>
-              <div className='from-primary h-px flex-1 bg-gradient-to-r to-violet-400/30' />
+              <div className='bg-primary/35 h-px flex-1' />
               <ArrowRight className='text-primary size-4' />
             </div>
 
             <div className='space-y-2.5'>
               {providers.length === 0 ? (
-                <div className='text-muted-foreground flex min-h-56 items-center justify-center rounded-2xl border border-dashed text-sm'>
+                <div className='text-muted-foreground flex min-h-56 items-center justify-center rounded-md border border-dashed text-sm'>
                   暂无供应商流量数据
                 </div>
               ) : (
@@ -523,7 +523,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
           </div>
         </EnterprisePanel>
 
-        <div className='grid gap-4'>
+        <div className='grid gap-3'>
           <EnterprisePanel
             title='实时健康状态'
             description='按当前请求量排序的主要渠道。'
@@ -537,7 +537,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
                 return (
                   <div
                     key={provider.channel_id}
-                    className='hover:bg-muted/45 flex items-center gap-3 rounded-xl px-2.5 py-2.5'
+                    className='hover:bg-muted/45 flex items-center gap-3 rounded-md px-2.5 py-2.5'
                   >
                     <span
                       className={cn(
@@ -600,7 +600,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
         </div>
       </div>
 
-      <div className='grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)]'>
+      <div className='grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.6fr)]'>
         <EnterprisePanel
           title='请求与路由趋势'
           description='展示近 7 天请求量，辅助判断流量波动与扩容窗口。'
@@ -654,7 +654,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
           </div>
         </EnterprisePanel>
 
-        <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-1'>
+        <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-1'>
           <EnterprisePanel title='最近策略变更' bodyClassName='p-2.5'>
             <EventList
               events={data?.recent_changes ?? []}

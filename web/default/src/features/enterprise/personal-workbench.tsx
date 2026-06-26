@@ -202,7 +202,7 @@ export function PersonalWorkbench() {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-4 pb-2 sm:space-y-5'>
+    <div className='enterprise-dashboard space-y-3 pb-2'>
       <EnterprisePageHeader
         eyebrow='个人中心'
         title={`你好，${user?.display_name || user?.username || '用户'}`}
@@ -211,14 +211,14 @@ export function PersonalWorkbench() {
           <>
             <Badge
               variant='outline'
-              className='bg-background/70 h-8 rounded-lg px-3 text-xs font-normal'
+              className='bg-background/70 h-8 rounded-md px-3 text-xs font-normal'
             >
               当前分组 · {user?.group || '默认'}
             </Badge>
             <Button
               variant='outline'
               size='sm'
-              className='bg-background/70 h-8 rounded-lg'
+              className='bg-background/70 h-8 rounded-md'
               disabled={usageQuery.isFetching || keysQuery.isFetching}
               onClick={() => {
                 void usageQuery.refetch()
@@ -288,7 +288,7 @@ export function PersonalWorkbench() {
         />
       </div>
 
-      <div className='grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]'>
+      <div className='grid gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]'>
         <EnterprisePanel
           title='我的 API 接入'
           description='密钥默认脱敏展示，复制时通过安全接口临时读取。'
@@ -303,13 +303,13 @@ export function PersonalWorkbench() {
               <ArrowRight className='size-3.5' />
             </Button>
           }
-          bodyClassName='space-y-4'
+          bodyClassName='space-y-3'
         >
-          <div className='rounded-xl border bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_6%,var(--background))_0%,var(--background)_100%)] p-4'>
+          <div className='bg-primary/[0.035] rounded-md border p-3'>
             <div className='flex flex-col justify-between gap-3 sm:flex-row sm:items-center'>
               <div className='min-w-0'>
                 <div className='flex items-center gap-2'>
-                  <span className='bg-primary/10 text-primary flex size-8 items-center justify-center rounded-lg'>
+                  <span className='bg-primary/10 text-primary flex size-8 items-center justify-center rounded-md'>
                     <KeyRound className='size-4' />
                   </span>
                   <div>
@@ -325,7 +325,7 @@ export function PersonalWorkbench() {
               {preferredKey ? (
                 <Button
                   size='sm'
-                  className='h-8 rounded-lg'
+                  className='h-8 rounded-md'
                   disabled={copyingKey}
                   onClick={() => void handleCopyKey()}
                 >
@@ -343,7 +343,7 @@ export function PersonalWorkbench() {
               ) : (
                 <Button
                   size='sm'
-                  className='h-8 rounded-lg'
+                  className='h-8 rounded-md'
                   render={<Link to='/keys' />}
                 >
                   创建 API Key
@@ -353,12 +353,12 @@ export function PersonalWorkbench() {
           </div>
 
           <div className='grid gap-3 sm:grid-cols-2'>
-            <div className='bg-background/55 rounded-xl border p-3.5'>
+            <div className='bg-background/55 rounded-md border p-3.5'>
               <p className='text-muted-foreground text-[11px] font-medium'>
                 Base URL
               </p>
               <div className='mt-2 flex items-center gap-2'>
-                <code className='bg-muted min-w-0 flex-1 truncate rounded-lg px-2.5 py-2 text-[11px]'>
+                <code className='bg-muted min-w-0 flex-1 truncate rounded-md px-2.5 py-2 text-[11px]'>
                   {baseUrl}
                 </code>
                 <Button
@@ -371,7 +371,7 @@ export function PersonalWorkbench() {
                 </Button>
               </div>
             </div>
-            <div className='bg-background/55 rounded-xl border p-3.5'>
+            <div className='bg-background/55 rounded-md border p-3.5'>
               <p className='text-muted-foreground text-[11px] font-medium'>
                 密钥权限
               </p>
@@ -394,7 +394,7 @@ export function PersonalWorkbench() {
           <div className='grid gap-2 sm:grid-cols-3'>
             <a
               href='/playground'
-              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors'
+              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-md border px-3.5 py-3 transition-colors'
             >
               <FlaskConical className='size-4 text-blue-600' />
               <div className='min-w-0 flex-1'>
@@ -407,7 +407,7 @@ export function PersonalWorkbench() {
             </a>
             <a
               href='/pricing'
-              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors'
+              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-md border px-3.5 py-3 transition-colors'
             >
               <BookOpen className='size-4 text-violet-600' />
               <div className='min-w-0 flex-1'>
@@ -420,7 +420,7 @@ export function PersonalWorkbench() {
             </a>
             <a
               href='/wallet'
-              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors'
+              className='group hover:border-primary/25 hover:bg-muted/30 flex items-center gap-3 rounded-md border px-3.5 py-3 transition-colors'
             >
               <Wallet className='size-4 text-emerald-600' />
               <div className='min-w-0 flex-1'>
@@ -516,16 +516,16 @@ export function PersonalWorkbench() {
         </EnterprisePanel>
       </div>
 
-      <div className='grid gap-4 xl:grid-cols-3'>
+      <div className='grid gap-3 xl:grid-cols-3'>
         <EnterprisePanel title='常用模型' description='按近 7 天请求量排序'>
           {usage.models.length > 0 ? (
             <div className='space-y-3'>
               {usage.models.map((model, index) => (
                 <div
                   key={model.name}
-                  className='bg-background/50 flex items-center gap-3 rounded-xl border p-3'
+                  className='bg-background/50 flex items-center gap-3 rounded-md border p-3'
                 >
-                  <span className='flex size-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-[10px] font-semibold text-violet-600'>
+                  <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-violet-500/10 text-[10px] font-semibold text-violet-600'>
                     {index + 1}
                   </span>
                   <div className='min-w-0 flex-1'>
@@ -571,7 +571,7 @@ export function PersonalWorkbench() {
                   key={record.id}
                   className='flex items-center gap-3 py-3 first:pt-0 last:pb-0'
                 >
-                  <span className='flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600'>
+                  <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600'>
                     <CircleDollarSign className='size-4' />
                   </span>
                   <div className='min-w-0 flex-1'>
@@ -651,9 +651,9 @@ export function PersonalWorkbench() {
               return (
                 <div
                   key={item.label}
-                  className='bg-background/50 flex items-center gap-3 rounded-xl border p-3'
+                  className='bg-background/50 flex items-center gap-3 rounded-md border p-3'
                 >
-                  <span className='bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg'>
+                  <span className='bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md'>
                     <Icon className='size-4' />
                   </span>
                   <div className='min-w-0 flex-1'>
@@ -674,7 +674,7 @@ export function PersonalWorkbench() {
           <Button
             variant='outline'
             size='sm'
-            className='mt-4 w-full rounded-lg'
+            className='mt-4 w-full rounded-md'
             render={<Link to='/profile' />}
           >
             进入账户设置
