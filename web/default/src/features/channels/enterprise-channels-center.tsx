@@ -18,13 +18,16 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Activity,
   AlertTriangle,
   ArrowUpRight,
+  BarChart3,
   Boxes,
   CheckCircle2,
   CircleDollarSign,
   Download,
   Gauge,
+  ListChecks,
   MoreHorizontal,
   Plus,
   Power,
@@ -37,6 +40,7 @@ import {
   SlidersHorizontal,
   Tags,
   TestTube2,
+  Waypoints,
   WalletCards,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -348,7 +352,7 @@ function DetailMetric({
   return (
     <div
       className={cn(
-        'rounded-md border px-2.5 py-2',
+        'rounded-md border px-2.5 py-1.5',
         tone === 'slate' && 'border-slate-200 bg-slate-50/60',
         tone === 'emerald' && 'border-emerald-100 bg-emerald-50/60',
         tone === 'amber' && 'border-amber-100 bg-amber-50/60',
@@ -365,6 +369,75 @@ function DetailMetric({
           {helper}
         </p>
       )}
+    </div>
+  )
+}
+
+function DetailSection({
+  title,
+  meta,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  meta?: string
+  icon: typeof Activity
+  children: ReactNode
+}) {
+  return (
+    <section>
+      <div className='mb-1 flex items-center justify-between gap-2'>
+        <div className='flex min-w-0 items-center gap-1.5'>
+          <Icon className='size-3.5 shrink-0 text-blue-600' />
+          <h3 className='truncate text-[12px] leading-4 font-semibold text-slate-950'>
+            {title}
+          </h3>
+        </div>
+        {meta != null && (
+          <span className='shrink-0 text-[10px] leading-4 text-slate-500'>
+            {meta}
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function MiniProgressRow({
+  label,
+  value,
+  helper,
+  max,
+  tone,
+}: {
+  label: string
+  value: number
+  helper: string
+  max: number
+  tone: 'blue' | 'emerald' | 'amber' | 'rose'
+}) {
+  const percent = max > 0 ? Math.min(100, Math.max(4, (value / max) * 100)) : 4
+  return (
+    <div className='rounded-md border border-slate-200 bg-white px-2.5 py-1.5'>
+      <div className='flex items-center justify-between gap-2'>
+        <span className='text-[10px] leading-4 text-slate-500'>{label}</span>
+        <span className='text-[11px] leading-4 font-semibold text-slate-900 tabular-nums'>
+          {helper}
+        </span>
+      </div>
+      <div className='mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+        <div
+          className={cn(
+            'h-full rounded-full',
+            tone === 'blue' && 'bg-blue-500',
+            tone === 'emerald' && 'bg-emerald-500',
+            tone === 'amber' && 'bg-amber-500',
+            tone === 'rose' && 'bg-rose-500'
+          )}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
     </div>
   )
 }
@@ -455,6 +528,14 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   )
   const selected = items.find((item) => item.id === selectedId) ?? null
   const detail = detailQuery.data?.data
+  const selectedModels = useMemo(
+    () =>
+      selected
+        ? (detail?.supported_models ?? splitModels(selected.models))
+        : [],
+    [detail?.supported_models, selected]
+  )
+  const selectedIncidents = detail?.incidents ?? []
   const total = data?.total ?? rawItems.length
   const fallbackSupplierTotal = supplierOptions.length
   const totalSuppliers =
@@ -638,6 +719,68 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
     ? selected.average_latency_ms || selected.response_time_ms
     : 0
   const availabilityTone = getAvailabilityTone(selectedStatus?.severity)
+  const enabledItems = useMemo(
+    () => items.filter((item) => item.status === CHANNEL_STATUS.ENABLED),
+    [items]
+  )
+  const riskyItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const severity = statusConfig(item).severity
+        return severity === 'warning' || severity === 'danger'
+      }),
+    [items]
+  )
+  const modelCoverage = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const item of items) {
+      for (const model of splitModels(item.models)) {
+        counts.set(model, (counts.get(model) ?? 0) + 1)
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 5)
+  }, [items])
+  const routeLeaders = useMemo(
+    () =>
+      [...items]
+        .sort(
+          (a, b) =>
+            Number(b.priority) - Number(a.priority) ||
+            Number(b.weight) - Number(a.weight) ||
+            b.used_quota - a.used_quota
+        )
+        .slice(0, 3),
+    [items]
+  )
+  const selectedPeerItems = useMemo(() => {
+    if (!selected) return []
+    return items.filter((item) =>
+      selected.supplier_id > 0
+        ? item.supplier_id === selected.supplier_id
+        : item.id === selected.id
+    )
+  }, [items, selected])
+  const supplierBalance = useMemo(() => {
+    if (detail?.supplier?.total_balance != null) {
+      return detail.supplier.total_balance
+    }
+    return selectedPeerItems.reduce((sum, item) => sum + item.balance, 0)
+  }, [detail?.supplier?.total_balance, selectedPeerItems])
+  const averageVisibleBalance = useMemo(
+    () =>
+      items.length > 0
+        ? items.reduce((sum, item) => sum + item.balance, 0) / items.length
+        : 0,
+    [items]
+  )
+  const maxBalanceForBars = Math.max(
+    selected?.balance ?? 0,
+    supplierBalance,
+    averageVisibleBalance,
+    1
+  )
   let supplierProfileContent: ReactNode = (
     <p className='rounded-md border border-dashed border-slate-200 p-3 text-xs leading-5 text-slate-500'>
       当前渠道尚未绑定供应商，可在经典配置中补充供应商信息。
@@ -1034,8 +1177,10 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                   </div>
                   <div
                     className={cn(
-                      'max-h-[calc(100vh-350px)] overflow-auto',
-                      items.length <= 4 ? 'min-h-[220px]' : 'min-h-[430px]'
+                      'overflow-auto',
+                      items.length <= 4
+                        ? 'max-h-[230px]'
+                        : 'max-h-[calc(100vh-350px)] min-h-[430px]'
                     )}
                   >
                     <Table className='min-w-[920px]'>
@@ -1249,6 +1394,88 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                       </TableBody>
                     </Table>
                   </div>
+                  {items.length > 0 && (
+                    <div className='grid border-t border-slate-100 bg-slate-50/50 sm:grid-cols-3'>
+                      <div className='border-b border-slate-100 px-3 py-2 sm:border-r sm:border-b-0'>
+                        <div className='flex items-center justify-between gap-2'>
+                          <span className='text-[11px] font-medium text-slate-500'>
+                            渠道可用状态
+                          </span>
+                          <span className='text-[12px] font-semibold text-slate-950 tabular-nums'>
+                            {enabledItems.length}/{items.length}
+                          </span>
+                        </div>
+                        <div className='mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-slate-200'>
+                          <span
+                            className='bg-emerald-500'
+                            style={{
+                              width: `${items.length > 0 ? (enabledItems.length / items.length) * 100 : 0}%`,
+                            }}
+                          />
+                          <span
+                            className='bg-amber-400'
+                            style={{
+                              width: `${items.length > 0 ? (riskyItems.length / items.length) * 100 : 0}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className='border-b border-slate-100 px-3 py-2 sm:border-r sm:border-b-0'>
+                        <div className='flex items-center justify-between gap-2'>
+                          <span className='text-[11px] font-medium text-slate-500'>
+                            模型覆盖 Top
+                          </span>
+                          <span className='text-[11px] text-slate-500'>
+                            {modelCoverage.length} 类
+                          </span>
+                        </div>
+                        <div className='mt-1.5 flex gap-1 overflow-hidden'>
+                          {modelCoverage.slice(0, 3).map(([model, count]) => (
+                            <Badge
+                              key={model}
+                              variant='secondary'
+                              className='h-5 min-w-0 rounded px-1.5 text-[10px]'
+                            >
+                              <span className='truncate'>{model}</span>
+                              <span className='ml-1 text-slate-500'>
+                                {count}
+                              </span>
+                            </Badge>
+                          ))}
+                          {modelCoverage.length === 0 && (
+                            <span className='text-[11px] text-slate-400'>
+                              暂无模型配置
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className='px-3 py-2'>
+                        <div className='flex items-center justify-between gap-2'>
+                          <span className='text-[11px] font-medium text-slate-500'>
+                            路由优先级
+                          </span>
+                          <span className='text-[11px] text-slate-500'>
+                            按优先级/权重
+                          </span>
+                        </div>
+                        <div className='mt-1.5 flex items-center gap-1.5 overflow-hidden'>
+                          {routeLeaders.map((item, index) => (
+                            <span
+                              key={item.id}
+                              className='inline-flex min-w-0 items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 ring-1 ring-slate-200'
+                            >
+                              <span className='text-slate-400'>
+                                {index + 1}
+                              </span>
+                              <span className='truncate'>
+                                {item.supplier_name || item.name}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </EnterprisePanel>
               </div>
 
@@ -1258,7 +1485,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                   bodyClassName='p-0'
                 >
                   {!selected ? (
-                    <div className='flex min-h-[520px] flex-col items-center justify-center px-6 text-center'>
+                    <div className='flex min-h-[520px] flex-col items-center justify-center px-6 text-center xl:min-h-[calc(100vh-172px)]'>
                       <span className='flex size-11 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
                         <ServerCog className='size-5' />
                       </span>
@@ -1270,7 +1497,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                       </p>
                     </div>
                   ) : (
-                    <div className='min-h-[520px]'>
+                    <div className='min-h-[520px] xl:min-h-[calc(100vh-172px)]'>
                       <div className='border-b border-slate-100 px-3 py-3'>
                         <div className='flex items-start justify-between gap-3'>
                           <div className='min-w-0'>
@@ -1353,18 +1580,14 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                         ))}
                       </div>
 
-                      <div className='space-y-3 px-3 py-3'>
+                      <div className='space-y-2.5 px-3 py-2.5'>
                         {detailTab === 'overview' && (
-                          <>
-                            <div>
-                              <div className='mb-2 flex items-center justify-between'>
-                                <h3 className='text-[13px] font-semibold text-slate-950'>
-                                  账户健康
-                                </h3>
-                                <span className='text-[10px] text-slate-500'>
-                                  {detailQuery.isFetching ? '更新中' : '实时'}
-                                </span>
-                              </div>
+                          <div className='space-y-2.5'>
+                            <DetailSection
+                              title='账户健康'
+                              meta={detailQuery.isFetching ? '更新中' : '实时'}
+                              icon={Activity}
+                            >
                               <div className='grid grid-cols-2 gap-2'>
                                 <DetailMetric
                                   label='成功率'
@@ -1399,16 +1622,138 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                                   }
                                 />
                               </div>
-                            </div>
+                            </DetailSection>
 
-                            <div>
-                              <div className='mb-2 flex items-center gap-2 text-[13px] font-semibold text-slate-950'>
-                                <ShieldCheck className='size-3.5 text-blue-600' />
-                                供应商画像
+                            <DetailSection
+                              title='余额快照'
+                              meta='USD'
+                              icon={BarChart3}
+                            >
+                              <div className='space-y-1.5'>
+                                <MiniProgressRow
+                                  label='当前渠道余额'
+                                  value={selected.balance}
+                                  helper={formatMoney(selected.balance)}
+                                  max={maxBalanceForBars}
+                                  tone={
+                                    selected.balance > 0 &&
+                                    selected.balance < 10
+                                      ? 'rose'
+                                      : 'emerald'
+                                  }
+                                />
+                                <MiniProgressRow
+                                  label='供应商余额'
+                                  value={supplierBalance}
+                                  helper={formatMoney(supplierBalance)}
+                                  max={maxBalanceForBars}
+                                  tone='blue'
+                                />
                               </div>
-                              {supplierProfileContent}
-                            </div>
-                          </>
+                            </DetailSection>
+
+                            <DetailSection
+                              title='近期事件'
+                              meta={
+                                selectedIncidents.length > 1
+                                  ? `近 ${rangeDays} 天 · +${selectedIncidents.length - 1}`
+                                  : `近 ${rangeDays} 天`
+                              }
+                              icon={ListChecks}
+                            >
+                              <div className='space-y-1.5'>
+                                {selectedIncidents.length === 0 ? (
+                                  <div className='rounded-md border border-emerald-100 bg-emerald-50/70 px-2.5 py-2 text-[11px] leading-4 text-emerald-700'>
+                                    当前窗口未发现错误事件。
+                                  </div>
+                                ) : (
+                                  selectedIncidents
+                                    .slice(0, 1)
+                                    .map((incident) => (
+                                      <div
+                                        key={incident.id}
+                                        className='rounded-md border border-slate-200 bg-white px-2 py-1.5'
+                                      >
+                                        <div className='flex items-start justify-between gap-2'>
+                                          <p className='line-clamp-1 text-[11px] leading-4 font-medium text-slate-900'>
+                                            {incident.title}
+                                          </p>
+                                          <Badge
+                                            variant='outline'
+                                            className='h-5 rounded px-1.5 text-[10px]'
+                                          >
+                                            {incident.status}
+                                          </Badge>
+                                        </div>
+                                        <p className='mt-0.5 text-[10px] text-slate-500'>
+                                          {dayjs
+                                            .unix(incident.created_at)
+                                            .format('MM-DD HH:mm')}
+                                        </p>
+                                      </div>
+                                    ))
+                                )}
+                              </div>
+                            </DetailSection>
+
+                            <DetailSection
+                              title='支持模型'
+                              meta={`${selectedModels.length} 个模型`}
+                              icon={Tags}
+                            >
+                              <div className='flex max-h-[48px] flex-wrap gap-1 overflow-auto rounded-md border border-slate-200 bg-slate-50/50 p-1.5'>
+                                {selectedModels.length === 0 ? (
+                                  <span className='text-[11px] text-slate-400'>
+                                    暂无模型配置
+                                  </span>
+                                ) : (
+                                  selectedModels.slice(0, 10).map((model) => (
+                                    <Badge
+                                      key={model}
+                                      variant='secondary'
+                                      className='h-5 rounded px-1.5 text-[10px]'
+                                    >
+                                      {model}
+                                    </Badge>
+                                  ))
+                                )}
+                              </div>
+                            </DetailSection>
+
+                            <DetailSection
+                              title='路由优先级'
+                              meta='同组分流'
+                              icon={Waypoints}
+                            >
+                              <div className='grid grid-cols-3 gap-2 rounded-md border border-blue-100 bg-blue-50/50 p-1.5'>
+                                <div>
+                                  <p className='text-[10px] text-blue-600/80'>
+                                    优先级
+                                  </p>
+                                  <p className='mt-0.5 text-[13px] font-semibold text-slate-950 tabular-nums'>
+                                    {selected.priority || 0}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className='text-[10px] text-blue-600/80'>
+                                    权重
+                                  </p>
+                                  <p className='mt-0.5 text-[13px] font-semibold text-slate-950 tabular-nums'>
+                                    {selected.weight || 0}%
+                                  </p>
+                                </div>
+                                <div className='min-w-0'>
+                                  <p className='text-[10px] text-blue-600/80'>
+                                    分组
+                                  </p>
+                                  <p className='mt-0.5 truncate text-[13px] font-semibold text-slate-950'>
+                                    {selected.group || 'default'}
+                                  </p>
+                                </div>
+                              </div>
+                            </DetailSection>
+
+                          </div>
                         )}
 
                         {detailTab === 'balance' && (
@@ -1617,6 +1962,9 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                                 )}
                               </div>
                             </div>
+                            <DetailSection title='供应商画像' icon={ShieldCheck}>
+                              {supplierProfileContent}
+                            </DetailSection>
                             <p className='rounded-md border border-slate-200 bg-slate-50/60 p-2.5 text-[11px] leading-5 text-slate-500'>
                               策略编辑、模型映射、多
                               Key、状态码风控等高级操作保留在经典配置视图中，避免企业视图重复维护复杂表单。
