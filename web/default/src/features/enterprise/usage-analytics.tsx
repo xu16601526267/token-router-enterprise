@@ -24,7 +24,6 @@ import {
   ArrowUpRight,
   Boxes,
   CalendarDays,
-  Clock3,
   Coins,
   DatabaseZap,
   Download,
@@ -36,7 +35,6 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
-  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -68,7 +66,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useEnterpriseConsole } from '@/context/enterprise-console-context'
+import {
+  ENTERPRISE_TIME_RANGE_OPTIONS,
+  useEnterpriseConsole,
+  type EnterpriseRangePreset,
+} from '@/context/enterprise-console-context'
 import {
   formatCompactNumber,
   formatCurrencyUSD,
@@ -147,6 +149,9 @@ const REQUEST_TYPE_OPTIONS = [
   { value: 'audio', label: '音频' },
 ]
 
+const USAGE_PANEL_CHROME =
+  'border-slate-200/75 shadow-[0_1px_1px_rgb(15_23_42/0.025)]'
+
 function formatPercent(value: number): string {
   return new Intl.NumberFormat('zh-CN', {
     style: 'percent',
@@ -210,6 +215,14 @@ function formatRequestType(value: string) {
   return REQUEST_TYPE_LABELS[value] ?? '对话'
 }
 
+function applyRangePreset(
+  value: string,
+  setRangePreset: (rangePreset: EnterpriseRangePreset) => void
+) {
+  if (value === 'custom') return
+  setRangePreset(value as EnterpriseRangePreset)
+}
+
 function LogStatusBadge(props: { status: string }) {
   const isSuccess = props.status === 'success'
   return (
@@ -232,6 +245,7 @@ function TopBreakdownList(props: {
   value: 'cost' | 'quota'
   emptyText: string
   limit?: number
+  compact?: boolean
 }) {
   if (props.items.length === 0) {
     return (
@@ -246,9 +260,19 @@ function TopBreakdownList(props: {
       {props.items.slice(0, props.limit ?? 6).map((item, index) => (
         <div
           key={`${item.name}-${item.quota}`}
-          className='grid grid-cols-[22px_minmax(0,1fr)_72px] items-center gap-2 text-xs'
+          className={cn(
+            'grid items-center text-xs',
+            props.compact
+              ? 'grid-cols-[18px_minmax(0,1fr)_54px] gap-1.5'
+              : 'grid-cols-[22px_minmax(0,1fr)_72px] gap-2'
+          )}
         >
-          <span className='flex size-5 items-center justify-center rounded bg-slate-100 text-[10px] font-semibold text-slate-500'>
+          <span
+            className={cn(
+              'flex items-center justify-center rounded bg-slate-100 font-semibold text-slate-500',
+              props.compact ? 'size-4 text-[9px]' : 'size-5 text-[10px]'
+            )}
+          >
             {index + 1}
           </span>
           <div className='min-w-0'>
@@ -256,11 +280,21 @@ function TopBreakdownList(props: {
               <span className='truncate font-semibold text-slate-800'>
                 {item.name}
               </span>
-              <span className='text-[10px] text-slate-500'>
+              <span
+                className={cn(
+                  'text-[10px] text-slate-500',
+                  props.compact && 'hidden'
+                )}
+              >
                 {formatPercent(item.share)}
               </span>
             </div>
-            <div className='mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+            <div
+              className={cn(
+                'mt-1 overflow-hidden rounded-full bg-slate-100',
+                props.compact ? 'h-1' : 'h-1.5'
+              )}
+            >
               <div
                 className='h-full rounded-full bg-blue-500'
                 style={{
@@ -269,7 +303,12 @@ function TopBreakdownList(props: {
               />
             </div>
           </div>
-          <span className='text-right text-[11px] font-semibold text-slate-900 tabular-nums'>
+          <span
+            className={cn(
+              'text-right font-semibold text-slate-900 tabular-nums',
+              props.compact ? 'text-[10px]' : 'text-[11px]'
+            )}
+          >
             {props.value === 'cost'
               ? formatCurrencyUSD(item.cost)
               : formatLogQuota(item.quota)}
@@ -292,11 +331,13 @@ function CostDonutPanel(props: {
       className={cn(
         'grid h-full min-h-0 items-center gap-2',
         props.compact
-          ? 'grid-cols-[104px_minmax(0,1fr)]'
+          ? 'grid-cols-[86px_minmax(0,1fr)]'
           : 'grid-cols-[118px_minmax(0,1fr)]'
       )}
     >
-      <div className={cn('relative', props.compact ? 'h-[112px]' : 'h-[124px]')}>
+      <div
+        className={cn('relative', props.compact ? 'h-[104px]' : 'h-[124px]')}
+      >
         {props.items.length === 0 ? (
           <div className='flex h-full items-center justify-center rounded-md bg-slate-50 text-xs text-slate-400'>
             暂无数据
@@ -313,8 +354,8 @@ function CostDonutPanel(props: {
                   data={props.items.slice(0, 6)}
                   dataKey='cost'
                   nameKey='name'
-                  innerRadius={34}
-                  outerRadius={52}
+                  innerRadius={props.compact ? 27 : 34}
+                  outerRadius={props.compact ? 41 : 52}
                   paddingAngle={3}
                 >
                   {props.items.slice(0, 6).map((item, index) => (
@@ -330,7 +371,12 @@ function CostDonutPanel(props: {
               </PieChart>
             </ResponsiveContainer>
             <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center'>
-              <span className='text-[13px] font-semibold text-slate-950'>
+              <span
+                className={cn(
+                  'font-semibold text-slate-950',
+                  props.compact ? 'text-[11px]' : 'text-[13px]'
+                )}
+              >
                 {props.centerText}
               </span>
               <span className='text-[10px] text-slate-500'>
@@ -345,6 +391,7 @@ function CostDonutPanel(props: {
         value='cost'
         emptyText={`暂无${props.title}数据`}
         limit={props.compact ? 3 : 6}
+        compact={props.compact}
       />
     </div>
   )
@@ -369,8 +416,8 @@ function UsageLogTable(props: {
 
   return (
     <>
-      <div className='max-h-[250px] overflow-auto'>
-        <Table className='w-full table-fixed text-[11px] [&_td]:h-7 [&_td]:px-2 [&_td]:py-1 [&_td]:text-[11px] [&_td_*]:text-[11px] [&_th]:h-7 [&_th]:px-2 [&_th]:text-[11px] [&_th_*]:text-[11px]'>
+      <div className='max-h-[224px] overflow-auto'>
+        <Table className='w-full table-fixed text-[10.5px] [&_td]:h-6 [&_td]:px-2 [&_td]:py-0.5 [&_td]:text-[10.5px] [&_td_*]:text-[10.5px] [&_th]:h-6 [&_th]:px-2 [&_th]:text-[10.5px] [&_th_*]:text-[10.5px]'>
           <TableHeader className='sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_rgb(226_232_240)]'>
             <TableRow>
               <TableHead className='w-[11%]'>请求 ID</TableHead>
@@ -391,22 +438,36 @@ function UsageLogTable(props: {
           </TableHeader>
           <TableBody>
             {props.logs.map((log) => (
-              <TableRow key={log.id} className='hover:bg-blue-50/40'>
-                <TableCell className='truncate font-mono text-[11px] text-blue-600'>
-                  {log.request_id || `log_${log.id}`}
+              <TableRow
+                key={log.id}
+                className='hover:bg-blue-50/40'
+                style={{
+                  animation: 'none',
+                  opacity: 1,
+                  transform: 'none',
+                }}
+              >
+                <TableCell>
+                  <span className='block truncate font-mono text-blue-600'>
+                    {log.request_id || `log_${log.id}`}
+                  </span>
                 </TableCell>
-                <TableCell className='truncate text-slate-500'>
-                  {formatDateTime(log.created_at)}
+                <TableCell>
+                  <span className='block truncate text-slate-500'>
+                    {formatDateTime(log.created_at)}
+                  </span>
                 </TableCell>
-                <TableCell className='truncate'>
-                  <span className='truncate font-semibold text-slate-800'>
+                <TableCell>
+                  <span className='block truncate font-semibold text-slate-800'>
                     {log.group || log.username || '默认客户'}
                   </span>
                 </TableCell>
-                <TableCell className='truncate text-slate-600'>
-                  {log.username || 'system'}
+                <TableCell>
+                  <span className='block truncate text-slate-600'>
+                    {log.username || 'system'}
+                  </span>
                 </TableCell>
-                <TableCell className='truncate'>
+                <TableCell>
                   <Badge
                     variant='outline'
                     className='h-5 max-w-full truncate rounded px-1.5 text-[10px]'
@@ -434,9 +495,11 @@ function UsageLogTable(props: {
                 <TableCell className='text-right font-semibold tabular-nums'>
                   {formatLogQuota(log.quota)}
                 </TableCell>
-                <TableCell className='truncate'>
-                  {log.channel_name ||
-                    (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
+                <TableCell>
+                  <span className='block truncate'>
+                    {log.channel_name ||
+                      (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
+                  </span>
                 </TableCell>
                 <TableCell className='text-right tabular-nums'>
                   {formatNumber(log.use_time_ms)} ms
@@ -491,8 +554,14 @@ function UsageLogTable(props: {
 export function EnterpriseUsageAnalytics(props: {
   classicContent?: ReactNode
 }) {
-  const { range, rangeLabel, granularity, setGranularity } =
-    useEnterpriseConsole()
+  const {
+    range,
+    rangeLabel,
+    rangePreset,
+    granularity,
+    setRangePreset,
+    setGranularity,
+  } = useEnterpriseConsole()
   const [search, setSearch] = useState('')
   const [modelFilter, setModelFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
@@ -519,8 +588,7 @@ export function EnterpriseUsageAnalytics(props: {
           ? Number.parseInt(channelFilter, 10)
           : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
-      request_type:
-        requestTypeFilter !== 'all' ? requestTypeFilter : undefined,
+      request_type: requestTypeFilter !== 'all' ? requestTypeFilter : undefined,
       page,
       page_size: 20,
       sort_by: sortBy,
@@ -603,6 +671,7 @@ export function EnterpriseUsageAnalytics(props: {
     () => [...usage.by_model].sort((a, b) => b.quota - a.quota),
     [usage.by_model]
   )
+  const topCustomer = usage.by_user[0]
 
   const anomalyItems = useMemo(() => {
     const items: Array<{
@@ -767,11 +836,29 @@ export function EnterpriseUsageAnalytics(props: {
         />
       </section>
 
-      <EnterprisePanel bodyClassName='p-2'>
-        <div className='grid gap-1.5 min-[1420px]:grid-cols-[170px_repeat(6,minmax(104px,1fr))_minmax(190px,1.5fr)_76px_76px_92px]'>
-          <div className='flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700'>
-            <CalendarDays className='size-3.5 text-slate-400' />
-            <span className='truncate'>{rangeLabel}</span>
+      <EnterprisePanel className={USAGE_PANEL_CHROME} bodyClassName='p-1.5'>
+        <div className='grid gap-1.5 min-[1420px]:grid-cols-[170px_repeat(6,minmax(104px,1fr))_minmax(190px,1.5fr)_72px_72px_86px]'>
+          <div className='relative'>
+            <CalendarDays className='pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-slate-400' />
+            <NativeSelect
+              value={rangePreset}
+              className='h-8 w-full rounded-md bg-white text-xs [&_[data-slot=native-select]]:h-8 [&_[data-slot=native-select]]:rounded-md [&_[data-slot=native-select]]:pl-7 [&_[data-slot=native-select]]:text-xs'
+              onChange={(event) => {
+                applyRangePreset(event.target.value, setRangePreset)
+                setPage(1)
+              }}
+            >
+              {rangePreset === 'custom' && (
+                <NativeSelectOption value='custom'>
+                  {rangeLabel}
+                </NativeSelectOption>
+              )}
+              {ENTERPRISE_TIME_RANGE_OPTIONS.map((option) => (
+                <NativeSelectOption key={option.value} value={option.value}>
+                  {option.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
           </div>
           <NativeSelect
             value={userFilter}
@@ -902,6 +989,7 @@ export function EnterpriseUsageAnalytics(props: {
             <EnterprisePanel
               title='Tokens 趋势'
               description='输入 Tokens、输出 Tokens 与缓存命中率'
+              className={USAGE_PANEL_CHROME}
               action={
                 <NativeSelect
                   value={granularity}
@@ -1003,6 +1091,7 @@ export function EnterpriseUsageAnalytics(props: {
             <EnterprisePanel
               title='成本分布'
               description='按模型策略聚合'
+              className={USAGE_PANEL_CHROME}
               bodyClassName='h-36 p-2'
               action={
                 <Badge
@@ -1024,12 +1113,16 @@ export function EnterpriseUsageAnalytics(props: {
             <EnterprisePanel
               title='模型用量排行'
               description='按 Token 成本排序'
+              className={USAGE_PANEL_CHROME}
               bodyClassName='h-36 p-2'
               action={
                 <NativeSelect
                   value={sortBy}
                   className='h-6 rounded-md bg-white text-[11px]'
-                  onChange={(event) => setSortBy(event.target.value)}
+                  onChange={(event) => {
+                    setSortBy(event.target.value)
+                    setPage(1)
+                  }}
                 >
                   <NativeSelectOption value='created_at'>
                     最新
@@ -1051,6 +1144,7 @@ export function EnterpriseUsageAnalytics(props: {
           <EnterprisePanel
             title='错误率趋势'
             description='错误率与错误请求数按当前粒度聚合'
+            className={USAGE_PANEL_CHROME}
             action={
               <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
                 {GRANULARITY_LABELS[granularity]}
@@ -1124,6 +1218,7 @@ export function EnterpriseUsageAnalytics(props: {
           <EnterprisePanel
             title='用量日志'
             description={`当前展示 ${usage.recent_logs.length} 条，按 ${sortLabel} 排序`}
+            className={USAGE_PANEL_CHROME}
             bodyClassName='p-0'
           >
             <UsageLogTable
@@ -1144,6 +1239,7 @@ export function EnterpriseUsageAnalytics(props: {
           <EnterprisePanel
             title='成本中心控制'
             description='按部门 / 分组监测预算'
+            className={USAGE_PANEL_CHROME}
             action={
               <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
                 实时
@@ -1162,6 +1258,7 @@ export function EnterpriseUsageAnalytics(props: {
           <EnterprisePanel
             title='热点客户'
             description='按成本贡献排序'
+            className={USAGE_PANEL_CHROME}
             action={
               <Button
                 variant='ghost'
@@ -1181,7 +1278,11 @@ export function EnterpriseUsageAnalytics(props: {
             />
           </EnterprisePanel>
 
-          <EnterprisePanel title='优化建议'>
+          <EnterprisePanel
+            title='优化建议'
+            className={USAGE_PANEL_CHROME}
+            bodyClassName='min-h-[214px] p-2.5'
+          >
             <div className='space-y-2'>
               {anomalyItems.map((item) => {
                 const Icon = OPTIMIZATION_ICONS[item.tone]
@@ -1212,9 +1313,9 @@ export function EnterpriseUsageAnalytics(props: {
                   </article>
                 )
               })}
-              <article className='rounded-md border border-emerald-100 bg-emerald-50/70 p-2.5 text-emerald-700'>
+              <article className='rounded-md border border-emerald-100 bg-emerald-50/70 p-2 text-emerald-700'>
                 <div className='flex items-start gap-2'>
-                  <span className='mt-0.5 flex size-7 shrink-0 items-center justify-center rounded bg-white/70'>
+                  <span className='mt-0.5 flex size-6 shrink-0 items-center justify-center rounded bg-white/70'>
                     <ArrowUpRight className='size-3.5' />
                   </span>
                   <div className='min-w-0'>
@@ -1227,25 +1328,24 @@ export function EnterpriseUsageAnalytics(props: {
                   </div>
                 </div>
               </article>
-            </div>
-          </EnterprisePanel>
-
-          <EnterprisePanel title='运行概况'>
-            <div className='grid grid-cols-2 gap-2'>
-              <div className='rounded-md border border-slate-100 bg-slate-50 p-2'>
-                <Clock3 className='size-3.5 text-violet-500' />
-                <p className='mt-1.5 text-base font-semibold tabular-nums'>
-                  {formatNumber(metrics.average_latency_ms)} ms
-                </p>
-                <p className='text-[10px] text-slate-500'>平均延迟</p>
-              </div>
-              <div className='rounded-md border border-slate-100 bg-slate-50 p-2'>
-                <UsersRound className='size-3.5 text-blue-500' />
-                <p className='mt-1.5 text-base font-semibold tabular-nums'>
-                  {formatNumber(usage.by_user.length)}
-                </p>
-                <p className='text-[10px] text-slate-500'>活跃主体</p>
-              </div>
+              {topCustomer && (
+                <article className='rounded-md border border-blue-100 bg-blue-50/70 p-2 text-blue-700'>
+                  <div className='flex items-start gap-2'>
+                    <span className='mt-0.5 flex size-6 shrink-0 items-center justify-center rounded bg-white/70'>
+                      <Coins className='size-3.5' />
+                    </span>
+                    <div className='min-w-0'>
+                      <p className='text-xs font-semibold'>复核高成本主体</p>
+                      <p className='mt-1 text-[11px] leading-4 text-slate-600'>
+                        {topCustomer.name} 当前成本{' '}
+                        {formatCurrencyUSD(topCustomer.cost)}，占比{' '}
+                        {formatPercent(topCustomer.share)}
+                        ，建议同步预算阈值。
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              )}
             </div>
           </EnterprisePanel>
         </aside>
