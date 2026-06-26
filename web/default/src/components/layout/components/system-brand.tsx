@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils'
 type SystemBrandProps = {
   defaultName?: string
   defaultVersion?: string
+  nameOverride?: string
+  versionOverride?: string
   /**
    * Visual layout:
    * - 'sidebar': stacked card style (used inside the sidebar header).
@@ -51,9 +53,13 @@ export function SystemBrand(props: SystemBrandProps) {
   const { logo } = useSystemConfig()
 
   const variant = props.variant ?? 'sidebar'
-  const name = status?.system_name || props.defaultName || 'New API'
+  const name =
+    props.nameOverride ?? status?.system_name ?? props.defaultName ?? 'New API'
   const version =
-    status?.version || props.defaultVersion || t('Unknown version')
+    props.versionOverride ??
+    status?.version ??
+    props.defaultVersion ??
+    t('Unknown version')
 
   if (variant === 'inline') {
     return (
@@ -94,7 +100,7 @@ export function SystemBrand(props: SystemBrandProps) {
           </div>
           <div className='grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden'>
             <span className='truncate font-semibold'>{name}</span>
-            <span className='truncate text-xs'>{version}</span>
+            {version ? <span className='truncate text-xs'>{version}</span> : null}
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>

@@ -63,31 +63,33 @@ export function EnterpriseStatCard({
   loading = false,
 }: EnterpriseStatCardProps) {
   return (
-    <article className='enterprise-stat-card bg-card relative min-h-[92px] overflow-hidden rounded-md border p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
-      <div className='bg-primary/80 pointer-events-none absolute inset-y-0 left-0 w-0.5' />
-      <div className='flex items-start justify-between gap-3'>
-        <div className='min-w-0'>
-          <p className='text-muted-foreground truncate text-[11px] font-medium'>
-            {title}
-          </p>
-          {loading ? (
-            <div className='bg-muted mt-2 h-7 w-24 animate-pulse rounded-md' />
-          ) : (
-            <p className='text-foreground mt-1 truncate text-[22px] leading-7 font-semibold tabular-nums'>
-              {value}
-            </p>
-          )}
-        </div>
+    <article className='enterprise-stat-card min-h-[84px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200'>
+      <div className='flex items-start gap-2.5'>
         <span
           className={cn(
             'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
             toneStyles[tone]
           )}
         >
-          <Icon className='size-4' strokeWidth={1.8} />
+          <Icon className='size-4' strokeWidth={1.9} />
         </span>
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center justify-between gap-2'>
+            <p className='text-muted-foreground truncate text-[11px] font-medium'>
+              {title}
+            </p>
+            <span className='text-muted-foreground text-lg leading-none'>›</span>
+          </div>
+          {loading ? (
+            <div className='bg-muted mt-2 h-7 w-24 animate-pulse rounded-md' />
+          ) : (
+            <p className='mt-1 truncate text-[19px] leading-6 font-semibold text-slate-950 tabular-nums'>
+              {value}
+            </p>
+          )}
+        </div>
       </div>
-      <div className='mt-2 flex min-h-4 items-center gap-1.5 text-[11px]'>
+      <div className='mt-2 flex min-h-4 items-center gap-1.5 pl-10 text-[11px]'>
         {trend != null && (
           <span
             className={cn(

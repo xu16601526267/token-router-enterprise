@@ -533,7 +533,11 @@ export function EnterpriseBillingCenter(props: {
                 当前周期暂无账本趋势数据
               </div>
             ) : (
-              <ResponsiveContainer width='100%' height='100%'>
+              <ResponsiveContainer
+                width='100%'
+                height='100%'
+                initialDimension={{ width: 720, height: 320 }}
+              >
                 <BarChart
                   data={trend}
                   margin={{ top: 12, right: 12, left: -18, bottom: 0 }}

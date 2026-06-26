@@ -39,21 +39,21 @@ export function EnterprisePanel({
   return (
     <section
       className={cn(
-        'enterprise-panel overflow-hidden rounded-md border bg-card shadow-[0_1px_2px_rgb(15_23_42/0.04)]',
+        'enterprise-panel overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]',
         className
       )}
       {...props}
     >
       {(title != null || description != null || action != null) && (
-        <header className='border-border/80 bg-muted/20 flex min-h-11 items-center justify-between gap-3 border-b px-3 py-2.5 sm:px-4'>
+        <header className='flex min-h-10 items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/65 px-3 py-2 sm:px-3.5'>
           <div className='min-w-0'>
             {title != null && (
-              <h3 className='text-foreground truncate text-[13px] font-semibold sm:text-sm'>
+              <h3 className='truncate text-[13px] font-semibold text-slate-900'>
                 {title}
               </h3>
             )}
             {description != null && (
-              <p className='text-muted-foreground mt-0.5 text-[11px] leading-4'>
+              <p className='mt-0.5 text-[11px] leading-4 text-slate-500'>
                 {description}
               </p>
             )}
@@ -61,7 +61,7 @@ export function EnterprisePanel({
           {action != null && <div className='shrink-0'>{action}</div>}
         </header>
       )}
-      <div className={cn('p-3 sm:p-4', bodyClassName)}>{children}</div>
+      <div className={cn('p-3', bodyClassName)}>{children}</div>
     </section>
   )
 }

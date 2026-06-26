@@ -30,19 +30,18 @@ export function EnterprisePageHeader({
   actions?: ReactNode
 }) {
   return (
-    <div className='enterprise-page-header bg-card relative overflow-hidden rounded-md border px-4 py-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:px-5'>
-      <div className='bg-primary absolute inset-y-0 left-0 w-1' />
-      <div className='relative flex flex-col justify-between gap-3 sm:flex-row sm:items-center'>
+    <div className='enterprise-page-header px-1 py-2'>
+      <div className='flex flex-col justify-between gap-3 sm:flex-row sm:items-center'>
         <div className='min-w-0'>
           {eyebrow != null && (
-            <p className='text-primary mb-1 text-[11px] font-semibold uppercase'>
+            <p className='mb-0.5 text-[11px] font-semibold text-blue-600'>
               {eyebrow}
             </p>
           )}
-          <h1 className='text-foreground text-[20px] leading-7 font-semibold sm:text-[22px]'>
+          <h1 className='text-[22px] leading-7 font-semibold text-slate-950 sm:text-2xl'>
             {title}
           </h1>
-          <p className='text-muted-foreground mt-1 max-w-3xl text-xs leading-5 sm:text-[13px]'>
+          <p className='mt-0.5 max-w-3xl text-sm leading-5 text-slate-500'>
             {description}
           </p>
         </div>

@@ -488,8 +488,12 @@ export function EnterpriseApiKeys() {
   const items = pageData?.items ?? EMPTY_API_KEY_ITEMS
 
   useEffect(() => {
-    if (selected && !items.some((item) => item.id === selected.id)) {
-      setSelected(null)
+    if (items.length === 0) {
+      if (selected) setSelected(null)
+      return
+    }
+    if (!selected || !items.some((item) => item.id === selected.id)) {
+      setSelected(items[0])
     }
   }, [items, selected])
 

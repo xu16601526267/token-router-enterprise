@@ -440,7 +440,11 @@ export function PersonalWorkbench() {
           bodyClassName='h-[340px] px-2 pb-2 pt-4 sm:px-3'
         >
           {usage.trend.length > 0 ? (
-            <ResponsiveContainer width='100%' height='100%'>
+            <ResponsiveContainer
+              width='100%'
+              height='100%'
+              initialDimension={{ width: 520, height: 340 }}
+            >
               <AreaChart
                 data={usage.trend}
                 margin={{ top: 12, right: 14, left: 0, bottom: 4 }}

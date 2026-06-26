@@ -80,7 +80,8 @@ For commercial licensing, please contact support@quantumnous.com
 
 @layer components {
   .enterprise-app-shell {
-    --app-header-height: 3rem;
+    --app-header-height: 0px;
+    --enterprise-topbar-height: 3.25rem;
     --sidebar: oklch(0.205 0.045 264.5);
     --sidebar-foreground: oklch(0.94 0.015 255);
     --sidebar-accent: oklch(0.31 0.07 261);
@@ -90,6 +91,19 @@ For commercial licensing, please contact support@quantumnous.com
   }
 
   .enterprise-app-shell [data-slot='sidebar-inset'] {
+    background: #f6f8fb;
+  }
+
+  [data-theme-content-layout='centered']
+    .enterprise-app-shell
+    [data-slot='sidebar-inset']
+    > * {
+    max-width: none;
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .enterprise-content-scroll {
     background: #f6f8fb;
   }
 
@@ -107,7 +121,7 @@ For commercial licensing, please contact support@quantumnous.com
   }
 
   .enterprise-app-shell [data-sidebar='menu-button'] {
-    min-height: 1.9rem;
+    min-height: 1.85rem;
     border-radius: 6px;
     font-size: 12px;
   }
@@ -131,6 +145,12 @@ For commercial licensing, please contact support@quantumnous.com
     font-size: 13px;
   }
 
+  .enterprise-dashboard {
+    max-width: 1586px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
   .enterprise-dashboard [data-slot='table'],
   .enterprise-dashboard [data-slot='table'] *,
   .enterprise-overview table,
@@ -140,7 +160,7 @@ For commercial licensing, please contact support@quantumnous.com
 
   .enterprise-dashboard [data-slot='table-head'],
   .enterprise-overview th {
-    height: 34px;
+    height: 32px;
     background: #f8fafc;
     color: #475569;
     font-weight: 600;
@@ -148,7 +168,19 @@ For commercial licensing, please contact support@quantumnous.com
 
   .enterprise-dashboard [data-slot='table-cell'],
   .enterprise-overview td {
-    padding-block: 0.55rem;
+    padding-block: 0.45rem;
+  }
+
+  .enterprise-dashboard [data-slot='tabs-list'],
+  .enterprise-overview [data-slot='tabs-list'] {
+    min-height: 2rem;
+  }
+
+  .enterprise-dashboard [data-slot='tabs-trigger'],
+  .enterprise-overview [data-slot='tabs-trigger'] {
+    min-height: 1.65rem;
+    padding-inline: 0.65rem;
+    font-size: 12px;
   }
 
   .enterprise-dashboard .recharts-cartesian-axis-tick-value,

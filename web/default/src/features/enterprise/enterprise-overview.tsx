@@ -418,7 +418,7 @@ function OverviewPanel({
         className
       )}
     >
-      <div className='flex min-h-14 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3'>
+      <div className='flex min-h-12 items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5'>
         <div className='min-w-0'>
           <h2 className='truncate text-[15px] font-semibold text-slate-950'>
             {title}
@@ -431,7 +431,7 @@ function OverviewPanel({
         </div>
         {action != null && <div className='shrink-0'>{action}</div>}
       </div>
-      <div className={cn('p-4', bodyClassName)}>{children}</div>
+      <div className={cn('p-3', bodyClassName)}>{children}</div>
     </section>
   )
 }
@@ -456,34 +456,33 @@ function MetricCard({
   const toneClass = metricToneClassName[tone]
 
   return (
-    <article className='group relative min-h-[108px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200'>
-      <div
-        className={cn(
-          'absolute inset-x-0 top-0 h-0.5 opacity-90',
-          toneClass.accent
-        )}
-      />
-      <div className='flex items-start justify-between gap-3'>
-        <div className='min-w-0'>
-          <p className='text-[13px] font-medium text-slate-500'>{title}</p>
+    <article className='group min-h-[100px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200'>
+      <div className='flex items-start gap-2.5'>
+        <span
+          className={cn(
+            'flex size-9 shrink-0 items-center justify-center rounded-md ring-1',
+            toneClass.icon
+          )}
+        >
+          <Icon className='size-4.5' strokeWidth={2.1} />
+        </span>
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center justify-between gap-2'>
+            <p className='truncate text-[12px] font-medium text-slate-500'>
+              {title}
+            </p>
+            <ChevronRight className='size-3.5 shrink-0 text-slate-400' />
+          </div>
           {loading ? (
             <div className='mt-3 h-8 w-24 animate-pulse rounded-md bg-slate-100' />
           ) : (
-            <p className='mt-1.5 truncate text-[22px] leading-7 font-semibold text-slate-950 tabular-nums'>
+            <p className='mt-1 truncate text-[21px] leading-7 font-semibold text-slate-950 tabular-nums'>
               {value}
             </p>
           )}
         </div>
-        <span
-          className={cn(
-            'flex size-10 shrink-0 items-center justify-center rounded-md ring-1',
-            toneClass.icon
-          )}
-        >
-          <Icon className='size-5' strokeWidth={2.1} />
-        </span>
       </div>
-      <div className='mt-5 flex items-center justify-between gap-3 text-xs'>
+      <div className='mt-3 flex items-center justify-between gap-3 pl-[46px] text-xs'>
         <span className='min-w-0 truncate text-slate-500'>{helper}</span>
         <span
           className={cn(
@@ -725,7 +724,7 @@ export function EnterpriseOverview() {
         />
       </section>
 
-      <section className='grid gap-3 2xl:grid-cols-[minmax(0,1fr)_384px]'>
+      <section className='relative grid items-start gap-3 2xl:block 2xl:pr-[396px]'>
         <OverviewPanel
           title='请求趋势'
           description='成功请求、失败请求与平均延迟'
@@ -748,10 +747,14 @@ export function EnterpriseOverview() {
               </Badge>
             </div>
           }
-          bodyClassName='h-[334px] px-2 pb-2 pt-4 sm:px-3'
+          bodyClassName='h-[246px] px-2 pb-2 pt-3 sm:px-3'
         >
           {trendData.length > 0 ? (
-            <ResponsiveContainer width='100%' height='100%'>
+            <ResponsiveContainer
+              width='100%'
+              height='100%'
+              initialDimension={{ width: 760, height: 246 }}
+            >
               <ComposedChart
                 data={trendData}
                 margin={{ top: 8, right: 16, bottom: 8, left: 4 }}
@@ -868,7 +871,7 @@ export function EnterpriseOverview() {
           )}
         </OverviewPanel>
 
-        <div className='grid gap-3'>
+        <div className='grid gap-3 2xl:absolute 2xl:top-0 2xl:right-0 2xl:w-96'>
           <OverviewPanel
             title='SLA 告警'
             description={`${Math.max(metrics.open_insights, slaItems.length || 3)} 条待确认`}
@@ -1012,15 +1015,19 @@ export function EnterpriseOverview() {
         </div>
       </section>
 
-      <section className='grid gap-3 xl:grid-cols-3'>
+      <section className='grid gap-3 xl:grid-cols-3 2xl:mr-[396px]'>
         <OverviewPanel
           title='成本 vs 收入'
           description='按当前定价口径估算'
           action={<Settings2 className='size-4 text-slate-400' />}
-          bodyClassName='h-[286px] px-2 pb-2 pt-4 sm:px-3'
+          bodyClassName='h-[220px] px-2 pb-2 pt-3 sm:px-3'
         >
           {costData.length > 0 ? (
-            <ResponsiveContainer width='100%' height='100%'>
+            <ResponsiveContainer
+              width='100%'
+              height='100%'
+              initialDimension={{ width: 420, height: 220 }}
+            >
               <BarChart
                 data={costData}
                 margin={{ top: 8, right: 10, bottom: 8, left: 4 }}
@@ -1090,11 +1097,15 @@ export function EnterpriseOverview() {
           title='供应商流量分布'
           description='按渠道消耗占比'
           action={<PieChartIcon className='size-4 text-slate-400' />}
-          bodyClassName='h-[286px]'
+          bodyClassName='h-[220px]'
         >
           {donutData.length > 0 ? (
             <div className='grid h-full grid-cols-[minmax(0,1fr)_150px] items-center gap-3 max-sm:grid-cols-1'>
-              <ResponsiveContainer width='100%' height='100%'>
+              <ResponsiveContainer
+                width='100%'
+                height='100%'
+                initialDimension={{ width: 220, height: 220 }}
+              >
                 <RechartsPieChart>
                   <Pie
                     data={donutData}
@@ -1222,7 +1233,7 @@ export function EnterpriseOverview() {
         </OverviewPanel>
       </section>
 
-      <section className='grid gap-3 2xl:grid-cols-[minmax(0,1fr)_384px]'>
+      <section className='grid gap-3 2xl:mr-[396px]'>
         <OverviewPanel
           title='近期运营事件'
           description='来自 SLA、渠道和定价治理的最近事件'

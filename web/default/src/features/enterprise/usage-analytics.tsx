@@ -578,7 +578,11 @@ export function EnterpriseUsageAnalytics(props: {
                 当前时间范围内暂无趋势数据
               </div>
             ) : (
-              <ResponsiveContainer width='100%' height='100%'>
+              <ResponsiveContainer
+                width='100%'
+                height='100%'
+                initialDimension={{ width: 720, height: 320 }}
+              >
                 <AreaChart
                   data={chartData}
                   margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
@@ -691,7 +695,11 @@ export function EnterpriseUsageAnalytics(props: {
               </div>
             ) : (
               <div className='grid min-h-52 grid-cols-[140px_minmax(0,1fr)] items-center gap-2'>
-                <ResponsiveContainer width='100%' height={150}>
+                <ResponsiveContainer
+                  width='100%'
+                  height={150}
+                  initialDimension={{ width: 140, height: 150 }}
+                >
                   <PieChart>
                     <Pie
                       data={usage.by_group.slice(0, 5)}
@@ -751,7 +759,11 @@ export function EnterpriseUsageAnalytics(props: {
                 暂无服务质量趋势
               </div>
             ) : (
-              <ResponsiveContainer width='100%' height='100%'>
+              <ResponsiveContainer
+                width='100%'
+                height='100%'
+                initialDimension={{ width: 720, height: 256 }}
+              >
                 <BarChart
                   data={chartData}
                   margin={{ top: 12, right: 12, left: -20, bottom: 0 }}

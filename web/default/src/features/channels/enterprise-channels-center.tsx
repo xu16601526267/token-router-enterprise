@@ -33,7 +33,7 @@ import {
   ShieldCheck,
   Tags,
 } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -208,6 +208,16 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   const detail = detailQuery.data?.data
   const total = data?.total ?? items.length
   const totalPages = Math.max(1, Math.ceil(total / (data?.page_size ?? 50)))
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setSelectedId(null)
+      return
+    }
+    if (selectedId == null || !items.some((item) => item.id === selectedId)) {
+      setSelectedId(items[0].id)
+    }
+  }, [items, selectedId])
 
   let supplierProfileContent = (
     <p className='text-muted-foreground mt-3 rounded-md border border-dashed p-4 text-xs'>
@@ -455,7 +465,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
 
               <div className='grid min-h-0 gap-3 2xl:grid-cols-[minmax(0,1fr)_380px]'>
                 <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
-                  <div className='overflow-x-auto'>
+                  <div className='max-h-[540px] overflow-auto'>
                     <Table>
                       <TableHeader>
                         <TableRow>

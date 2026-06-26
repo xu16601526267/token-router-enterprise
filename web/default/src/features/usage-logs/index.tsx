@@ -116,9 +116,11 @@ function UsageLogsContent() {
   return (
     <>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          {t(pageMeta.titleKey)}
-        </SectionPageLayout.Title>
+        {activeCategory !== 'common' && (
+          <SectionPageLayout.Title>
+            {t(pageMeta.titleKey)}
+          </SectionPageLayout.Title>
+        )}
         <SectionPageLayout.Content>
           {isAdmin && activeCategory === 'common' ? (
             <div className='h-full min-h-0 overflow-auto'>

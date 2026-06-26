@@ -232,7 +232,10 @@ function PolicyStatus(props: { policy: RoutingPolicyItem }) {
   )
 }
 
-export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
+export function ControlTower(props: {
+  nav?: ReactNode
+  onOpenRoutingPolicies?: () => void
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const endTimestamp = Math.floor(Date.now() / 1000)
@@ -358,7 +361,7 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
     <div className='flex flex-col gap-3 pb-5'>
       <EnterprisePageHeader
         eyebrow='企业级路由治理'
-        title='智能路由控制塔'
+        title='Token Router 控制塔'
         description='统一观测实时流量、供应商健康、SLA、路由策略和待执行动作。原有 Token Router 能力完整保留。'
         actions={
           <>
@@ -423,6 +426,8 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
           loading={query.isLoading}
         />
       </div>
+
+      {props.nav != null && <div className='min-w-0'>{props.nav}</div>}
 
       <div className='grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]'>
         <EnterprisePanel
@@ -607,7 +612,11 @@ export function ControlTower(props: { onOpenRoutingPolicies?: () => void }) {
           action={<Badge variant='outline'>自动刷新 60 秒</Badge>}
         >
           <div className='h-72'>
-            <ResponsiveContainer width='100%' height='100%'>
+            <ResponsiveContainer
+              width='100%'
+              height='100%'
+              initialDimension={{ width: 720, height: 288 }}
+            >
               <AreaChart data={trend} margin={{ left: -16, right: 8 }}>
                 <defs>
                   <linearGradient

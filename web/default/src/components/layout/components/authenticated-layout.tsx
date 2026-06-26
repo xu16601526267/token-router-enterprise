@@ -39,23 +39,30 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
       <SearchProvider>
         <SidebarProvider
           defaultOpen={defaultOpen}
-          className='enterprise-app-shell flex-col'
+          className='enterprise-app-shell'
+          style={
+            {
+              '--app-header-height': '0px',
+              '--enterprise-topbar-height': '3.25rem',
+              '--sidebar-width': '13.75rem',
+              '--sidebar-width-icon': '3rem',
+            } as React.CSSProperties
+          }
         >
           <SkipToMain />
-          <AppHeader />
-          <div className='flex min-h-0 w-full flex-1'>
-            <AppSidebar />
-            <SidebarInset
-              className={cn(
-                '@container/content',
-                'h-[calc(100svh-var(--app-header-height,0px))]',
-                'min-h-0 overflow-hidden',
-                'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-(var(--spacing)*4))]'
-              )}
-            >
+          <AppSidebar />
+          <SidebarInset
+            className={cn(
+              '@container/content',
+              'h-svh min-h-0 overflow-hidden bg-[#f6f8fb]',
+              'md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:shadow-none'
+            )}
+          >
+            <AppHeader />
+            <div className='enterprise-content-scroll flex min-h-0 flex-1 flex-col overflow-auto'>
               {props.children ?? <AnimatedOutlet />}
-            </SidebarInset>
-          </div>
+            </div>
+          </SidebarInset>
         </SidebarProvider>
       </SearchProvider>
     </LayoutProvider>

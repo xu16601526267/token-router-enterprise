@@ -7223,20 +7223,24 @@ export function TokenRouter() {
         </AlertDialogContent>
       </AlertDialog>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>{t('Token Router')}</SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <Button
-            variant='outline'
-            onClick={() => {
-              void queryClient.invalidateQueries({
-                queryKey: ['token-router'],
-              })
-            }}
-          >
-            <RefreshCw data-icon='inline-start' />
-            {t('Refresh')}
-          </Button>
-        </SectionPageLayout.Actions>
+        {activeTab !== 'control-tower' ? (
+          <SectionPageLayout.Title>{t('Token Router')}</SectionPageLayout.Title>
+        ) : null}
+        {activeTab !== 'control-tower' ? (
+          <SectionPageLayout.Actions>
+            <Button
+              variant='outline'
+              onClick={() => {
+                void queryClient.invalidateQueries({
+                  queryKey: ['token-router'],
+                })
+              }}
+            >
+              <RefreshCw data-icon='inline-start' />
+              {t('Refresh')}
+            </Button>
+          </SectionPageLayout.Actions>
+        ) : null}
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
             {activeTab !== 'control-tower' && (
@@ -7269,9 +7273,11 @@ export function TokenRouter() {
             <Tabs
               value={activeTab}
               onValueChange={(value) => setActiveTab(value as TabValue)}
-              className='min-h-0 flex-1'
+              className='flex min-h-0 flex-1 flex-col gap-3 overflow-hidden'
             >
-              <TabsList className='w-full max-w-full flex-nowrap justify-start overflow-x-auto group-data-horizontal/tabs:h-auto [&_[data-slot=tabs-trigger]]:flex-none'>
+              {activeTab !== 'control-tower' && (
+                <div className='min-w-0 overflow-x-auto pb-1'>
+                  <TabsList className='inline-flex w-max max-w-none flex-nowrap justify-start group-data-horizontal/tabs:h-auto [&_[data-slot=tabs-trigger]]:flex-none'>
                 <TabsTrigger value='control-tower'>控制塔</TabsTrigger>
                 <TabsTrigger value='overview'>{t('Overview')}</TabsTrigger>
                 <TabsTrigger value='suppliers'>{t('Suppliers')}</TabsTrigger>
@@ -7314,13 +7320,44 @@ export function TokenRouter() {
                 <TabsTrigger value='settlements'>
                   {t('Settlements')}
                 </TabsTrigger>
-              </TabsList>
+                  </TabsList>
+                </div>
+              )}
 
               <TabsContent
                 value='control-tower'
                 className='min-h-0 overflow-auto'
               >
                 <ControlTower
+                  nav={
+                    <div className='min-w-0 overflow-x-auto border-b border-slate-200'>
+                      <TabsList
+                        variant='line'
+                        className='inline-flex w-max max-w-none flex-nowrap justify-start rounded-none p-0 [&_[data-slot=tabs-trigger]]:h-9 [&_[data-slot=tabs-trigger]]:flex-none [&_[data-slot=tabs-trigger]]:px-4'
+                      >
+                        <TabsTrigger value='control-tower'>
+                          流量画像
+                        </TabsTrigger>
+                        <TabsTrigger value='forecasts'>
+                          {t('Forecasts')}
+                        </TabsTrigger>
+                        <TabsTrigger value='pricing'>{t('Pricing')}</TabsTrigger>
+                        <TabsTrigger value='insights'>
+                          {t('Operating Insights')}
+                        </TabsTrigger>
+                        <TabsTrigger value='sla-evidence'>SLA</TabsTrigger>
+                        <TabsTrigger value='decisions'>
+                          {t('Decisions')}
+                        </TabsTrigger>
+                        <TabsTrigger value='actions'>
+                          {t('Action Plans')}
+                        </TabsTrigger>
+                        <TabsTrigger value='executions'>
+                          {t('Executions')}
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+                  }
                   onOpenRoutingPolicies={() => {
                     setActiveTab('routing')
                     toast.info(

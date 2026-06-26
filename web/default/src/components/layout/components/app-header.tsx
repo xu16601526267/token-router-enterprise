@@ -16,24 +16,26 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Building2, CalendarClock, CircleDot } from 'lucide-react'
+import {
+  Building2,
+  CalendarClock,
+  ChevronDown,
+  CircleDot,
+  HelpCircle,
+} from 'lucide-react'
 
 import { ConfigDrawer } from '@/components/config-drawer'
-import { LanguageSwitcher } from '@/components/language-switcher'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
+import { Button } from '@/components/ui/button'
 import { useNotifications } from '@/hooks/use-notifications'
-import { useTopNavLinks } from '@/hooks/use-top-nav-links'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { defaultTopNavLinks } from '../config/top-nav.config'
 import type { TopNavLink } from '../types'
 import { Header } from './header'
-import { SystemBrand } from './system-brand'
-import { TopNav } from './top-nav'
 
 /**
  * General application Header component
@@ -101,8 +103,13 @@ type AppHeaderProps = {
 function EnterpriseHeaderContext() {
   const user = useAuthStore((state) => state.auth.user)
   const isAdmin = (user?.role ?? 0) >= ROLE.ADMIN
+  const rawGroup = user?.group?.trim()
   const workspace =
-    user?.group?.trim() || (isAdmin ? '企业工作区' : '个人工作区')
+    rawGroup && rawGroup !== 'default'
+      ? rawGroup
+      : isAdmin
+        ? '趋境科技 / Enterprise'
+        : '个人工作区'
   const dateLabel = new Intl.DateTimeFormat('zh-CN', {
     weekday: 'short',
     month: '2-digit',
@@ -112,33 +119,35 @@ function EnterpriseHeaderContext() {
     import.meta.env.MODE === 'production' ? '生产环境' : '测试环境'
 
   return (
-    <div className='ms-2 hidden min-w-0 items-center gap-2 xl:flex'>
-      <span className='bg-muted/70 text-muted-foreground inline-flex h-7 max-w-52 items-center gap-1.5 rounded-md border px-2 text-xs'>
-        <Building2 className='text-primary size-3.5 shrink-0' />
+    <div className='hidden min-w-0 items-center gap-2 lg:flex'>
+      <button
+        type='button'
+        className='inline-flex h-8 max-w-56 items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50'
+      >
+        <Building2 className='size-3.5 shrink-0 text-blue-600' />
         <span className='truncate'>{workspace}</span>
-      </span>
+        <ChevronDown className='size-3.5 shrink-0 text-slate-400' />
+      </button>
       <span
         className={cn(
-          'inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs',
+          'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium',
           isAdmin
-            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-            : 'border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            : 'border-blue-200 bg-blue-50 text-blue-700'
         )}
       >
         <CircleDot className='size-3.5' />
         {envLabel}
       </span>
-      <span className='text-muted-foreground inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs'>
+      <span className='inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-600 shadow-sm'>
         <CalendarClock className='size-3.5' />
-        {dateLabel}
+        最近 7 天 · {dateLabel}
       </span>
     </div>
   )
 }
 
 export function AppHeader({
-  navLinks = defaultTopNavLinks,
-  showTopNav = true,
   leftContent,
   showSearch = true,
   rightContent,
@@ -146,16 +155,10 @@ export function AppHeader({
   showConfigDrawer = true,
   showProfileDropdown = true,
 }: AppHeaderProps) {
-  // Prioritize dynamically generated links from backend
-  const dynamicLinks = useTopNavLinks()
-  const links = dynamicLinks.length > 0 ? dynamicLinks : navLinks
-
-  // Notifications hook
   const notifications = useNotifications()
 
   return (
     <Header>
-      <SystemBrand variant='inline' />
       <EnterpriseHeaderContext />
 
       {leftContent ? (
@@ -163,13 +166,13 @@ export function AppHeader({
       ) : null}
 
       {rightContent ?? (
-        <div className='ms-auto flex items-center gap-1 sm:gap-2'>
-          {showTopNav && (
-            <div className='me-1 hidden lg:block'>
-              <TopNav links={links} />
-            </div>
+        <div className='ms-auto flex min-w-0 items-center gap-1.5 sm:gap-2'>
+          {showSearch && (
+            <Search
+              className='hidden h-8 border-slate-200 bg-white text-xs shadow-sm md:flex lg:w-64 xl:w-80'
+              placeholder='搜索客户、密钥、渠道、模型'
+            />
           )}
-          {showSearch && <Search />}
           {showNotifications && (
             <NotificationPopover
               open={notifications.popoverOpen}
@@ -182,7 +185,14 @@ export function AppHeader({
               loading={notifications.loading}
             />
           )}
-          <LanguageSwitcher />
+          <Button
+            variant='outline'
+            size='icon-sm'
+            className='hidden border-slate-200 bg-white text-slate-500 shadow-sm sm:inline-flex'
+            aria-label='帮助中心'
+          >
+            <HelpCircle className='size-4' />
+          </Button>
           {showConfigDrawer && <ConfigDrawer />}
           {showProfileDropdown && <ProfileDropdown />}
         </div>
