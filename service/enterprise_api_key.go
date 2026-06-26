@@ -63,6 +63,7 @@ func normalizeEnterpriseAllowIps(value *string) (*string, error) {
 func validateEnterpriseAPIKeyInput(input *dto.EnterpriseAPIKeyMutationInput, isCreate bool) error {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Group = strings.TrimSpace(input.Group)
+	input.RateLimit = strings.TrimSpace(input.RateLimit)
 	input.ModelLimits = normalizeEnterpriseModels(input.ModelLimits)
 	if isCreate && input.UserId <= 0 {
 		return errors.New("请选择归属用户")
@@ -72,6 +73,9 @@ func validateEnterpriseAPIKeyInput(input *dto.EnterpriseAPIKeyMutationInput, isC
 	}
 	if len(input.Name) > 50 {
 		return errors.New("密钥名称不能超过 50 个字符")
+	}
+	if len(input.RateLimit) > 128 {
+		return errors.New("速率限制配置不能超过 128 个字符")
 	}
 	if input.Status == 0 {
 		input.Status = common.TokenStatusEnabled
@@ -138,6 +142,7 @@ func enterpriseAPIKeyItem(record model.EnterpriseTokenRecord) dto.EnterpriseAPIK
 		AllowIps:           record.Token.AllowIps,
 		Group:              record.Token.Group,
 		CrossGroupRetry:    record.Token.CrossGroupRetry,
+		RateLimit:          record.Token.RateLimit,
 		Username:           record.Username,
 		DisplayName:        record.DisplayName,
 		Email:              record.Email,
@@ -150,12 +155,33 @@ func ListEnterpriseAPIKeys(filters model.EnterpriseTokenFilters, offset int, lim
 	if err != nil {
 		return nil, 0, dto.EnterpriseAPIKeySummary{}, err
 	}
+	now := time.Now().Unix()
+	tokenIds := make([]int, 0, len(records))
+	for _, record := range records {
+		tokenIds = append(tokenIds, record.Token.Id)
+	}
+	recentFailures := map[int]int64{}
+	if len(tokenIds) > 0 {
+		var rows []struct {
+			TokenId int
+			Count   int64
+		}
+		_ = model.LOG_DB.Model(&model.Log{}).
+			Select("token_id, COUNT(*) AS count").
+			Where("token_id IN ? AND type = ? AND created_at >= ?", tokenIds, model.LogTypeError, now-24*60*60).
+			Group("token_id").
+			Scan(&rows).Error
+		for _, row := range rows {
+			recentFailures[row.TokenId] = row.Count
+		}
+	}
 	items := make([]dto.EnterpriseAPIKeyItem, 0, len(records))
 	for _, record := range records {
-		items = append(items, enterpriseAPIKeyItem(record))
+		item := enterpriseAPIKeyItem(record)
+		item.RecentFailureCount = recentFailures[record.Token.Id]
+		items = append(items, item)
 	}
 
-	now := time.Now().Unix()
 	base := model.DB.Model(&model.Token{})
 	if filters.RestrictByManagerRole && filters.ManagerRole < common.RoleRootUser {
 		var ids []int
@@ -228,7 +254,7 @@ func CreateEnterpriseAPIKey(input dto.EnterpriseAPIKeyMutationInput) (*dto.Enter
 		ExpiredTime: input.ExpiredTime, RemainQuota: input.RemainQuota,
 		UnlimitedQuota: input.UnlimitedQuota, ModelLimitsEnabled: input.ModelLimitsEnabled,
 		ModelLimits: input.ModelLimits, AllowIps: input.AllowIps, Group: group,
-		CrossGroupRetry: input.CrossGroupRetry,
+		CrossGroupRetry: input.CrossGroupRetry, RateLimit: input.RateLimit,
 	}
 	if err := token.Insert(); err != nil {
 		return nil, err
@@ -256,6 +282,7 @@ func UpdateEnterpriseAPIKey(id int, input dto.EnterpriseAPIKeyMutationInput) (*d
 	token.AllowIps = input.AllowIps
 	token.Group = input.Group
 	token.CrossGroupRetry = input.CrossGroupRetry
+	token.RateLimit = input.RateLimit
 	if err := token.Update(); err != nil {
 		return nil, err
 	}

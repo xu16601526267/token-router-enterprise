@@ -32,6 +32,7 @@ type EnterpriseAPIKeyMutationInput struct {
 	AllowIps           *string `json:"allow_ips"`
 	Group              string  `json:"group"`
 	CrossGroupRetry    bool    `json:"cross_group_retry"`
+	RateLimit          string  `json:"rate_limit"`
 }
 
 type EnterpriseAPIKeyItem struct {
@@ -52,6 +53,8 @@ type EnterpriseAPIKeyItem struct {
 	AllowIps           *string `json:"allow_ips"`
 	Group              string  `json:"group"`
 	CrossGroupRetry    bool    `json:"cross_group_retry"`
+	RateLimit          string  `json:"rate_limit"`
+	RecentFailureCount int64   `json:"recent_failure_count"`
 	Username           string  `json:"username"`
 	DisplayName        string  `json:"display_name"`
 	Email              string  `json:"email"`

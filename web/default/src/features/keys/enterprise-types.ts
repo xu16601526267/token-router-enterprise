@@ -28,6 +28,7 @@ export type EnterpriseApiKeyInput = {
   allow_ips: string | null
   group: string
   cross_group_retry: boolean
+  rate_limit: string
 }
 
 export type EnterpriseApiKeyItem = EnterpriseApiKeyInput & {
@@ -41,6 +42,7 @@ export type EnterpriseApiKeyItem = EnterpriseApiKeyInput & {
   display_name: string
   email: string
   user_group: string
+  recent_failure_count: number
 }
 
 export type EnterpriseApiKeySummary = {

@@ -35,7 +35,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -104,6 +104,7 @@ type ApiKeyFormState = {
   allowIps: string
   group: string
   crossGroupRetry: boolean
+  rateLimit: string
 }
 
 const emptyForm: ApiKeyFormState = {
@@ -118,6 +119,7 @@ const emptyForm: ApiKeyFormState = {
   allowIps: '',
   group: '',
   crossGroupRetry: false,
+  rateLimit: '',
 }
 
 function tokenStatus(status: number): {
@@ -284,6 +286,26 @@ function MetricTile(props: {
   )
 }
 
+function FilterField(props: {
+  label: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <label
+      className={cn(
+        'flex h-8 min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-white px-2 text-xs',
+        props.className
+      )}
+    >
+      <span className='shrink-0 text-[11px] font-medium text-slate-500'>
+        {props.label}
+      </span>
+      <div className='min-w-0 flex-1'>{props.children}</div>
+    </label>
+  )
+}
+
 function DetailField(props: {
   label: string
   value: string
@@ -330,6 +352,7 @@ function toForm(item: EnterpriseApiKeyItem): ApiKeyFormState {
     allowIps: item.allow_ips ?? '',
     group: item.group,
     crossGroupRetry: item.cross_group_retry,
+    rateLimit: item.rate_limit ?? '',
   }
 }
 
@@ -348,6 +371,7 @@ function toInput(form: ApiKeyFormState): EnterpriseApiKeyInput {
     allow_ips: form.allowIps.trim() || null,
     group: form.group.trim(),
     cross_group_retry: form.crossGroupRetry,
+    rate_limit: form.rateLimit.trim(),
   }
 }
 
@@ -484,6 +508,17 @@ function ApiKeyFormDialog(props: {
               onChange={(event) => update('group', event.target.value)}
             />
           </Field>
+          <Field>
+            <FieldLabel htmlFor='enterprise-key-rate-limit'>
+              QPS / 速率限制
+            </FieldLabel>
+            <Input
+              id='enterprise-key-rate-limit'
+              value={form.rateLimit}
+              placeholder='留空继承租户，例如 200'
+              onChange={(event) => update('rateLimit', event.target.value)}
+            />
+          </Field>
           <Field className='sm:col-span-2'>
             <div className='flex items-center justify-between gap-3'>
               <FieldLabel htmlFor='enterprise-key-model-limit'>
@@ -598,6 +633,7 @@ export function EnterpriseApiKeys() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('all')
   const [tenantFilter, setTenantFilter] = useState('all')
@@ -620,7 +656,7 @@ export function EnterpriseApiKeys() {
   const params = useMemo(
     () => ({
       page,
-      page_size: 10,
+      page_size: pageSize,
       keyword: keyword.trim() || undefined,
       status: status === 'all' ? undefined : Number(status),
       user_id: tenantFilter === 'all' ? undefined : Number(tenantFilter),
@@ -631,6 +667,7 @@ export function EnterpriseApiKeys() {
     }),
     [
       page,
+      pageSize,
       keyword,
       status,
       tenantFilter,
@@ -651,6 +688,7 @@ export function EnterpriseApiKeys() {
   const pageData = keysQuery.data?.data
   const summary = pageData?.summary
   const items = pageData?.items ?? EMPTY_API_KEY_ITEMS
+  const totalPages = Math.max(1, Math.ceil((pageData?.total ?? 0) / pageSize))
   const users = usersQuery.data?.data ?? EMPTY_API_KEY_USERS
   const groupOptions = useMemo(() => {
     const groups = new Set<string>()
@@ -666,9 +704,6 @@ export function EnterpriseApiKeys() {
   const selectedStatus = selected
     ? tokenStatus(selected.effective_status)
     : null
-  const selectedEnvironment = selected
-    ? environmentLabel(selected.group || selected.user_group)
-    : ''
   const selectedBaseUrl =
     typeof window === 'undefined' ? '/v1' : `${window.location.origin}/v1`
   const selectedClientId = selected
@@ -816,37 +851,6 @@ export function EnterpriseApiKeys() {
           <EnterprisePageHeader
             title='API Keys 与客户接入'
             description='面向企业客户的密钥发放、租户接入与访问控制'
-            actions={
-              <>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => void exportKeys()}
-                  disabled={exporting || keysQuery.isFetching}
-                >
-                  <Download className='size-4' />
-                  {exporting ? '导出中' : '导出'}
-                </Button>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={() => keysQuery.refetch()}
-                  disabled={keysQuery.isFetching}
-                >
-                  <RefreshCw
-                    className={cn(
-                      'size-4',
-                      keysQuery.isFetching && 'animate-spin'
-                    )}
-                  />
-                  刷新
-                </Button>
-                <Button size='sm' onClick={openCreate}>
-                  <Plus className='size-4' />
-                  创建企业密钥
-                </Button>
-              </>
-            }
           />
 
           <div className='grid min-h-0 gap-2 2xl:grid-cols-[minmax(0,1fr)_384px]'>
@@ -897,107 +901,116 @@ export function EnterpriseApiKeys() {
               </div>
 
               <EnterprisePanel bodyClassName='p-2.5'>
-                <div className='grid gap-2 lg:grid-cols-[repeat(5,minmax(120px,1fr))_minmax(220px,1.3fr)_64px]'>
-                  <NativeSelect
-                    value={tenantFilter}
-                    className='h-8 rounded-md text-xs'
-                    onChange={(event) => {
-                      setTenantFilter(event.target.value)
-                      setPage(1)
-                    }}
-                  >
-                    <NativeSelectOption value='all'>
-                      全部租户
-                    </NativeSelectOption>
-                    {users.map((user) => (
-                      <NativeSelectOption key={user.id} value={String(user.id)}>
-                        {user.display_name || user.username}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <NativeSelect
-                    value={groupFilter}
-                    className='h-8 rounded-md text-xs'
-                    onChange={(event) => {
-                      setGroupFilter(event.target.value)
-                      setPage(1)
-                    }}
-                  >
-                    <NativeSelectOption value='all'>
-                      全部环境
-                    </NativeSelectOption>
-                    {groupOptions.map((group) => (
-                      <NativeSelectOption key={group} value={group}>
-                        {environmentLabel(group)}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <NativeSelect
-                    value={modelLimitMode}
-                    className='h-8 rounded-md text-xs'
-                    onChange={(event) => {
-                      setModelLimitMode(event.target.value)
-                      setPage(1)
-                    }}
-                  >
-                    <NativeSelectOption value='any'>
-                      授权模型：全部
-                    </NativeSelectOption>
-                    <NativeSelectOption value='all'>
-                      全量模型
-                    </NativeSelectOption>
-                    <NativeSelectOption value='restricted'>
-                      白名单模型
-                    </NativeSelectOption>
-                  </NativeSelect>
-                  <NativeSelect
-                    value={status}
-                    className='h-8 rounded-md text-xs'
-                    onChange={(event) => {
-                      setStatus(event.target.value)
-                      setPage(1)
-                    }}
-                  >
-                    <NativeSelectOption value='all'>
-                      全部状态
-                    </NativeSelectOption>
-                    <NativeSelectOption value={TOKEN_STATUS_ENABLED}>
-                      活跃
-                    </NativeSelectOption>
-                    <NativeSelectOption value={TOKEN_STATUS_DISABLED}>
-                      已禁用
-                    </NativeSelectOption>
-                    <NativeSelectOption value={TOKEN_STATUS_EXPIRED}>
-                      已过期
-                    </NativeSelectOption>
-                    <NativeSelectOption value={TOKEN_STATUS_EXHAUSTED}>
-                      额度耗尽
-                    </NativeSelectOption>
-                  </NativeSelect>
-                  <div className='flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2'>
-                    <CalendarClock className='size-3.5 text-slate-400' />
-                    <Input
-                      value={createdStart}
-                      placeholder='开始'
-                      aria-label='开始日期，格式 YYYY-MM-DD'
-                      className='h-6 min-w-0 rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+                <div className='grid gap-2 lg:grid-cols-[minmax(126px,0.9fr)_minmax(126px,0.9fr)_minmax(138px,0.95fr)_minmax(118px,0.78fr)_minmax(178px,1.18fr)_minmax(230px,1.45fr)_64px]'>
+                  <FilterField label='租户'>
+                    <NativeSelect
+                      value={tenantFilter}
+                      className='h-6 w-full rounded border-0 bg-transparent px-0 text-xs shadow-none'
                       onChange={(event) => {
-                        setCreatedStart(event.target.value)
+                        setTenantFilter(event.target.value)
                         setPage(1)
                       }}
-                    />
-                    <span className='text-[11px] text-slate-400'>~</span>
-                    <Input
-                      value={createdEnd}
-                      placeholder='结束'
-                      aria-label='结束日期，格式 YYYY-MM-DD'
-                      className='h-6 min-w-0 rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+                    >
+                      <NativeSelectOption value='all'>
+                        全部租户
+                      </NativeSelectOption>
+                      {users.map((user) => (
+                        <NativeSelectOption
+                          key={user.id}
+                          value={String(user.id)}
+                        >
+                          {user.display_name || user.username}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </FilterField>
+                  <FilterField label='环境'>
+                    <NativeSelect
+                      value={groupFilter}
+                      className='h-6 w-full rounded border-0 bg-transparent px-0 text-xs shadow-none'
                       onChange={(event) => {
-                        setCreatedEnd(event.target.value)
+                        setGroupFilter(event.target.value)
                         setPage(1)
                       }}
-                    />
-                  </div>
+                    >
+                      <NativeSelectOption value='all'>
+                        全部环境
+                      </NativeSelectOption>
+                      {groupOptions.map((group) => (
+                        <NativeSelectOption key={group} value={group}>
+                          {environmentLabel(group)}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  </FilterField>
+                  <FilterField label='授权模型'>
+                    <NativeSelect
+                      value={modelLimitMode}
+                      className='h-6 w-full rounded border-0 bg-transparent px-0 text-xs shadow-none'
+                      onChange={(event) => {
+                        setModelLimitMode(event.target.value)
+                        setPage(1)
+                      }}
+                    >
+                      <NativeSelectOption value='any'>全部</NativeSelectOption>
+                      <NativeSelectOption value='all'>
+                        全量模型
+                      </NativeSelectOption>
+                      <NativeSelectOption value='restricted'>
+                        白名单模型
+                      </NativeSelectOption>
+                    </NativeSelect>
+                  </FilterField>
+                  <FilterField label='状态'>
+                    <NativeSelect
+                      value={status}
+                      className='h-6 w-full rounded border-0 bg-transparent px-0 text-xs shadow-none'
+                      onChange={(event) => {
+                        setStatus(event.target.value)
+                        setPage(1)
+                      }}
+                    >
+                      <NativeSelectOption value='all'>全部</NativeSelectOption>
+                      <NativeSelectOption value={TOKEN_STATUS_ENABLED}>
+                        活跃
+                      </NativeSelectOption>
+                      <NativeSelectOption value={TOKEN_STATUS_DISABLED}>
+                        已禁用
+                      </NativeSelectOption>
+                      <NativeSelectOption value={TOKEN_STATUS_EXPIRED}>
+                        已过期
+                      </NativeSelectOption>
+                      <NativeSelectOption value={TOKEN_STATUS_EXHAUSTED}>
+                        额度耗尽
+                      </NativeSelectOption>
+                    </NativeSelect>
+                  </FilterField>
+                  <FilterField label='日期'>
+                    <div className='flex min-w-0 items-center gap-1'>
+                      <CalendarClock className='size-3.5 shrink-0 text-slate-400' />
+                      <Input
+                        value={createdStart}
+                        placeholder='开始'
+                        aria-label='开始日期，格式 YYYY-MM-DD'
+                        className='h-6 min-w-0 rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+                        onChange={(event) => {
+                          setCreatedStart(event.target.value)
+                          setPage(1)
+                        }}
+                      />
+                      <span className='text-[11px] text-slate-400'>~</span>
+                      <Input
+                        value={createdEnd}
+                        placeholder='结束'
+                        aria-label='结束日期，格式 YYYY-MM-DD'
+                        className='h-6 min-w-0 rounded border-0 px-1 text-[11px] shadow-none focus-visible:ring-0'
+                        onChange={(event) => {
+                          setCreatedEnd(event.target.value)
+                          setPage(1)
+                        }}
+                      />
+                    </div>
+                  </FilterField>
                   <div className='relative'>
                     <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
                     <Input
@@ -1024,7 +1037,11 @@ export function EnterpriseApiKeys() {
               <EnterprisePanel bodyClassName='p-0' className='min-w-0'>
                 <div className='flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-2'>
                   <div className='flex flex-wrap items-center gap-2'>
-                    <Button size='sm' className='h-8' onClick={openCreate}>
+                    <Button
+                      size='sm'
+                      className='h-8 bg-blue-600 text-white hover:bg-blue-700'
+                      onClick={openCreate}
+                    >
                       <Plus className='size-3.5' />
                       创建 API Key
                     </Button>
@@ -1050,8 +1067,8 @@ export function EnterpriseApiKeys() {
                     </Button>
                     <Button
                       size='sm'
-                      variant='destructive'
-                      className='h-8'
+                      variant='outline'
+                      className='h-8 border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700'
                       disabled={!selected}
                       onClick={() => setConfirmAction('delete')}
                     >
@@ -1203,7 +1220,9 @@ export function EnterpriseApiKeys() {
                                   已用 {formatLogQuota(item.used_quota)}
                                 </p>
                               </TableCell>
-                              <TableCell>继承租户</TableCell>
+                              <TableCell>
+                                {item.rate_limit?.trim() || '继承租户'}
+                              </TableCell>
                               <TableCell>
                                 {ipCount > 0 ? `${ipCount} 条` : '0 条'}
                               </TableCell>
@@ -1280,44 +1299,57 @@ export function EnterpriseApiKeys() {
                       disabled={page <= 1}
                       onClick={() => setPage((value) => Math.max(1, value - 1))}
                     >
-                      上一页
+                      ‹
                     </Button>
-                    <span className='text-xs text-slate-500'>第 {page} 页</span>
+                    {[...Array(Math.min(totalPages, 5))].map((_, index) => {
+                      const pageNumber = index + 1
+                      return (
+                        <Button
+                          key={pageNumber}
+                          size='xs'
+                          variant={page === pageNumber ? 'default' : 'ghost'}
+                          className={cn(
+                            'size-7 px-0',
+                            page === pageNumber &&
+                              'bg-blue-600 text-white hover:bg-blue-700'
+                          )}
+                          onClick={() => setPage(pageNumber)}
+                        >
+                          {pageNumber}
+                        </Button>
+                      )
+                    })}
+                    {totalPages > 5 && (
+                      <span className='text-xs text-slate-400'>...</span>
+                    )}
                     <Button
                       size='xs'
                       variant='outline'
-                      disabled={items.length < 10}
+                      disabled={page >= totalPages}
                       onClick={() => setPage((value) => value + 1)}
                     >
-                      下一页
+                      ›
                     </Button>
+                    <NativeSelect
+                      value={String(pageSize)}
+                      className='h-7 w-24 rounded-md text-xs'
+                      onChange={(event) => {
+                        setPageSize(Number(event.target.value))
+                        setPage(1)
+                      }}
+                    >
+                      {[10, 20, 50].map((size) => (
+                        <NativeSelectOption key={size} value={String(size)}>
+                          {size} 条 / 页
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
                   </div>
                 </div>
               </EnterprisePanel>
             </div>
 
-            <EnterprisePanel
-              className='min-w-0'
-              bodyClassName='p-0'
-              title={selected ? keyOwner(selected) : '选择一条密钥'}
-              description={
-                selected
-                  ? `${selectedEnvironment} · ${selected.username || selected.user_group || '未绑定用户'}`
-                  : '从左侧列表选择密钥查看接入配置。'
-              }
-              action={
-                selectedStatus ? (
-                  <Badge
-                    className={cn(
-                      'h-5 rounded px-2 text-[10px]',
-                      selectedStatus.className
-                    )}
-                  >
-                    {selectedStatus.label}
-                  </Badge>
-                ) : null
-              }
-            >
+            <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
               {!selected ? (
                 <div className='flex min-h-[520px] flex-col items-center justify-center text-center'>
                   <span className='flex size-11 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
@@ -1332,6 +1364,43 @@ export function EnterpriseApiKeys() {
                 </div>
               ) : (
                 <div className='min-h-[520px]'>
+                  <div className='flex items-start justify-between gap-3 border-b border-slate-100 p-3.5'>
+                    <div className='flex min-w-0 items-start gap-3'>
+                      <span className='flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100'>
+                        <KeyRound className='size-4' />
+                      </span>
+                      <div className='min-w-0'>
+                        <p className='truncate text-sm font-semibold text-slate-900'>
+                          {keyOwner(selected)}
+                        </p>
+                        <p className='mt-0.5 truncate text-[11px] text-slate-500'>
+                          {selected.username ||
+                            selected.email ||
+                            selected.user_group ||
+                            '未绑定用户'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className='flex shrink-0 items-center gap-2'>
+                      {selectedStatus != null && (
+                        <Badge
+                          className={cn(
+                            'h-5 rounded px-2 text-[10px]',
+                            selectedStatus.className
+                          )}
+                        >
+                          {selectedStatus.label}
+                        </Badge>
+                      )}
+                      <Button
+                        variant='outline'
+                        size='icon-sm'
+                        aria-label='更多密钥操作'
+                      >
+                        <MoreHorizontal className='size-3.5' />
+                      </Button>
+                    </div>
+                  </div>
                   <div className='flex border-b border-slate-100 px-3'>
                     {[
                       ['access', '接入详情'],
@@ -1414,6 +1483,74 @@ export function EnterpriseApiKeys() {
                             </div>
                           </div>
                         </div>
+                        <div className='border-t border-slate-100 pt-3'>
+                          <p className='text-xs font-semibold text-slate-900'>
+                            回调与状态
+                          </p>
+                          <div className='mt-2 grid grid-cols-3 gap-2 text-[11px]'>
+                            <div>
+                              <p className='text-slate-500'>Webhook 状态</p>
+                              <p className='mt-1 inline-flex items-center gap-1 font-semibold text-emerald-600'>
+                                <span className='size-1.5 rounded-full bg-emerald-500' />
+                                {selected.allow_ips ? '受限访问' : '正常'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className='text-slate-500'>最近成功</p>
+                              <p className='mt-1 font-semibold text-slate-800'>
+                                {selected.accessed_time > 0
+                                  ? dayjs
+                                      .unix(selected.accessed_time)
+                                      .format('YYYY-MM-DD HH:mm:ss')
+                                  : '暂无调用'}
+                              </p>
+                            </div>
+                            <div>
+                              <p className='text-slate-500'>失败次数(24h)</p>
+                              <p className='mt-1 font-semibold text-slate-800'>
+                                {formatCount(
+                                  selected.recent_failure_count ?? 0
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className='border-t border-slate-100 pt-3'>
+                          <div className='flex items-center justify-between'>
+                            <p className='text-xs font-semibold text-slate-900'>
+                              最近审计活动
+                            </p>
+                            <button
+                              type='button'
+                              className='text-[11px] font-medium text-blue-600 hover:underline'
+                              onClick={() => setDetailTab('audit')}
+                            >
+                              查看完整审计日志 →
+                            </button>
+                          </div>
+                          <div className='mt-2 space-y-2'>
+                            {auditEvents.slice(0, 4).map((event) => (
+                              <div
+                                key={`access-${event.title}-${event.time}`}
+                                className='grid grid-cols-[94px_minmax(0,1fr)_42px] items-center gap-2 text-[11px]'
+                              >
+                                <span className='text-slate-500'>
+                                  {event.time > 0
+                                    ? dayjs
+                                        .unix(event.time)
+                                        .format('YYYY-MM-DD HH:mm')
+                                    : '-'}
+                                </span>
+                                <span className='truncate text-slate-700'>
+                                  {event.title}
+                                </span>
+                                <Badge className='h-5 rounded bg-emerald-50 px-2 text-[10px] text-emerald-600'>
+                                  {event.status}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -1490,6 +1627,12 @@ export function EnterpriseApiKeys() {
                             </p>
                           </div>
                           <div className='rounded-md border border-slate-200 p-3'>
+                            <p className='text-slate-500'>速率限制</p>
+                            <p className='mt-1 font-semibold text-slate-950'>
+                              {selected.rate_limit?.trim() || '继承租户'}
+                            </p>
+                          </div>
+                          <div className='rounded-md border border-slate-200 p-3'>
                             <p className='text-slate-500'>跨组重试</p>
                             <p className='mt-1 font-semibold text-slate-950'>
                               {selected.cross_group_retry ? '允许' : '不允许'}
@@ -1530,7 +1673,7 @@ export function EnterpriseApiKeys() {
                     <div className='flex gap-2 border-t border-slate-100 pt-3'>
                       <Button
                         size='sm'
-                        className='flex-1'
+                        className='flex-1 bg-blue-600 text-white hover:bg-blue-700'
                         onClick={() => openEdit(selected)}
                       >
                         <Edit3 className='size-3.5' />
