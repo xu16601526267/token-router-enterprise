@@ -500,6 +500,70 @@ function TrendMiniChart(props: {
   )
 }
 
+function MicroMetric(props: {
+  label: string
+  value: string
+  helper?: string
+  tone?: 'slate' | 'blue' | 'emerald' | 'amber' | 'rose'
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-md border px-2 py-1.5',
+        (props.tone == null || props.tone === 'slate') &&
+          'border-slate-200 bg-slate-50/65',
+        props.tone === 'blue' && 'border-blue-100 bg-blue-50/65',
+        props.tone === 'emerald' && 'border-emerald-100 bg-emerald-50/65',
+        props.tone === 'amber' && 'border-amber-100 bg-amber-50/65',
+        props.tone === 'rose' && 'border-rose-100 bg-rose-50/65'
+      )}
+    >
+      <p className='truncate text-[10px] leading-4 text-slate-500'>
+        {props.label}
+      </p>
+      <p className='mt-0.5 truncate text-[13px] leading-5 font-semibold text-slate-950 tabular-nums'>
+        {props.value}
+      </p>
+      {props.helper != null && (
+        <p className='truncate text-[10px] leading-4 text-slate-500'>
+          {props.helper}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function ChecklistRow(props: {
+  title: string
+  detail: string
+  tone?: 'emerald' | 'blue' | 'amber'
+}) {
+  return (
+    <div className='flex items-start gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5'>
+      <span
+        className={cn(
+          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ring-1',
+          props.tone === 'amber' &&
+            'bg-amber-50 text-amber-600 ring-amber-100',
+          props.tone === 'blue' && 'bg-blue-50 text-blue-600 ring-blue-100',
+          (props.tone == null || props.tone === 'emerald') &&
+            'bg-emerald-50 text-emerald-600 ring-emerald-100'
+        )}
+      >
+        <CheckCircle2 className='size-3' aria-hidden='true' />
+      </span>
+      <div className='min-w-0'>
+        <p className='truncate text-[11px] font-semibold text-slate-900'>
+          {props.title}
+        </p>
+        <p className='mt-0.5 line-clamp-1 text-[10px] text-slate-500'>
+          {props.detail}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function firstModelName(models: string): string {
   const text = models.trim()
   if (!text) {
@@ -629,6 +693,21 @@ export function ControlTower(props: {
         .slice(0, 4),
     [data?.provider_health]
   )
+  const enabledProviderCount = useMemo(
+    () => providers.filter((provider) => provider.status === 1).length,
+    [providers]
+  )
+  const watchedProviderCount = useMemo(
+    () =>
+      providers.filter((provider) => providerStatus(provider).label !== '健康良好')
+        .length,
+    [providers]
+  )
+  const totalBalance = useMemo(
+    () => providers.reduce((sum, provider) => sum + provider.balance, 0),
+    [providers]
+  )
+  const topProvider = providers[0]
   const rawPolicies = data?.policies ?? []
   const hasActiveRawPolicy = rawPolicies.some(
     (policy) => policy.status === 'active'
@@ -1146,6 +1225,34 @@ export function ControlTower(props: {
                 )}
               </TableBody>
             </Table>
+            {policies.length > 0 && (
+              <div className='grid border-t border-slate-100 bg-slate-50/50 sm:grid-cols-4'>
+                <div className='border-b border-slate-100 px-3 py-2 sm:border-r sm:border-b-0'>
+                  <p className='text-[10px] text-slate-500'>运行策略</p>
+                  <p className='mt-0.5 text-[13px] font-semibold text-slate-950 tabular-nums'>
+                    {activePolicyCount}/{policies.length}
+                  </p>
+                </div>
+                <div className='border-b border-slate-100 px-3 py-2 sm:border-r sm:border-b-0'>
+                  <p className='text-[10px] text-slate-500'>主路由</p>
+                  <p className='mt-0.5 truncate text-[13px] font-semibold text-slate-950'>
+                    {topProvider?.channel_name || primaryPolicy?.channel_name || '-'}
+                  </p>
+                </div>
+                <div className='border-b border-slate-100 px-3 py-2 sm:border-r sm:border-b-0'>
+                  <p className='text-[10px] text-slate-500'>备用路由</p>
+                  <p className='mt-0.5 truncate text-[13px] font-semibold text-slate-950'>
+                    {backupProvider?.channel_name || '未配置'}
+                  </p>
+                </div>
+                <div className='px-3 py-2'>
+                  <p className='text-[10px] text-slate-500'>供应余额</p>
+                  <p className='mt-0.5 text-[13px] font-semibold text-slate-950 tabular-nums'>
+                    ${totalBalance.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            )}
           </EnterprisePanel>
         </div>
 
@@ -1161,6 +1268,30 @@ export function ControlTower(props: {
             bodyClassName='p-2.5'
           >
             <div className='space-y-0.5'>
+              <div className='mb-2 grid grid-cols-3 gap-1.5'>
+                <MicroMetric
+                  label='在线渠道'
+                  value={`${enabledProviderCount}/${providers.length}`}
+                  helper='参与路由'
+                  tone='emerald'
+                />
+                <MicroMetric
+                  label='需关注'
+                  value={String(watchedProviderCount)}
+                  helper='健康阈值'
+                  tone={watchedProviderCount > 0 ? 'amber' : 'blue'}
+                />
+                <MicroMetric
+                  label='主路由延迟'
+                  value={formatLatency(
+                    topProvider?.average_latency_ms ||
+                      topProvider?.response_time_ms ||
+                      0
+                  )}
+                  helper={topProvider?.channel_name || '暂无'}
+                  tone='blue'
+                />
+              </div>
               <div className='grid grid-cols-[minmax(0,1fr)_54px_48px_54px] gap-2 px-1.5 pb-1 text-right text-[10px] text-slate-400'>
                 <span className='text-left'>供应商</span>
                 <span>成功率</span>
@@ -1220,21 +1351,35 @@ export function ControlTower(props: {
             }
             bodyClassName='p-2'
           >
-            <EventList
-              events={data?.pending_actions ?? []}
-              emptyText='当前没有待执行动作'
-              maxItems={3}
-              renderAction={(event) => (
-                <Button
-                  size='xs'
-                  variant='outline'
-                  disabled={updateActionStatus.isPending}
-                  onClick={() => updateActionStatus.mutate(event)}
-                >
-                  {event.status === 'in_progress' ? '标记完成' : '开始执行'}
-                </Button>
-              )}
-            />
+            {(data?.pending_actions.length ?? 0) === 0 ? (
+              <div className='space-y-1.5'>
+                <ChecklistRow
+                  title='执行队列已清空'
+                  detail='当前没有待人工推进的路由动作。'
+                />
+                <ChecklistRow
+                  title='自动切换未触发'
+                  detail={`本窗口自动切换 ${metrics?.automatic_switches ?? 0} 次。`}
+                  tone='blue'
+                />
+              </div>
+            ) : (
+              <EventList
+                events={data?.pending_actions ?? []}
+                emptyText='当前没有待执行动作'
+                maxItems={3}
+                renderAction={(event) => (
+                  <Button
+                    size='xs'
+                    variant='outline'
+                    disabled={updateActionStatus.isPending}
+                    onClick={() => updateActionStatus.mutate(event)}
+                  >
+                    {event.status === 'in_progress' ? '标记完成' : '开始执行'}
+                  </Button>
+                )}
+              />
+            )}
           </EnterprisePanel>
 
           <EnterprisePanel
@@ -1246,35 +1391,52 @@ export function ControlTower(props: {
             }
             bodyClassName='p-2'
           >
-            <EventList
-              events={data?.risks ?? []}
-              emptyText='当前没有未处理风险'
-              maxItems={3}
-              renderAction={(event) => (
-                <>
-                  <Button
-                    size='xs'
-                    variant='outline'
-                    disabled={
-                      acknowledgeRisk.isPending || dismissRisk.isPending
-                    }
-                    onClick={() => acknowledgeRisk.mutate(event.id)}
-                  >
-                    确认
-                  </Button>
-                  <Button
-                    size='xs'
-                    variant='ghost'
-                    disabled={
-                      acknowledgeRisk.isPending || dismissRisk.isPending
-                    }
-                    onClick={() => dismissRisk.mutate(event.id)}
-                  >
-                    忽略
-                  </Button>
-                </>
-              )}
-            />
+            {(data?.risks.length ?? 0) === 0 ? (
+              <div className='grid grid-cols-2 gap-1.5'>
+                <MicroMetric
+                  label='SLA 成功率'
+                  value={formatPercent(metrics?.realtime_success_rate ?? 0)}
+                  helper='无未处理风险'
+                  tone='emerald'
+                />
+                <MicroMetric
+                  label='平均延迟'
+                  value={formatLatency(metrics?.average_latency_ms ?? 0)}
+                  helper='当前窗口'
+                  tone='blue'
+                />
+              </div>
+            ) : (
+              <EventList
+                events={data?.risks ?? []}
+                emptyText='当前没有未处理风险'
+                maxItems={3}
+                renderAction={(event) => (
+                  <>
+                    <Button
+                      size='xs'
+                      variant='outline'
+                      disabled={
+                        acknowledgeRisk.isPending || dismissRisk.isPending
+                      }
+                      onClick={() => acknowledgeRisk.mutate(event.id)}
+                    >
+                      确认
+                    </Button>
+                    <Button
+                      size='xs'
+                      variant='ghost'
+                      disabled={
+                        acknowledgeRisk.isPending || dismissRisk.isPending
+                      }
+                      onClick={() => dismissRisk.mutate(event.id)}
+                    >
+                      忽略
+                    </Button>
+                  </>
+                )}
+              />
+            )}
           </EnterprisePanel>
         </aside>
       </div>
