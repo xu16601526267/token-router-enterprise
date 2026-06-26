@@ -119,6 +119,7 @@ export type EnterpriseUsageTrendPoint = {
   completion_tokens: number
   quota: number
   average_latency_ms: number
+  cache_hit_rate: number
 }
 
 export type EnterpriseUsageBreakdownItem = {
@@ -137,6 +138,7 @@ export type EnterpriseUsageLogItem = {
   group: string
   token_name: string
   model_name: string
+  request_type: string
   prompt_tokens: number
   completion_tokens: number
   quota: number

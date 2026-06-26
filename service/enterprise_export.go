@@ -150,7 +150,7 @@ func enterpriseUsageLogItemsWithFilters(startTimestamp int64, endTimestamp int64
 		items = append(items, dto.EnterpriseUsageLogItem{
 			Id: log.Id, RequestId: log.RequestId, CreatedAt: log.CreatedAt,
 			Username: log.Username, Group: log.Group, TokenName: log.TokenName,
-			ModelName: log.ModelName, PromptTokens: log.PromptTokens,
+			ModelName: log.ModelName, RequestType: enterpriseUsageRequestType(log.ModelName), PromptTokens: log.PromptTokens,
 			CompletionTokens: log.CompletionTokens, Quota: log.Quota,
 			ChannelId: log.ChannelId, ChannelName: channelNames[log.ChannelId],
 			UseTimeMs: log.UseTime * 1000, Status: status, Ip: log.Ip,
@@ -214,9 +214,10 @@ func BuildEnterpriseUsageAnalyticsCSVWithFilters(startTimestamp int64, endTimest
 			enterpriseFormatInt(item.CompletionTokens),
 			enterpriseFormatInt(item.Quota),
 			enterpriseFormatFloat(item.AverageLatencyMs),
+			enterpriseFormatFloat(item.CacheHitRate),
 		})
 	}
-	if err := enterpriseWriteCSVSection(writer, "每日趋势", []string{"日期", "请求数", "错误数", "输入 Tokens", "输出 Tokens", "额度", "平均延迟 ms"}, trendRows); err != nil {
+	if err := enterpriseWriteCSVSection(writer, "每日趋势", []string{"日期", "请求数", "错误数", "输入 Tokens", "输出 Tokens", "额度", "平均延迟 ms", "缓存命中率"}, trendRows); err != nil {
 		return nil, err
 	}
 	breakdownHeader := []string{"名称", "额度", "成本 USD", "占比"}
@@ -244,6 +245,7 @@ func BuildEnterpriseUsageAnalyticsCSVWithFilters(startTimestamp int64, endTimest
 			item.Group,
 			item.TokenName,
 			item.ModelName,
+			item.RequestType,
 			enterpriseFormatInt(int64(item.PromptTokens)),
 			enterpriseFormatInt(int64(item.CompletionTokens)),
 			enterpriseFormatInt(int64(item.Quota)),
@@ -254,7 +256,7 @@ func BuildEnterpriseUsageAnalyticsCSVWithFilters(startTimestamp int64, endTimest
 			item.Ip,
 		})
 	}
-	if err := enterpriseWriteCSVSection(writer, "调用日志（最多 10000 条）", []string{"日志ID", "请求编号", "时间", "用户", "分组", "密钥名称", "模型", "输入 Tokens", "输出 Tokens", "额度", "渠道ID", "渠道名称", "延迟 ms", "状态", "IP"}, logRows); err != nil {
+	if err := enterpriseWriteCSVSection(writer, "调用日志（最多 10000 条）", []string{"日志ID", "请求编号", "时间", "用户", "分组", "密钥名称", "模型", "请求类型", "输入 Tokens", "输出 Tokens", "额度", "渠道ID", "渠道名称", "延迟 ms", "状态", "IP"}, logRows); err != nil {
 		return nil, err
 	}
 	return enterpriseFlushCSV(buffer, writer)

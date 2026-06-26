@@ -49,6 +49,7 @@ type EnterpriseUsageParams = EnterpriseRangeParams & {
   username?: string
   group?: string
   status?: string
+  request_type?: string
   channel_id?: number
   page?: number
   page_size?: number

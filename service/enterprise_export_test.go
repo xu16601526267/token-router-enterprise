@@ -51,13 +51,17 @@ func TestEnterpriseUsageAnalyticsTrendAndStatusAreClientFriendly(t *testing.T) {
 	assert.EqualValues(t, 10, data.Trend[0].PromptTokens)
 	assert.EqualValues(t, 20, data.Trend[0].CompletionTokens)
 	assert.EqualValues(t, 2000, data.Trend[0].AverageLatencyMs)
+	assert.InDelta(t, 1, data.Trend[0].CacheHitRate, 0.0001)
 
 	statuses := map[string]bool{}
+	requestTypes := map[string]bool{}
 	for _, item := range data.RecentLogs {
 		statuses[item.Status] = true
+		requestTypes[item.RequestType] = true
 	}
 	assert.True(t, statuses["success"])
 	assert.True(t, statuses["error"])
+	assert.True(t, requestTypes["chat"])
 }
 
 func TestBuildEnterpriseUsageAnalyticsCSVIncludesFullLogSection(t *testing.T) {
@@ -77,6 +81,8 @@ func TestBuildEnterpriseUsageAnalyticsCSVIncludesFullLogSection(t *testing.T) {
 	assert.Contains(t, text, "用量指标")
 	assert.Contains(t, text, "调用日志")
 	assert.Contains(t, text, "req-success")
+	assert.Contains(t, text, "请求类型")
+	assert.Contains(t, text, "chat")
 	assert.Contains(t, text, "success")
 }
 
@@ -103,6 +109,12 @@ func TestEnterpriseUsageAnalyticsFiltersAndPaginatesLogs(t *testing.T) {
 		Group: "default", Quota: 500, RequestId: "req-other",
 		Content: "unmatched",
 	}).Error)
+	require.NoError(t, db.Create(&model.Log{
+		UserId: 3, CreatedAt: start + 40, Type: model.LogTypeConsume,
+		Username: "carol", TokenName: "embed-key", ModelName: "text-embedding-3-small",
+		Group: "default", Quota: 200, RequestId: "req-embedding",
+		Content: "embedding request",
+	}).Error)
 
 	data, err := GetEnterpriseUsageAnalyticsWithFilters(start, start+3600, EnterpriseUsageFilters{
 		Keyword: "needle", ModelName: "gpt-filter", Page: 1, PageSize: 1,
@@ -126,6 +138,24 @@ func TestEnterpriseUsageAnalyticsFiltersAndPaginatesLogs(t *testing.T) {
 	assert.EqualValues(t, 1, successOnly.TotalLogs)
 	assert.EqualValues(t, 1, successOnly.Metrics.TotalRequests)
 	assert.EqualValues(t, 0, successOnly.Metrics.ErrorRequests)
+
+	embeddingOnly, err := GetEnterpriseUsageAnalyticsWithFilters(start, start+3600, EnterpriseUsageFilters{
+		RequestType: "embedding",
+	})
+
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, embeddingOnly.TotalLogs)
+	assert.EqualValues(t, 1, embeddingOnly.Metrics.TotalRequests)
+	require.Len(t, embeddingOnly.RecentLogs, 1)
+	assert.Equal(t, "embedding", embeddingOnly.RecentLogs[0].RequestType)
+
+	chatOnly, err := GetEnterpriseUsageAnalyticsWithFilters(start, start+3600, EnterpriseUsageFilters{
+		RequestType: "chat",
+	})
+
+	require.NoError(t, err)
+	assert.EqualValues(t, 3, chatOnly.TotalLogs)
+	assert.EqualValues(t, 3, chatOnly.Metrics.TotalRequests)
 }
 
 func TestEnterpriseChannelCenterFiltersAndCSV(t *testing.T) {

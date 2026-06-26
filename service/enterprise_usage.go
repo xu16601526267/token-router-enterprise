@@ -56,6 +56,7 @@ type EnterpriseUsageFilters struct {
 	Username        string
 	Group           string
 	Status          string
+	RequestType     string
 	ChannelId       int
 	Page            int
 	PageSize        int
@@ -87,6 +88,40 @@ func enterpriseQuotaCurrency(quota int64) float64 {
 		return 0
 	}
 	return float64(quota) / common.QuotaPerUnit
+}
+
+func enterpriseUsageRequestType(modelName string) string {
+	value := strings.ToLower(strings.TrimSpace(modelName))
+	switch {
+	case strings.Contains(value, "embed"):
+		return "embedding"
+	case strings.Contains(value, "rerank"):
+		return "rerank"
+	case strings.Contains(value, "image") || strings.Contains(value, "vision"):
+		return "image"
+	case strings.Contains(value, "audio") || strings.Contains(value, "tts") || strings.Contains(value, "whisper"):
+		return "audio"
+	default:
+		return "chat"
+	}
+}
+
+func enterpriseApplyUsageRequestType(db *gorm.DB, requestType string) *gorm.DB {
+	switch strings.ToLower(strings.TrimSpace(requestType)) {
+	case "embedding":
+		return db.Where("LOWER(model_name) LIKE ?", "%embed%")
+	case "rerank":
+		return db.Where("LOWER(model_name) LIKE ?", "%rerank%")
+	case "image":
+		return db.Where("(LOWER(model_name) LIKE ? OR LOWER(model_name) LIKE ?)", "%image%", "%vision%")
+	case "audio":
+		return db.Where("(LOWER(model_name) LIKE ? OR LOWER(model_name) LIKE ? OR LOWER(model_name) LIKE ?)", "%audio%", "%tts%", "%whisper%")
+	case "chat":
+		return db.Where("LOWER(model_name) NOT LIKE ? AND LOWER(model_name) NOT LIKE ? AND LOWER(model_name) NOT LIKE ? AND LOWER(model_name) NOT LIKE ? AND LOWER(model_name) NOT LIKE ? AND LOWER(model_name) NOT LIKE ? AND LOWER(model_name) NOT LIKE ?",
+			"%embed%", "%rerank%", "%image%", "%vision%", "%audio%", "%tts%", "%whisper%")
+	default:
+		return db
+	}
 }
 
 func enterpriseUsageTrendBucket(timestamp int64, granularity string) int64 {
@@ -129,12 +164,35 @@ func enterpriseUsageLogQuery(db *gorm.DB, startTimestamp int64, endTimestamp int
 	if filters.ChannelId > 0 {
 		query = query.Where("channel_id = ?", filters.ChannelId)
 	}
+	query = enterpriseApplyUsageRequestType(query, filters.RequestType)
 	if keyword := strings.TrimSpace(filters.Keyword); keyword != "" {
 		like := enterpriseLikePattern(keyword)
 		query = query.Where(
-			"request_id LIKE ? ESCAPE '!' OR username LIKE ? ESCAPE '!' OR token_name LIKE ? ESCAPE '!' OR model_name LIKE ? ESCAPE '!' OR ip LIKE ? ESCAPE '!' OR content LIKE ? ESCAPE '!'",
+			"(request_id LIKE ? ESCAPE '!' OR username LIKE ? ESCAPE '!' OR token_name LIKE ? ESCAPE '!' OR model_name LIKE ? ESCAPE '!' OR ip LIKE ? ESCAPE '!' OR content LIKE ? ESCAPE '!')",
 			like, like, like, like, like, like,
 		)
+	}
+	return query
+}
+
+func enterpriseUsageLedgerQuery(db *gorm.DB, startTimestamp int64, endTimestamp int64, filters EnterpriseUsageFilters) *gorm.DB {
+	query := db.Model(&model.UsageLedger{}).
+		Where("created_at >= ? AND created_at <= ?", startTimestamp, endTimestamp)
+	if filters.Status == "success" {
+		query = query.Where("status = ?", "success")
+	} else if filters.Status == "error" {
+		query = query.Where("status <> ?", "success")
+	}
+	if filters.ModelName != "" {
+		query = query.Where("model_name = ?", filters.ModelName)
+	}
+	if filters.ChannelId > 0 {
+		query = query.Where("channel_id = ?", filters.ChannelId)
+	}
+	query = enterpriseApplyUsageRequestType(query, filters.RequestType)
+	if keyword := strings.TrimSpace(filters.Keyword); keyword != "" {
+		like := enterpriseLikePattern(keyword)
+		query = query.Where("(request_id LIKE ? ESCAPE '!' OR model_name LIKE ? ESCAPE '!')", like, like)
 	}
 	return query
 }
@@ -265,9 +323,8 @@ func GetEnterpriseUsageAnalyticsWithFilters(startTimestamp int64, endTimestamp i
 		Total int64
 		Hits  int64
 	}
-	_ = model.DB.Model(&model.UsageLedger{}).
+	_ = enterpriseUsageLedgerQuery(model.DB, startTimestamp, endTimestamp, filters).
 		Select("COUNT(*) AS total, COALESCE(SUM(CASE WHEN cache_hit THEN 1 ELSE 0 END), 0) AS hits").
-		Where("created_at >= ? AND created_at <= ?", startTimestamp, endTimestamp).
 		Scan(&cacheAggregate).Error
 	if cacheAggregate.Total > 0 {
 		data.Metrics.CacheHitRate = float64(cacheAggregate.Hits) / float64(cacheAggregate.Total)
@@ -281,6 +338,8 @@ func GetEnterpriseUsageAnalyticsWithFilters(startTimestamp int64, endTimestamp i
 		quota            int64
 		latencyMs        int64
 		latencyRequests  int64
+		cacheTotal       int64
+		cacheHits        int64
 	}
 	trendMap := make(map[int64]trendValue)
 	var trendRows []struct {
@@ -313,15 +372,35 @@ func GetEnterpriseUsageAnalyticsWithFilters(startTimestamp int64, endTimestamp i
 		}
 		trendMap[bucket] = value
 	}
+	var cacheRows []struct {
+		CreatedAt int64
+		CacheHit  bool
+	}
+	_ = enterpriseUsageLedgerQuery(model.DB, startTimestamp, endTimestamp, filters).
+		Select("created_at, cache_hit").
+		Find(&cacheRows).Error
+	for _, row := range cacheRows {
+		bucket := enterpriseUsageTrendBucket(row.CreatedAt, filters.TimeGranularity)
+		value := trendMap[bucket]
+		value.cacheTotal++
+		if row.CacheHit {
+			value.cacheHits++
+		}
+		trendMap[bucket] = value
+	}
 	for timestamp, value := range trendMap {
 		averageLatencyMs := 0.0
 		if value.latencyRequests > 0 {
 			averageLatencyMs = float64(value.latencyMs) / float64(value.latencyRequests)
 		}
+		cacheHitRate := 0.0
+		if value.cacheTotal > 0 {
+			cacheHitRate = float64(value.cacheHits) / float64(value.cacheTotal)
+		}
 		data.Trend = append(data.Trend, dto.EnterpriseUsageTrendPoint{
 			Timestamp: timestamp, Requests: value.requests, Errors: value.errors,
 			PromptTokens: value.promptTokens, CompletionTokens: value.completionTokens,
-			Quota: value.quota, AverageLatencyMs: averageLatencyMs,
+			Quota: value.quota, AverageLatencyMs: averageLatencyMs, CacheHitRate: cacheHitRate,
 		})
 	}
 	sort.Slice(data.Trend, func(i, j int) bool { return data.Trend[i].Timestamp < data.Trend[j].Timestamp })
@@ -386,7 +465,7 @@ func GetEnterpriseUsageAnalyticsWithFilters(startTimestamp int64, endTimestamp i
 		data.RecentLogs = append(data.RecentLogs, dto.EnterpriseUsageLogItem{
 			Id: log.Id, RequestId: log.RequestId, CreatedAt: log.CreatedAt,
 			Username: log.Username, Group: log.Group, TokenName: log.TokenName,
-			ModelName: log.ModelName, PromptTokens: log.PromptTokens,
+			ModelName: log.ModelName, RequestType: enterpriseUsageRequestType(log.ModelName), PromptTokens: log.PromptTokens,
 			CompletionTokens: log.CompletionTokens, Quota: log.Quota,
 			ChannelId: log.ChannelId, ChannelName: channelNames[log.ChannelId],
 			UseTimeMs: log.UseTime * 1000, Status: status, Ip: log.Ip,

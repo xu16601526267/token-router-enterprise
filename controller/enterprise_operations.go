@@ -106,6 +106,7 @@ func enterpriseUsageFiltersFromQuery(c *gin.Context) service.EnterpriseUsageFilt
 		Username:        strings.TrimSpace(c.Query("username")),
 		Group:           strings.TrimSpace(c.Query("group")),
 		Status:          strings.TrimSpace(c.Query("status")),
+		RequestType:     strings.TrimSpace(c.Query("request_type")),
 		ChannelId:       channelId,
 		Page:            enterprisePositiveInt(c, "page", 1, 1000000),
 		PageSize:        enterprisePositiveInt(c, "page_size", 50, 500),

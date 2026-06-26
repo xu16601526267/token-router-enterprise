@@ -281,6 +281,7 @@ type EnterpriseUsageTrendPoint struct {
 	CompletionTokens int64   `json:"completion_tokens"`
 	Quota            int64   `json:"quota"`
 	AverageLatencyMs float64 `json:"average_latency_ms"`
+	CacheHitRate     float64 `json:"cache_hit_rate"`
 }
 
 type EnterpriseUsageBreakdownItem struct {
@@ -299,6 +300,7 @@ type EnterpriseUsageLogItem struct {
 	Group            string `json:"group"`
 	TokenName        string `json:"token_name"`
 	ModelName        string `json:"model_name"`
+	RequestType      string `json:"request_type"`
 	PromptTokens     int    `json:"prompt_tokens"`
 	CompletionTokens int    `json:"completion_tokens"`
 	Quota            int    `json:"quota"`

@@ -33,7 +33,6 @@ import {
   Gauge,
   MoreHorizontal,
   RefreshCw,
-  Save,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -132,6 +131,22 @@ const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
   week: '周',
 }
 
+const REQUEST_TYPE_LABELS: Record<string, string> = {
+  chat: '对话',
+  embedding: 'Embedding',
+  rerank: 'Rerank',
+  image: '图像',
+  audio: '音频',
+}
+
+const REQUEST_TYPE_OPTIONS = [
+  { value: 'chat', label: '对话' },
+  { value: 'embedding', label: 'Embedding' },
+  { value: 'rerank', label: 'Rerank' },
+  { value: 'image', label: '图像' },
+  { value: 'audio', label: '音频' },
+]
+
 function formatPercent(value: number): string {
   return new Intl.NumberFormat('zh-CN', {
     style: 'percent',
@@ -191,6 +206,10 @@ function getSortLabel(sortBy: string) {
   return '时间'
 }
 
+function formatRequestType(value: string) {
+  return REQUEST_TYPE_LABELS[value] ?? '对话'
+}
+
 function LogStatusBadge(props: { status: string }) {
   const isSuccess = props.status === 'success'
   return (
@@ -212,10 +231,11 @@ function TopBreakdownList(props: {
   items: EnterpriseUsageBreakdownItem[]
   value: 'cost' | 'quota'
   emptyText: string
+  limit?: number
 }) {
   if (props.items.length === 0) {
     return (
-      <div className='flex min-h-44 items-center justify-center text-xs text-slate-500'>
+      <div className='flex min-h-24 items-center justify-center text-xs text-slate-500'>
         {props.emptyText}
       </div>
     )
@@ -223,7 +243,7 @@ function TopBreakdownList(props: {
 
   return (
     <div className='space-y-2.5'>
-      {props.items.slice(0, 6).map((item, index) => (
+      {props.items.slice(0, props.limit ?? 6).map((item, index) => (
         <div
           key={`${item.name}-${item.quota}`}
           className='grid grid-cols-[22px_minmax(0,1fr)_72px] items-center gap-2 text-xs'
@@ -265,10 +285,18 @@ function CostDonutPanel(props: {
   subtitle?: string
   items: EnterpriseUsageBreakdownItem[]
   centerText: string
+  compact?: boolean
 }) {
   return (
-    <div className='grid h-full min-h-0 grid-cols-[118px_minmax(0,1fr)] items-center gap-2'>
-      <div className='relative h-[124px]'>
+    <div
+      className={cn(
+        'grid h-full min-h-0 items-center gap-2',
+        props.compact
+          ? 'grid-cols-[104px_minmax(0,1fr)]'
+          : 'grid-cols-[118px_minmax(0,1fr)]'
+      )}
+    >
+      <div className={cn('relative', props.compact ? 'h-[112px]' : 'h-[124px]')}>
         {props.items.length === 0 ? (
           <div className='flex h-full items-center justify-center rounded-md bg-slate-50 text-xs text-slate-400'>
             暂无数据
@@ -316,6 +344,7 @@ function CostDonutPanel(props: {
         items={props.items}
         value='cost'
         emptyText={`暂无${props.title}数据`}
+        limit={props.compact ? 3 : 6}
       />
     </div>
   )
@@ -341,47 +370,56 @@ function UsageLogTable(props: {
   return (
     <>
       <div className='overflow-x-auto'>
-        <Table className='text-xs [&_td]:h-7 [&_td]:py-1 [&_td]:text-xs [&_td_*]:text-xs [&_th]:h-7 [&_th]:text-xs [&_th_*]:text-xs'>
+        <Table className='w-full table-fixed text-[11px] [&_td]:h-7 [&_td]:px-2 [&_td]:py-1 [&_td]:text-[11px] [&_td_*]:text-[11px] [&_th]:h-7 [&_th]:px-2 [&_th]:text-[11px] [&_th_*]:text-[11px]'>
           <TableHeader className='bg-slate-50'>
             <TableRow>
-              <TableHead className='min-w-32'>请求 ID</TableHead>
-              <TableHead className='min-w-28'>时间</TableHead>
-              <TableHead className='min-w-28'>客户</TableHead>
-              <TableHead className='min-w-24'>用户</TableHead>
-              <TableHead className='min-w-32'>模型</TableHead>
-              <TableHead className='text-right'>输入 Tokens</TableHead>
-              <TableHead className='text-right'>输出 Tokens</TableHead>
-              <TableHead className='text-right'>单价</TableHead>
-              <TableHead className='text-right'>总成本</TableHead>
-              <TableHead className='min-w-28'>渠道</TableHead>
-              <TableHead className='text-right'>延迟</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className='w-12 text-right'>操作</TableHead>
+              <TableHead className='w-[11%]'>请求 ID</TableHead>
+              <TableHead className='w-[9%]'>时间</TableHead>
+              <TableHead className='w-[8%]'>客户</TableHead>
+              <TableHead className='w-[8%]'>用户</TableHead>
+              <TableHead className='w-[10%]'>模型</TableHead>
+              <TableHead className='w-[5%]'>类型</TableHead>
+              <TableHead className='w-[7%] text-right'>输入</TableHead>
+              <TableHead className='w-[7%] text-right'>输出</TableHead>
+              <TableHead className='w-[8%] text-right'>单价</TableHead>
+              <TableHead className='w-[7%] text-right'>总成本</TableHead>
+              <TableHead className='w-[8%]'>渠道</TableHead>
+              <TableHead className='w-[6%] text-right'>延迟</TableHead>
+              <TableHead className='w-[5%]'>状态</TableHead>
+              <TableHead className='w-[4%] text-right'>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {props.logs.map((log) => (
               <TableRow key={log.id} className='hover:bg-blue-50/40'>
-                <TableCell className='max-w-36 truncate font-mono text-[11px] text-blue-600'>
+                <TableCell className='truncate font-mono text-[11px] text-blue-600'>
                   {log.request_id || `log_${log.id}`}
                 </TableCell>
-                <TableCell className='text-slate-500'>
+                <TableCell className='truncate text-slate-500'>
                   {formatDateTime(log.created_at)}
                 </TableCell>
-                <TableCell>
-                  <span className='font-semibold text-slate-800'>
+                <TableCell className='truncate'>
+                  <span className='truncate font-semibold text-slate-800'>
                     {log.group || log.username || '默认客户'}
                   </span>
                 </TableCell>
-                <TableCell className='max-w-28 truncate text-slate-600'>
+                <TableCell className='truncate text-slate-600'>
                   {log.username || 'system'}
+                </TableCell>
+                <TableCell className='truncate'>
+                  <Badge
+                    variant='outline'
+                    className='h-5 max-w-full truncate rounded px-1.5 text-[10px]'
+                  >
+                    {log.model_name || '未知模型'}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge
                     variant='outline'
-                    className='h-5 max-w-32 truncate rounded px-2 text-[10px]'
+                    className='h-5 rounded px-1.5 text-[10px] text-slate-600'
                   >
-                    {log.model_name || '未知模型'}
+                    {formatRequestType(log.request_type)}
                   </Badge>
                 </TableCell>
                 <TableCell className='text-right tabular-nums'>
@@ -396,7 +434,7 @@ function UsageLogTable(props: {
                 <TableCell className='text-right font-semibold tabular-nums'>
                   {formatLogQuota(log.quota)}
                 </TableCell>
-                <TableCell className='max-w-28 truncate'>
+                <TableCell className='truncate'>
                   {log.channel_name ||
                     (log.channel_id > 0 ? `渠道 #${log.channel_id}` : '-')}
                 </TableCell>
@@ -461,6 +499,7 @@ export function EnterpriseUsageAnalytics(props: {
   const [groupFilter, setGroupFilter] = useState('all')
   const [channelFilter, setChannelFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [requestTypeFilter, setRequestTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('created_at')
   const [page, setPage] = useState(1)
   const [exportingUsage, setExportingUsage] = useState(false)
@@ -480,6 +519,8 @@ export function EnterpriseUsageAnalytics(props: {
           ? Number.parseInt(channelFilter, 10)
           : undefined,
       status: statusFilter !== 'all' ? statusFilter : undefined,
+      request_type:
+        requestTypeFilter !== 'all' ? requestTypeFilter : undefined,
       page,
       page_size: 20,
       sort_by: sortBy,
@@ -495,6 +536,7 @@ export function EnterpriseUsageAnalytics(props: {
       groupFilter,
       channelFilter,
       statusFilter,
+      requestTypeFilter,
       page,
       sortBy,
     ]
@@ -514,7 +556,7 @@ export function EnterpriseUsageAnalytics(props: {
     label: formatTrendLabel(point.timestamp, granularity),
     inputTokens: point.prompt_tokens,
     outputTokens: point.completion_tokens,
-    cacheRate: metrics.cache_hit_rate,
+    cacheRate: point.cache_hit_rate,
     errorRate: point.requests > 0 ? point.errors / point.requests : 0,
   }))
   const totalLogPages = Math.max(
@@ -611,6 +653,7 @@ export function EnterpriseUsageAnalytics(props: {
     setGroupFilter('all')
     setChannelFilter('all')
     setStatusFilter('all')
+    setRequestTypeFilter('all')
     setSortBy('created_at')
     setPage(1)
   }
@@ -652,8 +695,8 @@ export function EnterpriseUsageAnalytics(props: {
             variant='outline'
             className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
           >
-            <Save className='size-3' />
-            保存视图
+            <SlidersHorizontal className='size-3' />
+            自定义视图
           </Button>
           <Button
             variant='outline'
@@ -677,9 +720,7 @@ export function EnterpriseUsageAnalytics(props: {
         <EnterpriseStatCard
           title='总请求数'
           value={formatCompactNumber(metrics.total_requests)}
-          helper='较上期'
-          trend={metrics.total_requests > 0 ? '+18.6%' : '+0%'}
-          trendTone='positive'
+          helper='当前筛选范围'
           icon={Activity}
           tone='blue'
           loading={usageQuery.isLoading}
@@ -688,8 +729,6 @@ export function EnterpriseUsageAnalytics(props: {
           title='输入 Tokens'
           value={formatTokens(metrics.prompt_tokens)}
           helper='Prompt 消耗'
-          trend={metrics.prompt_tokens > 0 ? '+16.2%' : '+0%'}
-          trendTone='positive'
           icon={DatabaseZap}
           tone='amber'
           loading={usageQuery.isLoading}
@@ -698,8 +737,6 @@ export function EnterpriseUsageAnalytics(props: {
           title='输出 Tokens'
           value={formatTokens(metrics.completion_tokens)}
           helper='Completion 消耗'
-          trend={metrics.completion_tokens > 0 ? '+14.7%' : '+0%'}
-          trendTone='positive'
           icon={Boxes}
           tone='violet'
           loading={usageQuery.isLoading}
@@ -707,9 +744,7 @@ export function EnterpriseUsageAnalytics(props: {
         <EnterpriseStatCard
           title='缓存命中率'
           value={formatPercent(metrics.cache_hit_rate)}
-          helper='缓存节省'
-          trend={metrics.cache_hit_rate > 0 ? '+5.7pp' : '+0pp'}
-          trendTone='positive'
+          helper='Usage Ledger 统计'
           icon={Gauge}
           tone='emerald'
           loading={usageQuery.isLoading}
@@ -718,8 +753,6 @@ export function EnterpriseUsageAnalytics(props: {
           title='总成本'
           value={formatCurrencyUSD(metrics.estimated_cost)}
           helper='按额度换算'
-          trend={metrics.estimated_cost > 0 ? '+2.3%' : '+0%'}
-          trendTone='positive'
           icon={Coins}
           tone='amber'
           loading={usageQuery.isLoading}
@@ -728,8 +761,6 @@ export function EnterpriseUsageAnalytics(props: {
           title='错误率'
           value={formatPercent(metrics.error_rate)}
           helper={`${formatNumber(metrics.error_requests)} 次失败`}
-          trend={metrics.error_rate > 0 ? '-0.41pp' : '0pp'}
-          trendTone={metrics.error_rate >= 0.02 ? 'negative' : 'positive'}
           icon={AlertTriangle}
           tone={metrics.error_rate >= 0.02 ? 'rose' : 'emerald'}
           loading={usageQuery.isLoading}
@@ -737,7 +768,7 @@ export function EnterpriseUsageAnalytics(props: {
       </section>
 
       <EnterprisePanel bodyClassName='p-2'>
-        <div className='grid gap-2 min-[1300px]:grid-cols-[190px_repeat(5,minmax(112px,1fr))_220px_104px]'>
+        <div className='grid gap-1.5 min-[1420px]:grid-cols-[170px_repeat(6,minmax(104px,1fr))_minmax(190px,1.5fr)_76px_76px_92px]'>
           <div className='flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700'>
             <CalendarDays className='size-3.5 text-slate-400' />
             <span className='truncate'>{rangeLabel}</span>
@@ -814,6 +845,21 @@ export function EnterpriseUsageAnalytics(props: {
             <NativeSelectOption value='success'>成功</NativeSelectOption>
             <NativeSelectOption value='error'>失败</NativeSelectOption>
           </NativeSelect>
+          <NativeSelect
+            value={requestTypeFilter}
+            className='h-8 rounded-md bg-white text-xs'
+            onChange={(event) => {
+              setRequestTypeFilter(event.target.value)
+              setPage(1)
+            }}
+          >
+            <NativeSelectOption value='all'>全部请求类型</NativeSelectOption>
+            {REQUEST_TYPE_OPTIONS.map((item) => (
+              <NativeSelectOption key={item.value} value={item.value}>
+                {item.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
           <div className='relative'>
             <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
             <Input
@@ -827,11 +873,25 @@ export function EnterpriseUsageAnalytics(props: {
             />
           </div>
           <Button
-            className='h-8 rounded-md bg-blue-600 text-xs font-semibold text-white shadow-none hover:bg-blue-700'
+            variant='outline'
+            className='h-8 rounded-md border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-none hover:bg-slate-50'
             onClick={resetFilters}
           >
-            <Filter className='size-3.5' />
             重置
+          </Button>
+          <Button
+            className='h-8 rounded-md bg-blue-600 px-2 text-xs font-semibold text-white shadow-none hover:bg-blue-700'
+            onClick={() => void usageQuery.refetch()}
+            disabled={usageQuery.isFetching}
+          >
+            <Filter className='size-3.5' />
+            筛选
+          </Button>
+          <Button
+            variant='outline'
+            className='h-8 rounded-md border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-none hover:bg-slate-50'
+          >
+            保存视图
           </Button>
         </div>
       </EnterprisePanel>
@@ -957,6 +1017,7 @@ export function EnterpriseUsageAnalytics(props: {
                 title='成本分布'
                 items={usage.by_model}
                 centerText={formatCurrencyUSD(metrics.estimated_cost)}
+                compact
               />
             </EnterprisePanel>
 
@@ -982,6 +1043,7 @@ export function EnterpriseUsageAnalytics(props: {
                 items={modelRanking}
                 value='quota'
                 emptyText='暂无模型用量数据'
+                limit={4}
               />
             </EnterprisePanel>
           </div>
@@ -1080,18 +1142,20 @@ export function EnterpriseUsageAnalytics(props: {
 
         <aside className='grid gap-2'>
           <EnterprisePanel
-            title='成本中心监测'
-            description='按部门 / 分组汇总'
+            title='成本中心控制'
+            description='按部门 / 分组监测预算'
             action={
               <Badge variant='outline' className='h-5 rounded px-2 text-[10px]'>
                 实时
               </Badge>
             }
+            bodyClassName='h-36 p-2'
           >
             <CostDonutPanel
               title='成本中心'
               items={usage.by_group}
               centerText={formatCurrencyUSD(metrics.estimated_cost)}
+              compact
             />
           </EnterprisePanel>
 
@@ -1113,6 +1177,7 @@ export function EnterpriseUsageAnalytics(props: {
               items={usage.by_user}
               value='cost'
               emptyText='暂无客户用量数据'
+              limit={5}
             />
           </EnterprisePanel>
 
