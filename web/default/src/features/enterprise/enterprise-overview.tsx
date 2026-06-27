@@ -496,7 +496,7 @@ function MetricCard({
   const toneClass = metricToneClassName[tone]
 
   return (
-    <article className='group min-h-[74px] overflow-hidden rounded-[5px] border border-slate-200/45 bg-white/75 p-2 shadow-none transition-colors hover:border-blue-200/80 hover:bg-white/85'>
+    <article className='group min-h-[68px] overflow-hidden rounded-[5px] border border-slate-200/45 bg-white/75 p-2 shadow-none transition-colors hover:border-blue-200/80 hover:bg-white/85'>
       <div className='flex items-start gap-2'>
         <span
           className={cn(
@@ -516,13 +516,13 @@ function MetricCard({
           {loading ? (
             <div className='mt-1.5 h-5 w-[72px] animate-pulse rounded-md bg-slate-100' />
           ) : (
-            <p className='mt-0.5 truncate text-[17px] leading-5 font-semibold text-slate-950 tabular-nums'>
+            <p className='mt-0.5 truncate text-[16px] leading-[18px] font-semibold text-slate-950 tabular-nums'>
               {value}
             </p>
           )}
         </div>
       </div>
-      <div className='mt-1.5 flex items-center justify-between gap-2 pl-9 text-[10px] leading-4'>
+      <div className='mt-1 flex items-center justify-between gap-2 pl-9 text-[10px] leading-4'>
         <span className='min-w-0 truncate text-slate-500'>{helper}</span>
         <span
           className={cn(
@@ -914,17 +914,17 @@ export function EnterpriseOverview() {
               </Select>
             </div>
           }
-          bodyClassName='h-[202px] px-2 pb-1.5 pt-2 sm:px-2.5'
+          bodyClassName='h-[168px] px-2 pb-1.5 pt-1.5 sm:px-2.5'
         >
           {trendData.length > 0 ? (
             <ResponsiveContainer
               width='100%'
               height='100%'
-              initialDimension={{ width: 760, height: 202 }}
+              initialDimension={{ width: 760, height: 168 }}
             >
               <ComposedChart
                 data={trendData}
-                margin={{ top: 4, right: 14, bottom: 2, left: 2 }}
+                margin={{ top: 2, right: 14, bottom: 0, left: 2 }}
               >
                 <defs>
                   <linearGradient
@@ -1057,10 +1057,10 @@ export function EnterpriseOverview() {
               </Button>
             }
             headerClassName='min-h-8 px-3 py-1.5'
-            bodyClassName='h-[188px] px-3 pb-2 pt-1.5'
+            bodyClassName='h-[152px] px-3 pb-1.5 pt-1'
           >
             {costData.length > 0 ? (
-              <div className='grid h-full grid-rows-[18px_minmax(0,1fr)_34px]'>
+              <div className='grid h-full grid-rows-[16px_minmax(0,1fr)_30px]'>
                 <div className='flex items-center gap-5 text-[10.5px] leading-4 text-slate-500'>
                   <span className='flex items-center gap-1.5'>
                     <span className='h-1.5 w-4 rounded-full bg-blue-500' />
@@ -1074,13 +1074,13 @@ export function EnterpriseOverview() {
                 <ResponsiveContainer
                   width='100%'
                   height='100%'
-                  initialDimension={{ width: 420, height: 128 }}
+                  initialDimension={{ width: 420, height: 104 }}
                 >
                   <BarChart
                     data={costData}
                     barGap={2}
                     barCategoryGap='28%'
-                    margin={{ top: 3, right: 4, bottom: 0, left: 0 }}
+                    margin={{ top: 1, right: 4, bottom: 0, left: 0 }}
                   >
                     <CartesianGrid
                       vertical={false}
@@ -1174,16 +1174,16 @@ export function EnterpriseOverview() {
               </Button>
             }
             headerClassName='min-h-8 px-3 py-1.5'
-            bodyClassName='h-[188px] px-3 pb-2 pt-2'
+            bodyClassName='h-[152px] px-3 pb-1.5 pt-1.5'
           >
             {donutData.length > 0 ? (
-              <div className='grid h-full grid-rows-[minmax(0,1fr)_20px]'>
-                <div className='grid min-h-0 grid-cols-[154px_minmax(0,1fr)] items-center gap-3 max-sm:grid-cols-1'>
+              <div className='grid h-full grid-rows-[minmax(0,1fr)_18px]'>
+                <div className='grid min-h-0 grid-cols-[124px_minmax(0,1fr)] items-center gap-3 max-sm:grid-cols-1'>
                   <div className='relative h-full min-h-0'>
                     <ResponsiveContainer
                       width='100%'
                       height='100%'
-                      initialDimension={{ width: 154, height: 154 }}
+                      initialDimension={{ width: 124, height: 124 }}
                     >
                       <RechartsPieChart>
                         <Pie
@@ -1227,7 +1227,7 @@ export function EnterpriseOverview() {
                       <span className='text-[10px] leading-3 text-slate-500'>
                         总请求量
                       </span>
-                      <span className='mt-0.5 text-base leading-5 font-medium text-slate-900 tabular-nums'>
+                      <span className='mt-0.5 text-sm leading-4 font-medium text-slate-900 tabular-nums'>
                         {formatCompactNumber(donutTotal)}
                       </span>
                     </div>
@@ -1296,7 +1296,7 @@ export function EnterpriseOverview() {
               </Button>
             }
             headerClassName='min-h-8 px-3 py-1.5'
-            bodyClassName='flex h-[188px] flex-col p-0'
+            bodyClassName='flex h-[152px] flex-col p-0'
           >
             <div className='min-h-0 flex-1 overflow-hidden'>
               <table className='w-full table-fixed text-left text-[10.5px]'>
@@ -1307,11 +1307,11 @@ export function EnterpriseOverview() {
                 </colgroup>
                 <thead className='border-b border-slate-100 bg-slate-50/70 text-[10px] font-normal text-slate-500'>
                   <tr>
-                    <th className='px-3 py-1.5 font-normal'>模型</th>
-                    <th className='px-2 py-1.5 text-right font-normal'>
+                    <th className='px-3 py-1 font-normal'>模型</th>
+                    <th className='px-2 py-1 text-right font-normal'>
                       请求量
                     </th>
-                    <th className='px-3 py-1.5 text-right font-normal'>
+                    <th className='px-3 py-1 text-right font-normal'>
                       成功率
                     </th>
                   </tr>
@@ -1321,9 +1321,9 @@ export function EnterpriseOverview() {
                     overview.top_models.slice(0, 5).map((model, index) => (
                       <tr
                         key={model.name}
-                        className='h-6 hover:bg-slate-50/70'
+                        className='h-5 hover:bg-slate-50/70'
                       >
-                        <td className='px-3 py-1.5'>
+                        <td className='px-3 py-1'>
                           <div className='flex min-w-0 items-center gap-2'>
                             <span
                               className={cn(
@@ -1341,10 +1341,10 @@ export function EnterpriseOverview() {
                             </span>
                           </div>
                         </td>
-                        <td className='px-2 py-1.5 text-right font-normal text-slate-700 tabular-nums'>
+                        <td className='px-2 py-1 text-right font-normal text-slate-700 tabular-nums'>
                           {formatCompactNumber(model.requests)}
                         </td>
-                        <td className='px-3 py-1.5 text-right font-normal text-slate-700 tabular-nums'>
+                        <td className='px-3 py-1 text-right font-normal text-slate-700 tabular-nums'>
                           {formatPercentage(
                             clamp(
                               (metrics.success_rate || 0.9968) - index * 0.003,
@@ -1368,7 +1368,7 @@ export function EnterpriseOverview() {
                 </tbody>
               </table>
             </div>
-            <div className='flex h-7 shrink-0 items-center justify-end border-t border-slate-100 px-3'>
+            <div className='flex h-6 shrink-0 items-center justify-end border-t border-slate-100 px-3'>
               <Button
                 variant='ghost'
                 size='sm'
@@ -1403,21 +1403,21 @@ export function EnterpriseOverview() {
             <table className='w-full min-w-[860px] text-left text-[11px]'>
               <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-normal text-slate-500'>
                 <tr>
-                  <th className='px-3 py-1.5 font-normal'>时间</th>
-                  <th className='px-2.5 py-1.5 font-normal'>级别</th>
-                  <th className='px-2.5 py-1.5 font-normal'>事件</th>
-                  <th className='px-2.5 py-1.5 font-normal'>对象</th>
-                  <th className='px-2.5 py-1.5 font-normal'>影响</th>
-                  <th className='px-3 py-1.5 text-right font-normal'>状态</th>
+                  <th className='px-3 py-1 font-normal'>时间</th>
+                  <th className='px-2.5 py-1 font-normal'>级别</th>
+                  <th className='px-2.5 py-1 font-normal'>事件</th>
+                  <th className='px-2.5 py-1 font-normal'>对象</th>
+                  <th className='px-2.5 py-1 font-normal'>影响</th>
+                  <th className='px-3 py-1 text-right font-normal'>状态</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-slate-100'>
                 {operationEvents.map((event) => (
                   <tr key={event.id} className='hover:bg-slate-50/70'>
-                    <td className='px-3 py-1.5 text-slate-500 tabular-nums'>
+                    <td className='px-3 py-1 text-slate-500 tabular-nums'>
                       {event.time}
                     </td>
-                    <td className='px-2.5 py-1.5'>
+                    <td className='px-2.5 py-1'>
                       <Badge
                         variant='outline'
                         className={cn(
@@ -1428,16 +1428,16 @@ export function EnterpriseOverview() {
                         {event.level}
                       </Badge>
                     </td>
-                    <td className='max-w-56 px-2.5 py-1.5 font-normal text-slate-800'>
+                    <td className='max-w-56 px-2.5 py-1 font-normal text-slate-800'>
                       <span className='line-clamp-1'>{event.title}</span>
                     </td>
-                    <td className='max-w-44 px-2.5 py-1.5 text-slate-600'>
+                    <td className='max-w-44 px-2.5 py-1 text-slate-600'>
                       <span className='line-clamp-1'>{event.object}</span>
                     </td>
-                    <td className='max-w-80 px-2.5 py-1.5 text-slate-500'>
+                    <td className='max-w-80 px-2.5 py-1 text-slate-500'>
                       <span className='line-clamp-1'>{event.impact}</span>
                     </td>
-                    <td className='px-3 py-1.5 text-right text-slate-700'>
+                    <td className='px-3 py-1 text-right text-slate-700'>
                       {event.status}
                     </td>
                   </tr>
@@ -1603,19 +1603,19 @@ export function EnterpriseOverview() {
           <OverviewPanel
             title='快捷操作'
             headerClassName='min-h-6 px-2.5 py-1'
-            bodyClassName='px-3.5 py-3'
+            bodyClassName='px-3 py-2.5'
           >
-            <div className='grid grid-cols-4 gap-x-3 gap-y-3.5'>
+            <div className='grid grid-cols-4 gap-x-2.5 gap-y-2.5'>
               {QUICK_ACTIONS.slice(0, 6).map((item) => {
                 const Icon = item.icon
                 return (
                   <Link
                     key={item.label}
                     to={item.to}
-                    className='group flex min-h-[48px] flex-col items-center justify-start gap-1.5 rounded-md text-center text-[9.5px] font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
+                    className='group flex min-h-[42px] flex-col items-center justify-start gap-1 rounded-md text-center text-[9.5px] font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
                   >
-                    <span className='flex size-7 items-center justify-center rounded-md bg-blue-50 text-blue-700 shadow-[0_1px_2px_rgb(37_99_235/0.05)] group-hover:bg-blue-600 group-hover:text-white'>
-                      <Icon className='size-3.5' />
+                    <span className='flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-700 shadow-[0_1px_2px_rgb(37_99_235/0.05)] group-hover:bg-blue-600 group-hover:text-white'>
+                      <Icon className='size-3' />
                     </span>
                     <span className='max-w-full truncate leading-3'>
                       {item.label}
