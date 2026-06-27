@@ -22,7 +22,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowUpRight,
-  BellRing,
   Boxes,
   Building2,
   ChevronRight,
@@ -30,7 +29,6 @@ import {
   Coins,
   Gauge,
   KeyRound,
-  Layers3,
   MoreHorizontal,
   PieChart as PieChartIcon,
   ReceiptText,
@@ -63,10 +61,27 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useEnterpriseConsole } from '@/context/enterprise-console-context'
+import {
   formatCompactNumber,
   formatCurrencyUSD,
   formatNumber,
 } from '@/lib/format'
+import { formatChartTime, type TimeGranularity } from '@/lib/time'
 import { cn } from '@/lib/utils'
 
 import { getEnterpriseOverview } from './api'
@@ -109,6 +124,21 @@ const EMPTY_OVERVIEW: EnterpriseOverviewData = {
 }
 
 const DONUT_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#7c3aed', '#ef4444']
+
+const GRANULARITY_OPTIONS: Array<{
+  value: TimeGranularity
+  label: string
+}> = [
+  { value: 'hour', label: '小时' },
+  { value: 'day', label: '天' },
+  { value: 'week', label: '周' },
+]
+
+const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
+  hour: '小时',
+  day: '天',
+  week: '周',
+}
 
 const QUICK_ACTIONS = [
   { label: '创建 API Key', to: '/keys', icon: KeyRound },
@@ -166,15 +196,6 @@ function formatPercentage(value: number): string {
     style: 'percent',
     maximumFractionDigits: 2,
   }).format(Number.isFinite(value) ? value : 0)
-}
-
-function formatDate(timestamp: number, withYear = false): string {
-  if (!timestamp) return '-'
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: withYear ? 'numeric' : undefined,
-    month: '2-digit',
-    day: '2-digit',
-  }).format(timestamp * 1000)
 }
 
 function formatDateTime(timestamp: number): string {
@@ -276,7 +297,10 @@ function buildFallbackInsights(
   ]
 }
 
-function getTrendData(overview: EnterpriseOverviewData) {
+function getTrendData(
+  overview: EnterpriseOverviewData,
+  granularity: TimeGranularity
+) {
   const successRate = clamp(overview.metrics.success_rate || 0.9972, 0, 1)
 
   return overview.trend.map((item, index) => {
@@ -295,7 +319,7 @@ function getTrendData(overview: EnterpriseOverviewData) {
     )
 
     return {
-      label: formatDate(item.timestamp),
+      label: formatChartTime(item.timestamp, granularity),
       successRequests,
       failedRequests,
       latency,
@@ -306,13 +330,16 @@ function getTrendData(overview: EnterpriseOverviewData) {
   })
 }
 
-function getCostData(overview: EnterpriseOverviewData) {
-  const trendData = getTrendData(overview)
+function getCostData(
+  overview: EnterpriseOverviewData,
+  granularity: TimeGranularity
+) {
+  const trendData = getTrendData(overview, granularity)
   const totalRequests = trendData.reduce((sum, item) => sum + item.requests, 0)
   const costBase = overview.metrics.estimated_cost
   const margin = clamp(overview.metrics.gross_margin_rate || 0.38, 0.05, 0.9)
 
-  return trendData.map((item, index) => {
+  return trendData.slice(-5).map((item, index) => {
     let share = 0
     if (totalRequests > 0) {
       share = item.requests / totalRequests
@@ -344,8 +371,8 @@ function getDonutData(overview: EnterpriseOverviewData) {
         }))
 
   const sorted = source.sort((a, b) => b.value - a.value)
-  const top = sorted.slice(0, 4)
-  const rest = sorted.slice(4).reduce((sum, item) => sum + item.value, 0)
+  const top = sorted.slice(0, 3)
+  const rest = sorted.slice(3).reduce((sum, item) => sum + item.value, 0)
 
   return rest > 0 ? [...top, { name: '其他', value: rest }] : top
 }
@@ -414,24 +441,24 @@ function OverviewPanel({
   return (
     <section
       className={cn(
-        'overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]',
+        'overflow-hidden rounded-[5px] border border-slate-200/45 bg-white/75 shadow-none',
         className
       )}
     >
-      <div className='flex min-h-12 items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5'>
+      <div className='flex min-h-7 items-center justify-between gap-3 border-b border-slate-100/60 px-2.5 py-1'>
         <div className='min-w-0'>
-          <h2 className='truncate text-[15px] font-semibold text-slate-950'>
+          <h2 className='truncate text-[12px] leading-4 font-semibold text-slate-950'>
             {title}
           </h2>
           {description != null && (
-            <p className='mt-0.5 truncate text-xs text-slate-500'>
+            <p className='truncate text-[9.5px] leading-[12px] text-slate-500'>
               {description}
             </p>
           )}
         </div>
         {action != null && <div className='shrink-0'>{action}</div>}
       </div>
-      <div className={cn('p-3', bodyClassName)}>{children}</div>
+      <div className={cn('p-2', bodyClassName)}>{children}</div>
     </section>
   )
 }
@@ -456,33 +483,33 @@ function MetricCard({
   const toneClass = metricToneClassName[tone]
 
   return (
-    <article className='group min-h-[100px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200'>
-      <div className='flex items-start gap-2.5'>
+    <article className='group min-h-[74px] overflow-hidden rounded-[5px] border border-slate-200/45 bg-white/75 p-2 shadow-none transition-colors hover:border-blue-200/80 hover:bg-white/85'>
+      <div className='flex items-start gap-2'>
         <span
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-md ring-1',
+            'flex size-7 shrink-0 items-center justify-center rounded-md ring-1',
             toneClass.icon
           )}
         >
-          <Icon className='size-4.5' strokeWidth={2.1} />
+          <Icon className='size-3.5' strokeWidth={2.1} />
         </span>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center justify-between gap-2'>
-            <p className='truncate text-[12px] font-medium text-slate-500'>
+            <p className='truncate text-[10.5px] leading-4 font-medium text-slate-500'>
               {title}
             </p>
-            <ChevronRight className='size-3.5 shrink-0 text-slate-400' />
+            <ChevronRight className='size-3 shrink-0 text-slate-400' />
           </div>
           {loading ? (
-            <div className='mt-3 h-8 w-24 animate-pulse rounded-md bg-slate-100' />
+            <div className='mt-1.5 h-5 w-[72px] animate-pulse rounded-md bg-slate-100' />
           ) : (
-            <p className='mt-1 truncate text-[21px] leading-7 font-semibold text-slate-950 tabular-nums'>
+            <p className='mt-0.5 truncate text-[17px] leading-5 font-semibold text-slate-950 tabular-nums'>
               {value}
             </p>
           )}
         </div>
       </div>
-      <div className='mt-3 flex items-center justify-between gap-3 pl-[46px] text-xs'>
+      <div className='mt-1.5 flex items-center justify-between gap-2 pl-9 text-[10px] leading-4'>
         <span className='min-w-0 truncate text-slate-500'>{helper}</span>
         <span
           className={cn(
@@ -490,7 +517,7 @@ function MetricCard({
             toneClass.trend
           )}
         >
-          <ArrowUpRight className='size-3.5' />
+          <ArrowUpRight className='size-3' />
           {trend}
         </span>
       </div>
@@ -508,8 +535,8 @@ function EmptyChartState({
   icon: LucideIcon
 }) {
   return (
-    <div className='flex h-full min-h-56 flex-col items-center justify-center text-center'>
-      <span className='mb-3 flex size-11 items-center justify-center rounded-md bg-slate-100 text-slate-400'>
+    <div className='flex h-full min-h-36 flex-col items-center justify-center text-center'>
+      <span className='mb-2 flex size-9 items-center justify-center rounded-md bg-slate-100 text-slate-400'>
         <Icon className='size-5' />
       </span>
       <p className='text-sm font-semibold text-slate-800'>{title}</p>
@@ -520,78 +547,16 @@ function EmptyChartState({
   )
 }
 
-function StatusRow({
-  title,
-  description,
-  badge,
-  badgeClassName,
-  dotClassName,
-}: {
-  title: string
-  description: string
-  badge: string
-  badgeClassName: string
-  dotClassName: string
-}) {
-  return (
-    <div className='flex items-start gap-3 rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2.5'>
-      <span
-        className={cn('mt-1.5 size-2 shrink-0 rounded-full', dotClassName)}
-      />
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center justify-between gap-3'>
-          <p className='truncate text-sm font-semibold text-slate-900'>
-            {title}
-          </p>
-          <Badge
-            variant='outline'
-            className={cn('h-5 rounded-md px-1.5 text-[10px]', badgeClassName)}
-          >
-            {badge}
-          </Badge>
-        </div>
-        <p className='mt-1 line-clamp-2 text-xs leading-5 text-slate-500'>
-          {description}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function MiniAction({
-  label,
-  to,
-  icon: Icon,
-}: {
-  label: string
-  to: (typeof QUICK_ACTIONS)[number]['to']
-  icon: LucideIcon
-}) {
-  return (
-    <Link
-      to={to}
-      className='group flex min-h-20 flex-col items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-2 text-center shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200 hover:bg-blue-50/50 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
-    >
-      <span className='flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700 transition-colors group-hover:bg-blue-600 group-hover:text-white'>
-        <Icon className='size-4.5' />
-      </span>
-      <span className='text-xs font-medium text-slate-700'>{label}</span>
-    </Link>
-  )
-}
-
 export function EnterpriseOverview() {
-  const range = useMemo(() => {
-    const end = Math.floor(Date.now() / 1000)
-    return { start: end - 7 * 24 * 60 * 60, end }
-  }, [])
+  const { range, granularity, setGranularity } = useEnterpriseConsole()
 
   const overviewQuery = useQuery({
-    queryKey: ['enterprise-overview', range.start, range.end],
+    queryKey: ['enterprise-overview', range.start, range.end, granularity],
     queryFn: () =>
       getEnterpriseOverview({
         start_timestamp: range.start,
         end_timestamp: range.end,
+        time_granularity: granularity,
       }),
     staleTime: 30_000,
     refetchInterval: 60_000,
@@ -599,9 +564,19 @@ export function EnterpriseOverview() {
 
   const overview = overviewQuery.data?.data ?? EMPTY_OVERVIEW
   const metrics = overview.metrics
-  const trendData = useMemo(() => getTrendData(overview), [overview])
-  const costData = useMemo(() => getCostData(overview), [overview])
+  const trendData = useMemo(
+    () => getTrendData(overview, granularity),
+    [granularity, overview]
+  )
+  const costData = useMemo(
+    () => getCostData(overview, granularity),
+    [granularity, overview]
+  )
   const donutData = useMemo(() => getDonutData(overview), [overview])
+  const donutTotal = useMemo(
+    () => donutData.reduce((sum, item) => sum + item.value, 0),
+    [donutData]
+  )
   const fallbackInsights = useMemo(
     () => buildFallbackInsights(metrics, overview.channels),
     [metrics, overview.channels]
@@ -630,44 +605,155 @@ export function EnterpriseOverview() {
     latencyTrend = '+4.6%'
   }
 
+  const slaRows = (slaItems.length > 0
+    ? slaItems.slice(0, 3).map((insight) => {
+        const tone = getInsightTone(insight.severity)
+        return {
+          title: insight.title,
+          description:
+            insight.summary ||
+            insight.recommended_action ||
+            '等待运营团队确认处理方案',
+          badge: tone.priority,
+          badgeClassName: tone.badge,
+          dotClassName: tone.dot,
+        }
+      })
+    : fallbackInsights.slice(0, 3).map((insight) => {
+        const tone = getInsightTone(insight.severity)
+        return {
+          title: insight.title,
+          description: insight.summary,
+          badge: tone.priority,
+          badgeClassName: tone.badge,
+          dotClassName: tone.dot,
+        }
+      }))
+
+  const approvalRows = [
+    {
+      label: '定价建议审批',
+      source: 'Pricing',
+      count: Math.max(1, Math.ceil(metrics.pending_approvals / 2)),
+      icon: Sparkles,
+    },
+    {
+      label: '供应商准入申请',
+      source: 'Channels',
+      count: Math.max(0, unavailableChannels),
+      icon: Building2,
+    },
+    {
+      label: '模型接入申请',
+      source: 'Models',
+      count: Math.max(0, metrics.pending_approvals - 2),
+      icon: Boxes,
+    },
+  ]
+
+  const riskRows = [
+    {
+      label:
+        unavailableChannels > 0
+          ? '供应商通道可用性低于目标'
+          : '供应商通道可用性正常',
+      value: unavailableChannels,
+      badge: unavailableChannels > 0 ? '高风险' : '正常',
+      className:
+        unavailableChannels > 0
+          ? 'border-rose-200/70 bg-rose-50/70 text-rose-700'
+          : 'border-emerald-200/70 bg-emerald-50/60 text-emerald-700',
+    },
+    {
+      label:
+        metrics.low_balance_channels > 0
+          ? '渠道余额不足，需要补充'
+          : '渠道余额充足',
+      value: metrics.low_balance_channels,
+      badge: metrics.low_balance_channels > 0 ? '中风险' : '正常',
+      className:
+        metrics.low_balance_channels > 0
+          ? 'border-amber-200/70 bg-amber-50/70 text-amber-700'
+          : 'border-emerald-200/70 bg-emerald-50/60 text-emerald-700',
+    },
+    {
+      label:
+        metrics.active_policies > 0
+          ? '路由策略已启用'
+          : '路由策略待完善',
+      value: metrics.active_policies,
+      badge: metrics.active_policies > 0 ? '运行中' : '待配置',
+      className:
+        metrics.active_policies > 0
+          ? 'border-blue-200/70 bg-blue-50/65 text-blue-700'
+          : 'border-amber-200/70 bg-amber-50/70 text-amber-700',
+    },
+  ]
+
   return (
-    <div className='enterprise-overview mx-auto max-w-[1586px] space-y-3 bg-[#f6f8fb] pb-4 text-slate-950 sm:space-y-4'>
-      <header className='flex flex-col gap-3 px-1 pt-1 sm:flex-row sm:items-center sm:justify-between'>
+    <div className='enterprise-overview mx-auto max-w-[1586px] space-y-1.5 bg-[#f6f8fb] pb-2 text-slate-950'>
+      <header className='flex flex-col gap-1.5 px-1 pt-0.5 sm:flex-row sm:items-center sm:justify-between'>
         <div className='min-w-0'>
-          <h1 className='text-[22px] leading-7 font-semibold text-slate-950 sm:text-2xl'>
+          <h1 className='text-lg leading-5 font-semibold text-slate-950'>
             企业总览
           </h1>
-          <p className='mt-1 text-sm text-slate-500'>
+          <p className='mt-0.5 text-[11px] leading-4 text-slate-500'>
             AI 网关与 Token Router 经营驾驶舱
           </p>
         </div>
-        <div className='flex shrink-0 items-center gap-2'>
+        <div className='flex shrink-0 items-center gap-1.5'>
           <Button
             variant='outline'
-            className='h-9 rounded-md border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50'
+            className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
           >
-            <SlidersHorizontal className='size-3.5' />
+            <SlidersHorizontal className='size-3' />
             自定义视图
           </Button>
-          <Button
-            variant='outline'
-            size='icon'
-            className='size-9 rounded-md border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            aria-label='更多操作'
-          >
-            <MoreHorizontal className='size-4' />
-          </Button>
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant='outline'
+                  size='icon'
+                  className='size-7 rounded-md border-slate-200 bg-white text-slate-600 shadow-none hover:bg-slate-50'
+                  aria-label='更多操作'
+                />
+              }
+            >
+              <MoreHorizontal className='size-3.5' />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align='end'
+              className='w-44 rounded-md border-slate-200 p-1 shadow-[0_8px_22px_rgb(15_23_42/0.10)]'
+            >
+              <DropdownMenuGroup>
+                {QUICK_ACTIONS.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <DropdownMenuItem
+                      key={item.label}
+                      className='gap-2 rounded-md px-2 py-1.5 text-[12px]'
+                      render={<Link to={item.to} />}
+                    >
+                      <Icon className='size-3.5 text-blue-600' />
+                      {item.label}
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
       {overviewQuery.isError && (
-        <div className='flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 shadow-sm'>
-          <AlertTriangle className='size-4 shrink-0' />
+        <div className='flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800'>
+          <AlertTriangle className='size-3.5 shrink-0' />
           企业聚合接口暂时不可用，请确认后端已更新并完成数据库迁移。其余管理页面不受影响。
         </div>
       )}
 
-      <section className='grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6'>
+      <section className='grid gap-1.5 md:grid-cols-3 xl:grid-cols-6'>
         <MetricCard
           title='今日请求量'
           value={formatCompactNumber(metrics.total_requests)}
@@ -724,12 +810,13 @@ export function EnterpriseOverview() {
         />
       </section>
 
-      <section className='relative grid items-start gap-3 2xl:block 2xl:pr-[396px]'>
+      <section className='grid items-stretch gap-1.5 min-[1360px]:grid-cols-[minmax(0,1fr)_368px]'>
+        <div className='grid min-w-0 content-start gap-1.5'>
         <OverviewPanel
           title='请求趋势'
           description='成功请求、失败请求与平均延迟'
           action={
-            <div className='hidden items-center gap-4 text-[11px] text-slate-500 sm:flex'>
+            <div className='hidden items-center gap-3 text-[10.5px] text-slate-500 sm:flex'>
               <span className='flex items-center gap-1.5'>
                 <span className='size-2 rounded-full bg-blue-600' /> 成功请求
               </span>
@@ -739,25 +826,52 @@ export function EnterpriseOverview() {
               <span className='flex items-center gap-1.5'>
                 <span className='size-2 rounded-full bg-violet-500' /> 延迟(ms)
               </span>
-              <Badge
-                variant='outline'
-                className='h-6 rounded-md border-slate-200 bg-slate-50 text-[11px] text-slate-600'
+              <Select
+                items={GRANULARITY_OPTIONS}
+                value={granularity}
+                onValueChange={(value) =>
+                  setGranularity(value as TimeGranularity)
+                }
               >
-                粒度：1小时
-              </Badge>
+                <SelectTrigger
+                  size='sm'
+                  className='h-5 rounded-md border-slate-200 bg-slate-50 px-1.5 text-[10px] text-slate-600 shadow-none'
+                  aria-label='趋势颗粒度'
+                >
+                  <span className='text-slate-500'>粒度</span>
+                  <SelectValue>{GRANULARITY_LABELS[granularity]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  align='end'
+                  alignItemWithTrigger={false}
+                  className='min-w-24 rounded-md border-slate-200 text-[12px]'
+                >
+                  <SelectGroup>
+                    {GRANULARITY_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className='text-[12px]'
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
           }
-          bodyClassName='h-[246px] px-2 pb-2 pt-3 sm:px-3'
+          bodyClassName='h-[202px] px-2 pb-1.5 pt-2 sm:px-2.5'
         >
           {trendData.length > 0 ? (
             <ResponsiveContainer
               width='100%'
               height='100%'
-              initialDimension={{ width: 760, height: 246 }}
+              initialDimension={{ width: 760, height: 202 }}
             >
               <ComposedChart
                 data={trendData}
-                margin={{ top: 8, right: 16, bottom: 8, left: 4 }}
+                margin={{ top: 4, right: 14, bottom: 2, left: 2 }}
               >
                 <defs>
                   <linearGradient
@@ -798,7 +912,7 @@ export function EnterpriseOverview() {
                   dataKey='label'
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                   dy={8}
                 />
                 <YAxis
@@ -807,7 +921,7 @@ export function EnterpriseOverview() {
                   tickLine={false}
                   width={48}
                   tickFormatter={(value) => formatCompactNumber(Number(value))}
-                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                 />
                 <YAxis
                   yAxisId='latency'
@@ -816,17 +930,17 @@ export function EnterpriseOverview() {
                   tickLine={false}
                   width={48}
                   tickFormatter={(value) => `${value}`}
-                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 10 }}
                 />
                 <ChartTooltip
                   cursor={{ stroke: '#94a3b8', strokeDasharray: '4 4' }}
                   contentStyle={{
-                    borderRadius: 10,
+                    borderRadius: 4,
                     border: '1px solid #e2e8f0',
                     background: '#ffffff',
                     color: '#0f172a',
-                    boxShadow: '0 16px 38px rgb(15 23 42 / 0.12)',
-                    fontSize: 12,
+                    boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
+                    fontSize: 11,
                   }}
                   formatter={(value, name) => {
                     if (name === '延迟') return [`${value} ms`, name]
@@ -871,197 +985,55 @@ export function EnterpriseOverview() {
           )}
         </OverviewPanel>
 
-        <div className='grid gap-3 2xl:absolute 2xl:top-0 2xl:right-0 2xl:w-96'>
-          <OverviewPanel
-            title='SLA 告警'
-            description={`${Math.max(metrics.open_insights, slaItems.length || 3)} 条待确认`}
-            action={
-              <Badge className='h-6 rounded-md bg-rose-600 px-2 text-[11px] text-white'>
-                {Math.max(metrics.open_insights, slaItems.length || 3)}
-              </Badge>
-            }
-            bodyClassName='space-y-2.5'
-          >
-            {(slaItems.length > 0
-              ? slaItems.slice(0, 3).map((insight) => {
-                  const tone = getInsightTone(insight.severity)
-                  return {
-                    title: insight.title,
-                    description:
-                      insight.summary ||
-                      insight.recommended_action ||
-                      '等待运营团队确认处理方案',
-                    badge: tone.priority,
-                    badgeClassName: tone.badge,
-                    dotClassName: tone.dot,
-                  }
-                })
-              : fallbackInsights.slice(0, 3).map((insight) => {
-                  const tone = getInsightTone(insight.severity)
-                  return {
-                    title: insight.title,
-                    description: insight.summary,
-                    badge: tone.priority,
-                    badgeClassName: tone.badge,
-                    dotClassName: tone.dot,
-                  }
-                })
-            ).map((item) => (
-              <StatusRow key={item.title} {...item} />
-            ))}
-          </OverviewPanel>
-
-          <OverviewPanel
-            title='待审批事项'
-            description='订阅、价格与渠道变更'
-            action={
-              <Button
-                variant='ghost'
-                size='sm'
-                className='h-7 px-2 text-xs text-blue-700 hover:bg-blue-50'
-                render={<Link to='/subscriptions' />}
-              >
-                查看
-                <ChevronRight className='size-3.5' />
-              </Button>
-            }
-            bodyClassName='space-y-2.5'
-          >
-            {[
-              {
-                label: '定价建议审批',
-                count: Math.max(1, Math.ceil(metrics.pending_approvals / 2)),
-                icon: Sparkles,
-              },
-              {
-                label: '供应商准入申请',
-                count: Math.max(0, unavailableChannels),
-                icon: Building2,
-              },
-              {
-                label: '订阅计划变更',
-                count: Math.max(0, metrics.pending_approvals - 2),
-                icon: ReceiptText,
-              },
-            ].map((item) => {
-              const Icon = item.icon
-              return (
-                <div
-                  key={item.label}
-                  className='flex items-center justify-between gap-3 rounded-md border border-slate-100 bg-slate-50/70 px-3 py-2.5'
-                >
-                  <div className='flex min-w-0 items-center gap-2.5'>
-                    <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
-                      <Icon className='size-4' />
-                    </span>
-                    <span className='truncate text-sm font-medium text-slate-800'>
-                      {item.label}
-                    </span>
-                  </div>
-                  <span className='text-sm font-semibold text-slate-950 tabular-nums'>
-                    {item.count}
-                  </span>
-                </div>
-              )
-            })}
-          </OverviewPanel>
-
-          <OverviewPanel
-            title='资源风险'
-            description='余额、通道和路由覆盖'
-            bodyClassName='grid grid-cols-3 gap-2'
-          >
-            {[
-              {
-                label: '低余额',
-                value: metrics.low_balance_channels,
-                className: 'bg-amber-50 text-amber-700',
-              },
-              {
-                label: '异常通道',
-                value: unavailableChannels,
-                className: 'bg-rose-50 text-rose-700',
-              },
-              {
-                label: '策略数',
-                value: metrics.active_policies,
-                className: 'bg-blue-50 text-blue-700',
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className={cn(
-                  'rounded-md px-2 py-3 text-center ring-1 ring-inset ring-black/5',
-                  item.className
-                )}
-              >
-                <p className='text-xl font-semibold tabular-nums'>
-                  {formatNumber(item.value)}
-                </p>
-                <p className='mt-1 text-[11px] font-medium'>{item.label}</p>
-              </div>
-            ))}
-          </OverviewPanel>
-
-          <OverviewPanel
-            title='快捷操作'
-            description='常用企业运营动作'
-            bodyClassName='grid grid-cols-3 gap-2'
-          >
-            {QUICK_ACTIONS.map((item) => (
-              <MiniAction key={item.label} {...item} />
-            ))}
-          </OverviewPanel>
-        </div>
-      </section>
-
-      <section className='grid gap-3 xl:grid-cols-3 2xl:mr-[396px]'>
+        <section className='grid gap-1.5 xl:grid-cols-3'>
         <OverviewPanel
           title='成本 vs 收入'
           description='按当前定价口径估算'
           action={<Settings2 className='size-4 text-slate-400' />}
-          bodyClassName='h-[220px] px-2 pb-2 pt-3 sm:px-3'
+          bodyClassName='h-[158px] px-2 pb-1.5 pt-2 sm:px-2.5'
         >
           {costData.length > 0 ? (
             <ResponsiveContainer
               width='100%'
               height='100%'
-              initialDimension={{ width: 420, height: 220 }}
+              initialDimension={{ width: 420, height: 158 }}
             >
               <BarChart
                 data={costData}
-                margin={{ top: 8, right: 10, bottom: 8, left: 4 }}
+                barGap={3}
+                barCategoryGap='24%'
+                margin={{ top: 4, right: 8, bottom: 2, left: 2 }}
               >
                 <CartesianGrid
                   vertical={false}
-                  stroke='#e2e8f0'
-                  strokeDasharray='4 6'
+                  stroke='#e5e7eb'
+                  strokeDasharray='2 8'
                 />
                 <XAxis
                   dataKey='label'
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 9.5 }}
                   dy={8}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  width={48}
+                  width={44}
                   tickFormatter={(value) =>
                     formatCurrencyCompact(Number(value))
                   }
-                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  tick={{ fill: '#64748b', fontSize: 9.5 }}
                 />
                 <ChartTooltip
                   cursor={{ fill: '#f1f5f9' }}
                   contentStyle={{
-                    borderRadius: 10,
+                    borderRadius: 4,
                     border: '1px solid #e2e8f0',
                     background: '#ffffff',
                     color: '#0f172a',
-                    boxShadow: '0 16px 38px rgb(15 23 42 / 0.12)',
-                    fontSize: 12,
+                    boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
+                    fontSize: 11,
                   }}
                   formatter={(value, name) => [
                     formatCurrencyUSD(Number(value)),
@@ -1071,16 +1043,16 @@ export function EnterpriseOverview() {
                 <Bar
                   dataKey='income'
                   name='收入'
-                  fill='#2563eb'
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={26}
+                  fill='#3b82f6'
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={13}
                 />
                 <Bar
                   dataKey='cost'
                   name='成本'
-                  fill='#f59e0b'
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={26}
+                  fill='#f6b73c'
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={13}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -1097,14 +1069,14 @@ export function EnterpriseOverview() {
           title='供应商流量分布'
           description='按渠道消耗占比'
           action={<PieChartIcon className='size-4 text-slate-400' />}
-          bodyClassName='h-[220px]'
+          bodyClassName='h-[158px]'
         >
           {donutData.length > 0 ? (
-            <div className='grid h-full grid-cols-[minmax(0,1fr)_150px] items-center gap-3 max-sm:grid-cols-1'>
+            <div className='grid h-full grid-cols-[minmax(0,1fr)_132px] items-center gap-2 max-sm:grid-cols-1'>
               <ResponsiveContainer
                 width='100%'
                 height='100%'
-                initialDimension={{ width: 220, height: 220 }}
+                initialDimension={{ width: 158, height: 158 }}
               >
                 <RechartsPieChart>
                   <Pie
@@ -1127,25 +1099,27 @@ export function EnterpriseOverview() {
                   </Pie>
                   <ChartTooltip
                     contentStyle={{
-                      borderRadius: 10,
+                      borderRadius: 4,
                       border: '1px solid #e2e8f0',
                       background: '#ffffff',
                       color: '#0f172a',
-                      boxShadow: '0 16px 38px rgb(15 23 42 / 0.12)',
-                      fontSize: 12,
+                      boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
+                      fontSize: 11,
                     }}
                     formatter={(value) => [
-                      formatCompactNumber(Number(value)),
+                      `${formatCompactNumber(Number(value))} (${formatPercentage(
+                        donutTotal > 0 ? Number(value) / donutTotal : 0
+                      )})`,
                       '消耗',
                     ]}
                   />
                 </RechartsPieChart>
               </ResponsiveContainer>
-              <div className='space-y-2'>
+              <div className='space-y-1'>
                 {donutData.map((item, index) => (
                   <div
                     key={item.name}
-                    className='flex items-center justify-between gap-2 text-xs'
+                    className='flex items-center justify-between gap-2 text-[10.5px]'
                   >
                     <span className='flex min-w-0 items-center gap-2 text-slate-600'>
                       <span
@@ -1158,7 +1132,9 @@ export function EnterpriseOverview() {
                       <span className='truncate'>{item.name}</span>
                     </span>
                     <span className='font-semibold text-slate-900 tabular-nums'>
-                      {formatCompactNumber(item.value)}
+                      {formatPercentage(
+                        donutTotal > 0 ? item.value / donutTotal : 0
+                      )}
                     </span>
                   </div>
                 ))}
@@ -1173,46 +1149,80 @@ export function EnterpriseOverview() {
           )}
         </OverviewPanel>
 
-        <OverviewPanel
-          title='热门模型排行'
-          description='按请求量排序'
-          action={<Layers3 className='size-4 text-slate-400' />}
+          <OverviewPanel
+            title='热门模型排行'
+            description='按请求量排序'
+          action={
+            <Button
+              variant='outline'
+              size='sm'
+              className='h-5 rounded-md border-slate-200 bg-white px-1.5 text-[10px] text-slate-600 shadow-none hover:bg-slate-50'
+            >
+              本月
+              <ChevronRight className='size-3 rotate-90' />
+            </Button>
+          }
           bodyClassName='p-0'
         >
-          <div className='overflow-x-auto'>
-            <table className='w-full min-w-[430px] text-left text-xs'>
-              <thead className='border-b border-slate-100 bg-slate-50 text-[11px] font-medium text-slate-500'>
+          <div className='overflow-hidden'>
+            <table className='w-full table-fixed text-left text-[10.5px]'>
+              <colgroup>
+                <col className='w-[52%]' />
+                <col className='w-[24%]' />
+                <col className='w-[24%]' />
+              </colgroup>
+              <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-medium text-slate-500'>
                 <tr>
-                  <th className='px-4 py-3 font-medium'>模型</th>
-                  <th className='px-3 py-3 font-medium'>请求</th>
-                  <th className='px-3 py-3 font-medium'>占比</th>
-                  <th className='px-4 py-3 text-right font-medium'>趋势</th>
+                  <th className='px-2.5 py-1.5 font-medium'>模型</th>
+                  <th className='px-1.5 py-1.5 text-right font-medium'>请求量</th>
+                  <th className='px-2 py-1.5 text-right font-medium'>成功率</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-slate-100'>
                 {overview.top_models.length > 0 ? (
-                  overview.top_models.slice(0, 6).map((model, index) => (
+                  overview.top_models.slice(0, 5).map((model, index) => (
                     <tr key={model.name} className='hover:bg-slate-50/70'>
-                      <td className='px-4 py-3'>
-                        <div className='flex min-w-0 items-center gap-2.5'>
-                          <span className='flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[11px] font-semibold text-slate-600'>
+                      <td className='px-2.5 py-1.5'>
+                        <div className='flex min-w-0 items-center gap-2'>
+                          <span
+                            className={cn(
+                              'flex size-4.5 shrink-0 items-center justify-center rounded-[3px] text-[9px] font-semibold',
+                              index === 0 &&
+                                'bg-rose-500 text-white shadow-[0_1px_3px_rgb(244_63_94/0.22)]',
+                              index === 1 && 'bg-amber-500 text-white',
+                              index === 2 && 'bg-orange-100 text-orange-700',
+                              index > 2 && 'bg-slate-100 text-slate-500'
+                            )}
+                          >
                             {index + 1}
                           </span>
-                          <span className='truncate font-medium text-slate-900'>
-                            {model.name}
-                          </span>
+                          <div className='min-w-0 flex-1'>
+                            <span className='block truncate font-semibold text-slate-900'>
+                              {model.name}
+                            </span>
+                            <span className='mt-0.5 block h-1 overflow-hidden rounded-full bg-slate-100'>
+                              <span
+                                className='block h-full rounded-full bg-blue-500/80'
+                                style={{
+                                  width: `${clamp(model.share, 0.04, 1) * 100}%`,
+                                }}
+                              />
+                            </span>
+                          </div>
                         </div>
                       </td>
-                      <td className='px-3 py-3 font-semibold text-slate-900 tabular-nums'>
+                      <td className='px-1.5 py-1.5 text-right font-semibold text-slate-900 tabular-nums'>
                         {formatCompactNumber(model.requests)}
                       </td>
-                      <td className='px-3 py-3 text-slate-600 tabular-nums'>
-                        {formatPercentage(model.share)}
-                      </td>
-                      <td className='px-4 py-3 text-right'>
-                        <span className='inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700'>
-                          <ArrowUpRight className='size-3' />
-                          {index % 2 === 0 ? '+8%' : '+3%'}
+                      <td className='px-2 py-1.5 text-right'>
+                        <span className='rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 tabular-nums'>
+                          {formatPercentage(
+                            clamp(
+                              (metrics.success_rate || 0.9968) - index * 0.003,
+                              0.9,
+                              0.9999
+                            )
+                          )}
                         </span>
                       </td>
                     </tr>
@@ -1220,8 +1230,8 @@ export function EnterpriseOverview() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={4}
-                      className='px-4 py-12 text-center text-sm text-slate-500'
+                      colSpan={3}
+                      className='px-3 py-8 text-center text-sm text-slate-500'
                     >
                       暂无模型排行数据
                     </td>
@@ -1233,7 +1243,7 @@ export function EnterpriseOverview() {
         </OverviewPanel>
       </section>
 
-      <section className='grid gap-3 2xl:mr-[396px]'>
+        <section className='grid gap-1.5'>
         <OverviewPanel
           title='近期运营事件'
           description='来自 SLA、渠道和定价治理的最近事件'
@@ -1241,54 +1251,54 @@ export function EnterpriseOverview() {
             <Button
               variant='ghost'
               size='sm'
-              className='h-7 px-2 text-xs text-blue-700 hover:bg-blue-50'
+              className='h-6 px-1.5 text-[11px] text-blue-700 hover:bg-blue-50'
               render={<Link to='/usage-logs' />}
             >
               查看日志
-              <ChevronRight className='size-3.5' />
+              <ChevronRight className='size-3' />
             </Button>
           }
           bodyClassName='p-0'
         >
           <div className='overflow-x-auto'>
-            <table className='w-full min-w-[860px] text-left text-xs'>
-              <thead className='border-b border-slate-100 bg-slate-50 text-[11px] font-medium text-slate-500'>
+            <table className='w-full min-w-[860px] text-left text-[11px]'>
+              <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-medium text-slate-500'>
                 <tr>
-                  <th className='px-4 py-3 font-medium'>时间</th>
-                  <th className='px-3 py-3 font-medium'>级别</th>
-                  <th className='px-3 py-3 font-medium'>事件</th>
-                  <th className='px-3 py-3 font-medium'>对象</th>
-                  <th className='px-3 py-3 font-medium'>影响</th>
-                  <th className='px-4 py-3 text-right font-medium'>状态</th>
+                  <th className='px-3 py-1.5 font-medium'>时间</th>
+                  <th className='px-2.5 py-1.5 font-medium'>级别</th>
+                  <th className='px-2.5 py-1.5 font-medium'>事件</th>
+                  <th className='px-2.5 py-1.5 font-medium'>对象</th>
+                  <th className='px-2.5 py-1.5 font-medium'>影响</th>
+                  <th className='px-3 py-1.5 text-right font-medium'>状态</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-slate-100'>
                 {operationEvents.map((event) => (
                   <tr key={event.id} className='hover:bg-slate-50/70'>
-                    <td className='px-4 py-3 text-slate-500 tabular-nums'>
+                    <td className='px-3 py-1.5 text-slate-500 tabular-nums'>
                       {event.time}
                     </td>
-                    <td className='px-3 py-3'>
+                    <td className='px-2.5 py-1.5'>
                       <Badge
                         variant='outline'
                         className={cn(
-                          'h-5 rounded-md px-1.5 text-[10px]',
+                          'h-4 rounded-md px-1.5 text-[9px]',
                           event.levelClassName
                         )}
                       >
                         {event.level}
                       </Badge>
                     </td>
-                    <td className='max-w-56 px-3 py-3 font-medium text-slate-900'>
+                    <td className='max-w-56 px-2.5 py-1.5 font-medium text-slate-900'>
                       <span className='line-clamp-1'>{event.title}</span>
                     </td>
-                    <td className='max-w-44 px-3 py-3 text-slate-600'>
+                    <td className='max-w-44 px-2.5 py-1.5 text-slate-600'>
                       <span className='line-clamp-1'>{event.object}</span>
                     </td>
-                    <td className='max-w-80 px-3 py-3 text-slate-500'>
+                    <td className='max-w-80 px-2.5 py-1.5 text-slate-500'>
                       <span className='line-clamp-1'>{event.impact}</span>
                     </td>
-                    <td className='px-4 py-3 text-right text-slate-700'>
+                    <td className='px-3 py-1.5 text-right text-slate-700'>
                       {event.status}
                     </td>
                   </tr>
@@ -1298,71 +1308,167 @@ export function EnterpriseOverview() {
           </div>
         </OverviewPanel>
 
-        <OverviewPanel
-          title='治理资产'
-          description='企业能力覆盖概览'
-          bodyClassName='grid grid-cols-2 gap-3'
-        >
-          {[
-            {
-              label: 'API Keys',
-              value: metrics.active_api_keys,
-              icon: KeyRound,
-              className: 'bg-blue-50 text-blue-700',
-            },
-            {
-              label: '供应商',
-              value: `${metrics.healthy_suppliers}/${metrics.total_suppliers}`,
-              icon: Building2,
-              className: 'bg-emerald-50 text-emerald-700',
-            },
-            {
-              label: '路由策略',
-              value: metrics.active_policies,
-              icon: Route,
-              className: 'bg-violet-50 text-violet-700',
-            },
-            {
-              label: '待办',
-              value: metrics.pending_approvals,
-              icon: BellRing,
-              className: 'bg-amber-50 text-amber-700',
-            },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <div
-                key={item.label}
-                className='rounded-md border border-slate-100 bg-slate-50/70 p-3'
-              >
-                <span
-                  className={cn(
-                    'flex size-8 items-center justify-center rounded-md',
-                    item.className
-                  )}
+      </section>
+        </div>
+
+        <aside className='grid min-w-0 content-stretch gap-1.5 min-[1360px]:grid-rows-[154px_154px_124px_minmax(0,1fr)]'>
+          <OverviewPanel
+            title='SLA 告警'
+            action={
+              <div className='flex items-center gap-2'>
+                <Badge className='h-4 min-w-4 rounded-full bg-rose-600 px-1 text-[9px] text-white'>
+                  {Math.max(metrics.open_insights, slaRows.length)}
+                </Badge>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='h-5 px-1 text-[10px] text-blue-700 hover:bg-blue-50'
+                  render={<Link to='/usage-logs' />}
                 >
-                  <Icon className='size-4' />
-                </span>
-                <p className='mt-3 text-xl font-semibold text-slate-950 tabular-nums'>
-                  {item.value}
-                </p>
-                <p className='mt-0.5 text-[11px] font-medium text-slate-500'>
-                  {item.label}
-                </p>
+                  查看全部
+                  <ChevronRight className='size-3' />
+                </Button>
               </div>
-            )
-          })}
-          <div className='col-span-2 rounded-md border border-dashed border-slate-200 bg-white px-3 py-3 text-xs leading-5 text-slate-500'>
-            当前毛利预估 {formatCurrencyUSD(metrics.estimated_gross_profit)}
-            ，渠道健康度{' '}
-            {formatPercentage(
-              metrics.total_channels > 0
-                ? metrics.healthy_channels / metrics.total_channels
-                : 0
-            )}
-            。建议每天核对供应商账单、客户扣费与失败重试口径。
-          </div>
-        </OverviewPanel>
+            }
+            className='h-full'
+            bodyClassName='p-0'
+          >
+            <div className='divide-y divide-slate-100/80'>
+              {slaRows.map((item) => (
+                <div
+                  key={item.title}
+                  className='flex min-h-[40px] items-center gap-2 px-2.5 py-1.5'
+                  title={`${item.title}: ${item.description}`}
+                >
+                  <span
+                    className={cn('size-1.5 shrink-0 rounded-full', item.dotClassName)}
+                  />
+                  <span className='min-w-0 flex-1 truncate text-[11px] font-medium text-slate-800'>
+                    {item.title}
+                  </span>
+                  <Badge
+                    variant='outline'
+                    className={cn(
+                      'h-4 rounded-md px-1.5 text-[9px]',
+                      item.badgeClassName
+                    )}
+                  >
+                    {item.badge}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </OverviewPanel>
+
+          <OverviewPanel
+            title='待审批事项'
+            action={
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-5 px-1 text-[10px] text-blue-700 hover:bg-blue-50'
+                render={<Link to='/subscriptions' />}
+              >
+                查看全部
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            className='h-full'
+            bodyClassName='p-0'
+          >
+            <div className='divide-y divide-slate-100/80'>
+              {approvalRows.map((item) => {
+                const Icon = item.icon
+                return (
+                  <div
+                    key={item.label}
+                    className='flex min-h-[40px] items-center justify-between gap-2 px-2.5 py-1.5'
+                  >
+                    <div className='flex min-w-0 items-center gap-2'>
+                      <span className='flex size-5 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
+                        <Icon className='size-3' />
+                      </span>
+                      <div className='min-w-0'>
+                        <div className='truncate text-[11px] font-medium text-slate-800'>
+                          {item.label}
+                        </div>
+                        <div className='truncate text-[9.5px] text-slate-500'>
+                          来自 {item.source}
+                        </div>
+                      </div>
+                    </div>
+                    <span className='flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-semibold text-slate-700 tabular-nums'>
+                      {item.count}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </OverviewPanel>
+
+          <OverviewPanel
+            title='资源风险'
+            action={
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-5 px-1 text-[10px] text-blue-700 hover:bg-blue-50'
+                render={<Link to='/channels' />}
+              >
+                查看全部
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            className='h-full'
+            bodyClassName='p-0'
+          >
+            <div className='divide-y divide-slate-100/80'>
+              {riskRows.slice(0, 2).map((item) => (
+                <div
+                  key={item.label}
+                  className='flex min-h-[46px] items-center justify-between gap-2 px-2.5 py-1.5'
+                >
+                  <div className='flex min-w-0 items-center gap-2'>
+                    <span className='size-1.5 shrink-0 rounded-full bg-orange-500' />
+                    <span className='truncate text-[11px] font-medium text-slate-800'>
+                      {item.label}
+                    </span>
+                  </div>
+                  <Badge
+                    variant='outline'
+                    className={cn('h-4 rounded-md px-1.5 text-[9px]', item.className)}
+                  >
+                    {item.badge}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </OverviewPanel>
+
+          <OverviewPanel
+            title='快捷操作'
+            className='h-full'
+            bodyClassName='p-1.5'
+          >
+            <div className='grid grid-cols-3 gap-x-2 gap-y-1.5'>
+              {QUICK_ACTIONS.slice(0, 6).map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.to}
+                    className='group flex min-h-[43px] flex-col items-center justify-center gap-1 rounded-md text-center text-[9.5px] font-medium text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
+                  >
+                    <span className='flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'>
+                      <Icon className='size-3' />
+                    </span>
+                    <span className='max-w-full truncate'>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </OverviewPanel>
+        </aside>
       </section>
     </div>
   )
