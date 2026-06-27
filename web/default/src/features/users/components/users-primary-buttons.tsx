@@ -16,15 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Plus } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { UserPlus } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
 import { useUsers } from './users-provider'
 
 export function UsersPrimaryButtons() {
-  const { t } = useTranslation()
   const { setOpen, setCurrentRow } = useUsers()
 
   const handleCreate = () => {
@@ -34,9 +32,13 @@ export function UsersPrimaryButtons() {
 
   return (
     <div className='flex gap-2'>
-      <Button size='sm' onClick={handleCreate}>
-        <Plus className='h-4 w-4' />
-        {t('Add User')}
+      <Button
+        size='sm'
+        className='h-7 rounded-md bg-blue-600 px-2.5 text-[11px] font-semibold text-white shadow-none hover:bg-blue-700'
+        onClick={handleCreate}
+      >
+        <UserPlus className='size-3.5' />
+        邀请成员
       </Button>
     </div>
   )

@@ -24,7 +24,6 @@ import {
   ChevronRight,
   CircleOff,
   Clock3,
-  Download,
   Folder,
   KeyRound,
   LockKeyhole,
@@ -145,6 +144,9 @@ const ROLE_CARD_DEFS: Array<{
 ]
 
 const PERMISSION_COLUMNS = ['Owner', 'Admin', 'Finance', 'Ops', 'Dev', 'Viewer']
+
+const USERS_PANEL_CHROME =
+  'border-slate-200/75 shadow-[0_1px_1px_rgb(15_23_42/0.025)]'
 
 function initials(user: EnterpriseUserItem): string {
   const name = user.display_name || user.username
@@ -325,6 +327,7 @@ export function EnterpriseUsersGovernance(props: {
             size='icon'
             className='size-7 rounded-md border-slate-200 bg-white text-slate-600 shadow-none hover:bg-slate-50'
             aria-label='更多用户操作'
+            onClick={() => setShowClassicUsers((value) => !value)}
           >
             <MoreHorizontal className='size-3.5' />
           </Button>
@@ -384,10 +387,10 @@ export function EnterpriseUsersGovernance(props: {
 
       <section className='grid items-start gap-2 xl:grid-cols-[230px_minmax(0,1fr)_380px]'>
         <EnterprisePanel
-          className='h-full'
+          className={cn('h-full', USERS_PANEL_CHROME)}
           title='组织结构'
           description='按现有用户分组聚合'
-          bodyClassName='p-2.5'
+          bodyClassName='p-2'
         >
           <label className='relative mb-2 block'>
             <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
@@ -398,12 +401,12 @@ export function EnterpriseUsersGovernance(props: {
               className='h-8 rounded-md border-slate-200 bg-white pl-8 text-xs shadow-none'
             />
           </label>
-          <div className='space-y-1.5'>
+          <div className='space-y-1'>
             <button
               type='button'
               onClick={() => setActiveGroup('all')}
               className={cn(
-                'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs transition-colors',
+                'flex h-7 w-full items-center justify-between rounded-md px-2.5 text-left text-xs transition-colors',
                 activeGroup === 'all'
                   ? 'bg-blue-50 font-semibold text-blue-700'
                   : 'text-slate-700 hover:bg-slate-50'
@@ -421,7 +424,7 @@ export function EnterpriseUsersGovernance(props: {
                 type='button'
                 onClick={() => setActiveGroup(group.name)}
                 className={cn(
-                  'flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs transition-colors',
+                  'flex h-7 w-full items-center justify-between rounded-md px-2.5 text-left text-xs transition-colors',
                   activeGroup === group.name
                     ? 'bg-blue-50 font-semibold text-blue-700'
                     : 'text-slate-700 hover:bg-slate-50'
@@ -438,9 +441,6 @@ export function EnterpriseUsersGovernance(props: {
               </button>
             ))}
           </div>
-          <div className='mt-3 rounded-md border border-dashed border-slate-200 bg-slate-50/70 p-2.5 text-[11px] leading-4 text-slate-500'>
-            当前使用后端用户分组字段聚合。后续接入企业组织树时，可直接映射为多层部门。
-          </div>
           <Button
             variant='outline'
             className='mt-2 h-8 w-full rounded-md border-slate-200 bg-white text-xs shadow-none'
@@ -451,14 +451,14 @@ export function EnterpriseUsersGovernance(props: {
         </EnterprisePanel>
 
         <EnterprisePanel
-          className='h-full'
+          className={cn('h-full', USERS_PANEL_CHROME)}
           title={
             activeGroup === 'all'
               ? `Platform Team (${filteredUsers.length})`
               : `${activeGroup} (${filteredUsers.length})`
           }
           description='选择成员后可查看权限与资产概况'
-          bodyClassName='flex min-h-[362px] flex-col p-0'
+          bodyClassName='flex min-h-[342px] flex-col p-0'
           action={
             <div className='flex items-center gap-1.5'>
               <Button
@@ -477,7 +477,7 @@ export function EnterpriseUsersGovernance(props: {
           }
         >
           <div className='min-h-0 flex-1 overflow-x-auto'>
-            <Table className='text-xs [&_td]:h-9 [&_td]:py-1.5 [&_td]:text-xs [&_td_*]:text-xs [&_th]:h-8 [&_th]:text-xs'>
+            <Table className='text-[11px] [&_td]:h-8 [&_td]:py-1 [&_td]:text-[11px] [&_td_*]:text-[11px] [&_th]:h-7 [&_th]:text-[11px]'>
               <TableHeader className='bg-slate-50'>
                 <TableRow>
                   <TableHead className='w-8'>
@@ -505,6 +505,11 @@ export function EnterpriseUsersGovernance(props: {
                         'cursor-pointer hover:bg-slate-50',
                         selected && 'bg-blue-50/60'
                       )}
+                      style={{
+                        animation: 'none',
+                        opacity: 1,
+                        transform: 'none',
+                      }}
                     >
                       <TableCell>
                         <span
@@ -589,7 +594,7 @@ export function EnterpriseUsersGovernance(props: {
 
         <aside className='grid gap-2'>
           <EnterprisePanel
-            className='h-full'
+            className={cn('h-full', USERS_PANEL_CHROME)}
             title='角色与权限'
             action={
               <Button
@@ -607,7 +612,7 @@ export function EnterpriseUsersGovernance(props: {
                 return (
                   <div
                     key={role.label}
-                    className='rounded-md border border-slate-200 bg-white p-2'
+                    className='rounded-md border border-slate-200/80 bg-white p-2'
                   >
                     <div className='flex items-center gap-1.5'>
                       <span
@@ -659,7 +664,14 @@ export function EnterpriseUsersGovernance(props: {
                       ['Billing', true, true, true, false, false, false],
                       ['System', true, true, false, false, false, false],
                     ].map((row) => (
-                      <TableRow key={String(row[0])}>
+                      <TableRow
+                        key={String(row[0])}
+                        style={{
+                          animation: 'none',
+                          opacity: 1,
+                          transform: 'none',
+                        }}
+                      >
                         <TableCell className='font-medium text-slate-700'>
                           {row[0]}
                         </TableCell>
@@ -685,6 +697,7 @@ export function EnterpriseUsersGovernance(props: {
 
       <section className='grid gap-2 xl:grid-cols-[1fr_1.25fr_1.25fr]'>
         <EnterprisePanel
+          className={USERS_PANEL_CHROME}
           title='SSO / SCIM / MFA'
           action={
             <Button
@@ -748,6 +761,7 @@ export function EnterpriseUsersGovernance(props: {
         </EnterprisePanel>
 
         <EnterprisePanel
+          className={USERS_PANEL_CHROME}
           title='访问审计（近 7 天）'
           action={
             <Button
@@ -790,6 +804,7 @@ export function EnterpriseUsersGovernance(props: {
         </EnterprisePanel>
 
         <EnterprisePanel
+          className={USERS_PANEL_CHROME}
           title='安全与合规'
           action={
             <Button
@@ -861,19 +876,15 @@ export function EnterpriseUsersGovernance(props: {
         </EnterprisePanel>
       </section>
 
-      {props.classicTable && (
-        <details
-          className='rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600'
-          onToggle={(event) => setShowClassicUsers(event.currentTarget.open)}
+      {props.classicTable && showClassicUsers && (
+        <EnterprisePanel
+          className={USERS_PANEL_CHROME}
+          title='经典用户管理'
+          description='完整用户列表、编辑与删除操作'
+          bodyClassName='h-[620px] min-h-0 p-0'
         >
-          <summary className='flex cursor-pointer items-center gap-2 font-semibold text-slate-800'>
-            <Download className='size-3.5 text-blue-600' />
-            经典用户管理
-          </summary>
-          {showClassicUsers && (
-            <div className='mt-2 h-[620px] min-h-0'>{props.classicTable}</div>
-          )}
-        </details>
+          {props.classicTable}
+        </EnterprisePanel>
       )}
     </div>
   )
