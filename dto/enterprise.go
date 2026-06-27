@@ -69,6 +69,7 @@ type EnterpriseAPIKeySummary struct {
 	Disabled       int64 `json:"disabled"`
 	ActiveUsers    int64 `json:"active_users"`
 	TotalUsedQuota int64 `json:"total_used_quota"`
+	RateLimitHits  int64 `json:"rate_limit_hits"`
 }
 
 type EnterpriseAPIKeyPage struct {

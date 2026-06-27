@@ -75,6 +75,7 @@ import dayjs from '@/lib/dayjs'
 import { cn } from '@/lib/utils'
 
 import {
+  getChannel,
   testChannel,
   updateAllChannelsBalance,
   updateChannelBalance,
@@ -297,12 +298,12 @@ function ChannelSummaryCard({
 }) {
   const styles = toneStyles[tone]
   return (
-    <article className='min-h-[84px] rounded-md border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+    <article className='min-h-[80px] rounded-md border border-slate-200/80 bg-white px-3 py-2 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
       <div className='flex items-start justify-between gap-2'>
         <div className='flex min-w-0 items-start gap-2.5'>
           <span
             className={cn(
-              'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+              'flex size-[30px] shrink-0 items-center justify-center rounded-md ring-1',
               styles.icon
             )}
           >
@@ -317,7 +318,7 @@ function ChannelSummaryCard({
             ) : (
               <p
                 className={cn(
-                  'mt-0.5 truncate text-[18px] leading-6 font-semibold tabular-nums',
+                  'mt-0.5 whitespace-nowrap text-[17px] leading-6 font-semibold tracking-tight tabular-nums',
                   styles.value
                 )}
               >
@@ -328,7 +329,7 @@ function ChannelSummaryCard({
         </div>
         <ArrowUpRight className='mt-1 size-3.5 shrink-0 text-slate-400' />
       </div>
-      <div className='mt-1.5 flex min-h-4 items-center gap-1.5 pl-10 text-[11px]'>
+      <div className='mt-1 flex min-h-4 items-center gap-1.5 pl-10 text-[11px]'>
         <span className='text-slate-500'>{helper}</span>
         {trend != null && (
           <span className={cn('font-semibold', styles.trend)}>{trend}</span>
@@ -459,6 +460,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
   const [detailTab, setDetailTab] = useState<DetailTab>('overview')
   const [exportingChannels, setExportingChannels] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [openingEditorId, setOpeningEditorId] = useState<number | null>(null)
   const rangeDays = useMemo(() => {
     const seconds = Math.max(0, range.end - range.start)
     return Math.max(1, Math.ceil(seconds / (24 * 60 * 60)))
@@ -642,13 +644,12 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
     }
   }
 
-  const refreshSelectedBalances = async () => {
-    const targets = getSelectedTargetIds(selectedIds, selected)
+  const refreshChannelBalances = async (targets: number[], action: string) => {
     if (targets.length === 0) {
       toast.error('请先选择渠道')
       return
     }
-    setBusyAction('selected-balance')
+    setBusyAction(action)
     try {
       const results = await Promise.allSettled(
         targets.map((id) => updateChannelBalance(id))
@@ -669,13 +670,12 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
     }
   }
 
-  const testSelectedChannels = async () => {
-    const targets = getSelectedTargetIds(selectedIds, selected)
+  const testChannelsByIds = async (targets: number[], action: string) => {
     if (targets.length === 0) {
       toast.error('请先选择渠道')
       return
     }
-    setBusyAction('selected-test')
+    setBusyAction(action)
     try {
       const results = await Promise.allSettled(
         targets.map((id) => testChannel(id))
@@ -693,6 +693,52 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
       await invalidateChannelViews()
     } finally {
       setBusyAction(null)
+    }
+  }
+
+  const refreshSelectedBalances = async () => {
+    await refreshChannelBalances(
+      getSelectedTargetIds(selectedIds, selected),
+      'selected-balance'
+    )
+  }
+
+  const refreshFocusedBalance = async () => {
+    await refreshChannelBalances(
+      selected ? [selected.id] : [],
+      'focused-balance'
+    )
+  }
+
+  const testSelectedChannels = async () => {
+    await testChannelsByIds(
+      getSelectedTargetIds(selectedIds, selected),
+      'selected-test'
+    )
+  }
+
+  const testFocusedChannel = async () => {
+    await testChannelsByIds(selected ? [selected.id] : [], 'focused-test')
+  }
+
+  const openSelectedChannelEditor = async () => {
+    if (!selected) {
+      toast.error('请先选择渠道')
+      return
+    }
+    setOpeningEditorId(selected.id)
+    try {
+      const response = await getChannel(selected.id)
+      if (!response.success || !response.data) {
+        toast.error(response.message || '获取渠道详情失败')
+        return
+      }
+      setCurrentRow(response.data)
+      setOpen('update-channel')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '获取渠道详情失败')
+    } finally {
+      setOpeningEditorId(null)
     }
   }
 
@@ -915,8 +961,8 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
             value='enterprise'
             className='min-h-0 flex-1 overflow-auto pb-4'
           >
-            <div className='grid min-h-full gap-2.5 xl:grid-cols-[minmax(0,1fr)_344px]'>
-              <div className='flex min-w-0 flex-col gap-2.5'>
+            <div className='grid min-h-full gap-2 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_328px]'>
+              <div className='flex min-w-0 flex-col gap-2'>
                 <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5'>
                   <ChannelSummaryCard
                     title='启用渠道数'
@@ -967,7 +1013,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
 
                 <EnterprisePanel bodyClassName='p-2'>
                   <div className='flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between'>
-                    <div className='grid flex-1 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_128px_128px_140px_140px]'>
+                    <div className='grid flex-1 grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_112px_112px_118px_128px]'>
                       <div className='relative min-w-0'>
                         <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400' />
                         <Input
@@ -1054,7 +1100,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                         ))}
                       </NativeSelect>
                     </div>
-                    <div className='flex shrink-0 items-center justify-between gap-2 text-xs text-slate-500 xl:justify-end'>
+                    <div className='flex shrink-0 items-center justify-between gap-2 text-[11px] text-slate-500 xl:justify-end'>
                       <Button
                         size='sm'
                         variant='outline'
@@ -1080,7 +1126,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                 </EnterprisePanel>
 
                 <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
-                  <div className='flex min-h-10 flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white px-3 py-2'>
+                  <div className='flex min-h-9 flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-white px-3 py-1.5'>
                     <div className='flex flex-wrap items-center gap-2 text-xs'>
                       <span className='font-medium text-slate-900'>
                         {selectedIds.length > 0
@@ -1183,9 +1229,9 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                         : 'max-h-[calc(100vh-350px)] min-h-[430px]'
                     )}
                   >
-                    <Table className='min-w-[920px]'>
+                    <Table className='min-w-[900px]'>
                       <TableHeader className='sticky top-0 z-10 bg-slate-50/95 backdrop-blur'>
-                        <TableRow className='h-9'>
+                        <TableRow className='h-8'>
                           <TableHead className='w-9 px-2'>
                             <Checkbox
                               checked={allPageSelected}
@@ -1257,7 +1303,7 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                               <TableRow
                                 key={item.id}
                                 className={cn(
-                                  'h-[52px] cursor-pointer border-slate-100 text-xs hover:bg-blue-50/40',
+                                  'h-[48px] cursor-pointer border-slate-100 text-xs hover:bg-blue-50/40',
                                   selectedId === item.id && 'bg-blue-50/70'
                                 )}
                                 onClick={() => {
@@ -1752,7 +1798,6 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                                 </div>
                               </div>
                             </DetailSection>
-
                           </div>
                         )}
 
@@ -1962,7 +2007,10 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                                 )}
                               </div>
                             </div>
-                            <DetailSection title='供应商画像' icon={ShieldCheck}>
+                            <DetailSection
+                              title='供应商画像'
+                              icon={ShieldCheck}
+                            >
                               {supplierProfileContent}
                             </DetailSection>
                             <p className='rounded-md border border-slate-200 bg-slate-50/60 p-2.5 text-[11px] leading-5 text-slate-500'>
@@ -2038,8 +2086,8 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                           <Button
                             size='sm'
                             variant='outline'
-                            onClick={() => void testSelectedChannels()}
-                            disabled={busyAction === 'selected-test'}
+                            onClick={() => void testFocusedChannel()}
+                            disabled={busyAction === 'focused-test'}
                           >
                             <TestTube2 className='size-3.5' />
                             测试
@@ -2047,8 +2095,8 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                           <Button
                             size='sm'
                             variant='outline'
-                            onClick={() => void refreshSelectedBalances()}
-                            disabled={busyAction === 'selected-balance'}
+                            onClick={() => void refreshFocusedBalance()}
+                            disabled={busyAction === 'focused-balance'}
                           >
                             <WalletCards className='size-3.5' />
                             更新余额
@@ -2056,10 +2104,13 @@ export function EnterpriseChannelsCenter(props: EnterpriseChannelsCenterProps) {
                           <Button
                             size='sm'
                             variant='outline'
-                            onClick={() => setActiveTab('classic')}
+                            onClick={() => void openSelectedChannelEditor()}
+                            disabled={openingEditorId === selected.id}
                           >
                             <Gauge className='size-3.5' />
-                            编辑
+                            {openingEditorId === selected.id
+                              ? '加载中'
+                              : '编辑'}
                           </Button>
                           <Button
                             size='sm'

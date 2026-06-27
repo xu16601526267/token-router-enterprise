@@ -132,18 +132,16 @@ export function RedemptionsTable() {
       columns={columns}
       isLoading={isLoading}
       isFetching={isFetching}
-      emptyTitle={t('No Redemption Codes Found')}
-      emptyDescription={t(
-        'No redemption codes available. Create your first redemption code to get started.'
-      )}
+      emptyTitle={t('暂无兑换码')}
+      emptyDescription={t('创建兑换码后可在这里追踪额度、有效期和核销状态。')}
       skeletonKeyPrefix='redemptions-skeleton'
       applyHeaderSize
       toolbarProps={{
-        searchPlaceholder: t('Filter by name or ID...'),
+        searchPlaceholder: t('搜索名称或 ID'),
         filters: [
           {
             columnId: 'status',
-            title: t('Status'),
+            title: t('状态'),
             options: redemptionStatusOptions,
             singleSelect: true,
           },

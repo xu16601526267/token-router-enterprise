@@ -66,38 +66,43 @@ export function ProfileSettingsCard({
 
   return (
     <TitledCard
-      title={t('Settings')}
-      description={t('Configure your account preferences and integrations')}
+      title={t('账户设置')}
+      description={t('管理账号绑定、通知偏好和个人集成')}
       icon={<Settings className='h-4 w-4' />}
       disableHoverEffect
+      className='rounded-md border-slate-200 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+      headerClassName='bg-slate-50/65 p-3 !pb-3'
+      contentClassName='p-3'
+      titleClassName='text-[14px] leading-5 font-semibold text-slate-900'
+      descriptionClassName='text-[11px] leading-4 text-slate-500'
     >
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className='grid w-full grid-cols-2 items-stretch gap-1 rounded-xl p-1 group-data-horizontal/tabs:h-10'>
+        <TabsList className='grid w-full grid-cols-2 items-stretch gap-1 rounded-md border border-slate-200 bg-white p-1 group-data-horizontal/tabs:h-8'>
           <TabsTrigger
             value='bindings'
-            className='h-full gap-2 rounded-lg px-3 py-0 leading-none'
+            className='h-full gap-2 rounded px-2.5 py-0 text-[12px] leading-none font-semibold data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-none'
           >
-            <Link2 className='h-4 w-4' />
-            <span className='hidden sm:inline'>{t('Account Bindings')}</span>
-            <span className='sm:hidden'>{t('Bindings')}</span>
+            <Link2 className='size-3.5' />
+            <span className='hidden sm:inline'>{t('账号绑定')}</span>
+            <span className='sm:hidden'>{t('绑定')}</span>
           </TabsTrigger>
           <TabsTrigger
             value='settings'
-            className='h-full gap-2 rounded-lg px-3 py-0 leading-none'
+            className='h-full gap-2 rounded px-2.5 py-0 text-[12px] leading-none font-semibold data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-none'
           >
-            <Settings className='h-4 w-4' />
+            <Settings className='size-3.5' />
             <span className='hidden sm:inline'>
-              {t('Settings & Preferences')}
+              {t('通知与偏好')}
             </span>
-            <span className='sm:hidden'>{t('Settings')}</span>
+            <span className='sm:hidden'>{t('偏好')}</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value='bindings' className='mt-4 sm:mt-6'>
+        <TabsContent value='bindings' className='mt-3'>
           <AccountBindingsTab profile={profile} onUpdate={onProfileUpdate} />
         </TabsContent>
 
-        <TabsContent value='settings' className='mt-4 sm:mt-6'>
+        <TabsContent value='settings' className='mt-3'>
           <NotificationTab profile={profile} onUpdate={onProfileUpdate} />
         </TabsContent>
       </Tabs>

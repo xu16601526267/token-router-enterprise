@@ -20,6 +20,7 @@ import { useParams } from '@tanstack/react-router'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { SectionPageLayout } from '@/components/layout'
 
 import { useSystemOptions, getOptionValue } from '../hooks/use-system-options'
@@ -51,7 +52,8 @@ type SettingsPageProps<
 }
 
 type SettingsPageFrameProps = {
-  title: ReactNode
+  title: string
+  description?: string
   children: ReactNode
 }
 
@@ -66,24 +68,38 @@ function SettingsPageFrame(props: SettingsPageFrameProps) {
       actionsContainer={actionsContainer}
       titleStatusContainer={titleStatusContainer}
     >
-      <SectionPageLayout>
-        <SectionPageLayout.Title>
-          <span className='inline-flex max-w-full min-w-0 items-center gap-2 align-middle'>
-            <span className='truncate'>{props.title}</span>
-            <span
-              ref={setTitleStatusContainer}
-              className='inline-flex min-w-0 shrink-0 items-center'
-            />
-          </span>
-        </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <div
-            ref={setActionsContainer}
-            className='flex flex-wrap items-center justify-end gap-2'
-          />
-        </SectionPageLayout.Actions>
+      <SectionPageLayout fixedContent>
         <SectionPageLayout.Content>
-          <div className='flex w-full flex-col gap-4'>{props.children}</div>
+          <div className='mx-auto flex h-full max-w-[1586px] flex-col overflow-hidden bg-[#f6f8fb] text-slate-950'>
+            <EnterprisePageHeader
+              eyebrow='系统设置'
+              title={props.title}
+              description={
+                props.description ??
+                '管理站点基础信息、认证、计费、模型路由、安全限制与运营能力'
+              }
+              actions={
+                <div className='flex flex-wrap items-center justify-end gap-2'>
+                  <span
+                    ref={setTitleStatusContainer}
+                    className='inline-flex min-w-0 shrink-0 items-center'
+                  />
+                  <div
+                    ref={setActionsContainer}
+                    className='flex flex-wrap items-center justify-end gap-2'
+                  />
+                </div>
+              }
+            />
+            <EnterprisePanel
+              className='min-h-0 flex-1 overflow-auto'
+              bodyClassName='p-3 sm:p-4'
+            >
+              <div className='flex w-full flex-col gap-3'>
+                {props.children}
+              </div>
+            </EnterprisePanel>
+          </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
     </SettingsPageProvider>
@@ -128,7 +144,7 @@ export function SettingsPage<
   if (isLoading) {
     return (
       <SettingsPageFrame title={t(sectionMeta.titleKey)}>
-        <div className='text-muted-foreground flex min-h-40 items-center justify-center text-sm'>
+        <div className='flex min-h-40 items-center justify-center text-sm text-slate-500'>
           {t(loadingMessage)}
         </div>
       </SettingsPageFrame>

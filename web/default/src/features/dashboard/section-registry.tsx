@@ -26,22 +26,22 @@ import { createSectionRegistry } from '@/features/system-settings/utils/section-
 const DASHBOARD_SECTIONS = [
   {
     id: 'overview',
-    titleKey: 'Overview',
+    titleKey: '总览',
     build: () => null,
   },
   {
     id: 'models',
-    titleKey: 'Model Call Analytics',
+    titleKey: '模型经营分析',
     build: () => null,
   },
   {
     id: 'flow',
-    titleKey: 'Flow',
+    titleKey: '流量链路分析',
     build: () => null,
   },
   {
     id: 'users',
-    titleKey: 'User Analytics',
+    titleKey: '用户用量分析',
     adminOnly: true,
     build: () => null,
   },

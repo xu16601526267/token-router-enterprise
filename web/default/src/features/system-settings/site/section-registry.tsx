@@ -32,7 +32,7 @@ import { createSectionRegistry } from '../utils/section-registry'
 const SITE_SECTIONS = [
   {
     id: 'system-info',
-    titleKey: 'System Information',
+    titleKey: '系统信息',
     build: (settings: SiteSettings) => (
       <SystemInfoSection
         defaultValues={{
@@ -55,14 +55,14 @@ const SITE_SECTIONS = [
   },
   {
     id: 'notice',
-    titleKey: 'System Notice',
+    titleKey: '系统公告',
     build: (settings: SiteSettings) => (
       <NoticeSection defaultValue={settings.Notice ?? ''} />
     ),
   },
   {
     id: 'header-navigation',
-    titleKey: 'Header navigation',
+    titleKey: '顶部导航',
     build: (settings: SiteSettings) => {
       const headerNavConfig = parseHeaderNavModules(settings.HeaderNavModules)
       const headerNavSerialized = serializeHeaderNavModules(headerNavConfig)
@@ -76,7 +76,7 @@ const SITE_SECTIONS = [
   },
   {
     id: 'sidebar-modules',
-    titleKey: 'Sidebar modules',
+    titleKey: '侧边栏模块',
     build: (settings: SiteSettings) => {
       const sidebarConfig = parseSidebarModulesAdmin(
         settings.SidebarModulesAdmin

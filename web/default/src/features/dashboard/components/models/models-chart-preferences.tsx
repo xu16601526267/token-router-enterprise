@@ -73,23 +73,23 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
       trigger={
         <Button variant='outline' size='sm'>
           <Settings2 className='mr-2 h-4 w-4' />
-          {t('Preferences')}
+          {t('显示偏好')}
         </Button>
       }
-      title={t('Model Analytics Defaults')}
-      description={t('Set default ranges and charts for model analytics.')}
+      title={t('模型分析默认设置')}
+      description={t('设置模型经营分析的默认时间范围、颗粒度和图表类型。')}
       contentClassName='sm:max-w-md'
       contentHeight='auto'
       bodyClassName='grid gap-3'
       footer={
         <Button onClick={handleSave} type='button'>
           <Save className='mr-2 h-4 w-4' />
-          {t('Save Preferences')}
+          {t('保存偏好')}
         </Button>
       }
     >
       <div className='grid gap-1.5'>
-        <Label htmlFor='default-time-range'>{t('Default range')}</Label>
+        <Label htmlFor='default-time-range'>{t('默认时间范围')}</Label>
         <Select
           items={TIME_RANGE_PRESETS.map((option) => ({
             value: String(option.days),
@@ -104,7 +104,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
           }
         >
           <SelectTrigger id='default-time-range'>
-            <SelectValue placeholder={t('Select default range')} />
+            <SelectValue placeholder={t('选择默认时间范围')} />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectGroup>
@@ -118,9 +118,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
         </Select>
       </div>
       <div className='grid gap-1.5'>
-        <Label htmlFor='default-time-granularity'>
-          {t('Default time granularity')}
-        </Label>
+        <Label htmlFor='default-time-granularity'>{t('默认时间颗粒度')}</Label>
         <Select
           items={TIME_GRANULARITY_OPTIONS.map((option) => ({
             value: option.value,
@@ -135,7 +133,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
           }
         >
           <SelectTrigger id='default-time-granularity'>
-            <SelectValue placeholder={t('Select time granularity')} />
+            <SelectValue placeholder={t('选择时间颗粒度')} />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectGroup>
@@ -150,7 +148,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
       </div>
       <div className='grid gap-1.5'>
         <Label htmlFor='consumption-distribution-chart'>
-          {t('Default consumption chart')}
+          {t('默认消耗图表')}
         </Label>
         <Select
           items={CONSUMPTION_DISTRIBUTION_CHART_OPTIONS.map((option) => ({
@@ -167,7 +165,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
           }
         >
           <SelectTrigger id='consumption-distribution-chart'>
-            <SelectValue placeholder={t('Select default chart')} />
+            <SelectValue placeholder={t('选择默认图表')} />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectGroup>
@@ -181,9 +179,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
         </Select>
       </div>
       <div className='grid gap-1.5'>
-        <Label htmlFor='model-analytics-chart'>
-          {t('Default model call chart')}
-        </Label>
+        <Label htmlFor='model-analytics-chart'>{t('默认模型调用图表')}</Label>
         <Select
           items={MODEL_ANALYTICS_CHART_OPTIONS.map((option) => ({
             value: option.value,
@@ -198,7 +194,7 @@ export function ModelsChartPreferences(props: ModelsChartPreferencesProps) {
           }
         >
           <SelectTrigger id='model-analytics-chart'>
-            <SelectValue placeholder={t('Select default chart')} />
+            <SelectValue placeholder={t('选择默认图表')} />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
             <SelectGroup>

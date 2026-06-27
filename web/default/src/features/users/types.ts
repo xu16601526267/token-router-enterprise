@@ -102,9 +102,10 @@ export interface UserFormData {
   username: string
   display_name: string
   password?: string
+  email?: string
   role?: number // Only used when creating user
   quota?: number // Only used when updating user
-  group?: string // Only used when updating user
+  group?: string
   remark?: string // Only used when updating user
 }
 

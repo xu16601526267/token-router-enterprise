@@ -88,7 +88,11 @@ import {
   generateEnterpriseSettlement,
   getEnterpriseBilling,
 } from './api'
-import type { EnterpriseBillingData, EnterpriseSettlementItem } from './types'
+import type {
+  EnterpriseBillingData,
+  EnterpriseBillingTrendPoint,
+  EnterpriseSettlementItem,
+} from './types'
 
 type CsvValue = boolean | null | number | string | undefined
 
@@ -275,6 +279,115 @@ function quotaRatio(used: number, limit: number): number {
 function trendLabel(timestamp: number, granularity: TimeGranularity) {
   if (timestamp <= 0) return '-'
   return formatChartTime(timestamp, granularity)
+}
+
+function startOfTrendBucket(
+  timestamp: number,
+  granularity: TimeGranularity
+): number {
+  if (timestamp <= 0) return 0
+  const date = new Date(timestamp * 1000)
+  if (granularity === 'hour') {
+    date.setMinutes(0, 0, 0)
+  } else {
+    date.setHours(0, 0, 0, 0)
+    if (granularity === 'week') {
+      const day = date.getDay() || 7
+      date.setDate(date.getDate() - day + 1)
+    }
+  }
+  return Math.floor(date.getTime() / 1000)
+}
+
+function nextTrendBucket(
+  timestamp: number,
+  granularity: TimeGranularity
+): number {
+  const date = new Date(timestamp * 1000)
+  if (granularity === 'hour') {
+    date.setHours(date.getHours() + 1)
+  } else if (granularity === 'week') {
+    date.setDate(date.getDate() + 7)
+  } else {
+    date.setDate(date.getDate() + 1)
+  }
+  return Math.floor(date.getTime() / 1000)
+}
+
+function buildBillingTrend(
+  rawTrend: EnterpriseBillingTrendPoint[],
+  startTimestamp: number,
+  endTimestamp: number,
+  granularity: TimeGranularity
+) {
+  const byBucket = new Map<number, EnterpriseBillingTrendPoint>()
+  rawTrend.forEach((item) => {
+    const bucket = startOfTrendBucket(item.timestamp, granularity)
+    const existing = byBucket.get(bucket)
+    byBucket.set(bucket, {
+      timestamp: bucket,
+      sell_quota: (existing?.sell_quota ?? 0) + item.sell_quota,
+      cost_quota: (existing?.cost_quota ?? 0) + item.cost_quota,
+      gross_profit_quota:
+        (existing?.gross_profit_quota ?? 0) + item.gross_profit_quota,
+    })
+  })
+
+  if (startTimestamp <= 0 || endTimestamp <= 0) {
+    return compactBillingTrend(
+      [...byBucket.values()]
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .map((item) => ({
+          ...item,
+          label: trendLabel(item.timestamp, granularity),
+        }))
+    )
+  }
+
+  const points: Array<EnterpriseBillingTrendPoint & { label: string }> = []
+  let cursor = startOfTrendBucket(startTimestamp, granularity)
+  const end = startOfTrendBucket(endTimestamp, granularity)
+  while (cursor <= end && points.length < 240) {
+    const item = byBucket.get(cursor)
+    points.push({
+      timestamp: cursor,
+      sell_quota: item?.sell_quota ?? 0,
+      cost_quota: item?.cost_quota ?? 0,
+      gross_profit_quota: item?.gross_profit_quota ?? 0,
+      label: trendLabel(cursor, granularity),
+    })
+    cursor = nextTrendBucket(cursor, granularity)
+  }
+  return compactBillingTrend(points)
+}
+
+function compactBillingTrend(
+  points: Array<EnterpriseBillingTrendPoint & { label: string }>
+) {
+  if (points.length <= 10) {
+    return points
+  }
+
+  const groupSize = Math.ceil(points.length / 8)
+  const compacted: Array<EnterpriseBillingTrendPoint & { label: string }> = []
+  for (let index = 0; index < points.length; index += groupSize) {
+    const group = points.slice(index, index + groupSize)
+    const first = group[0]
+    if (!first) {
+      continue
+    }
+    compacted.push({
+      timestamp: first.timestamp,
+      label: first.label,
+      sell_quota: group.reduce((sum, item) => sum + item.sell_quota, 0),
+      cost_quota: group.reduce((sum, item) => sum + item.cost_quota, 0),
+      gross_profit_quota: group.reduce(
+        (sum, item) => sum + item.gross_profit_quota,
+        0
+      ),
+    })
+  }
+  return compacted
 }
 
 function scrollToElement(id: string) {
@@ -681,6 +794,7 @@ export function EnterpriseBillingCenter(props: {
   const [exportingBilling, setExportingBilling] = useState(false)
   const [settlementDialogOpen, setSettlementDialogOpen] = useState(false)
   const [classicDialogOpen, setClassicDialogOpen] = useState(false)
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false)
   const [settlementSubjectType, setSettlementSubjectType] = useState<
     'user' | 'supplier'
   >('user')
@@ -713,10 +827,10 @@ export function EnterpriseBillingCenter(props: {
 
   const data = billingQuery.data?.data ?? EMPTY_BILLING
   const metrics = data.metrics
-  const trend = data.trend.map((item) => ({
-    ...item,
-    label: trendLabel(item.timestamp, granularity),
-  }))
+  const trend = useMemo(
+    () => buildBillingTrend(data.trend, range.start, range.end, granularity),
+    [data.trend, granularity, range.end, range.start]
+  )
   const pendingInvoiceItems = data.settlements.filter(
     (item) => item.status !== 'paid'
   )
@@ -724,6 +838,8 @@ export function EnterpriseBillingCenter(props: {
     (sum, item) => sum + item.total_sell_quota,
     0
   )
+  const invoiceRequestItems =
+    pendingInvoiceItems.length > 0 ? pendingInvoiceItems : data.settlements
   const topUpTotal =
     metrics.successful_top_up_amount + metrics.pending_top_up_amount
   const collectionProgress =
@@ -759,49 +875,75 @@ export function EnterpriseBillingCenter(props: {
     return matchesSubject && matchesStatus
   })
   const budgetAlerts = useMemo(() => {
-    const items: Array<{
+    const costUsageRate = quotaRatio(metrics.period_cost_quota, costBudgetLimit)
+    const grossProfitRate = quotaRatio(
+      metrics.period_gross_profit_quota,
+      grossProfitTarget
+    )
+    const settlementRisk = metrics.draft_settlements > 0
+    const itemForRatio = (
+      title: string,
+      detail: string,
+      ratio: number,
+      inverse = false
+    ): {
       title: string
       detail: string
       badge: string
       className: string
-    }> = []
-    if (budgetUsageRate >= 0.8) {
-      items.push({
-        title: '本期账单接近预算上限',
-        detail: `当前使用 ${formatPercent(budgetUsageRate)}，建议复核高消耗客户。`,
-        badge: '预警',
-        className: 'bg-amber-50 text-amber-700 border-amber-200',
-      })
+    } => {
+      const warning = inverse ? ratio < 0.6 : ratio >= 0.8
+      const danger = inverse ? ratio < 0.35 : ratio >= 1
+      return {
+        title,
+        detail,
+        badge: danger ? '高风险' : warning ? '预警' : '正常',
+        className: danger
+          ? 'bg-rose-50 text-rose-700 border-rose-200'
+          : warning
+            ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      }
     }
-    if (metrics.draft_settlements > 0) {
-      items.push({
-        title: `${metrics.draft_settlements} 张结算单待确认`,
-        detail: '财务需要复核应收、应付和请求数。',
-        badge: '高风险',
-        className: 'bg-rose-50 text-rose-700 border-rose-200',
-      })
-    }
-    if (metrics.pending_top_up_amount > 0) {
-      items.push({
-        title: '存在待处理充值',
-        detail: `待处理金额 ${formatCurrencyUSD(metrics.pending_top_up_amount)}。`,
-        badge: '注意',
-        className: 'bg-blue-50 text-blue-700 border-blue-200',
-      })
-    }
-    if (items.length === 0) {
-      items.push({
-        title: '预算与结算状态稳定',
-        detail: '当前周期未发现高风险财务事项。',
-        badge: '正常',
-        className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      })
-    }
-    return items.slice(0, 3)
+    return [
+      itemForRatio(
+        '总预算使用率',
+        `当前使用 ${formatPercent(budgetUsageRate)}，预算 ${formatLogQuota(primaryBudgetLimit)}。`,
+        budgetUsageRate
+      ),
+      itemForRatio(
+        'API 调用成本预算',
+        `已用 ${formatPercent(costUsageRate)}，成本 ${formatLogQuota(metrics.period_cost_quota)}。`,
+        costUsageRate
+      ),
+      itemForRatio(
+        '毛利守护线',
+        `当前毛利率 ${formatPercent(metrics.gross_margin_rate)}。`,
+        grossProfitRate,
+        true
+      ),
+      {
+        title: settlementRisk
+          ? `${metrics.draft_settlements} 张结算单待确认`
+          : '结算单状态稳定',
+        detail: settlementRisk
+          ? '财务需要复核应收、应付和请求数。'
+          : '当前周期无待确认结算风险。',
+        badge: settlementRisk ? '高风险' : '正常',
+        className: settlementRisk
+          ? 'bg-rose-50 text-rose-700 border-rose-200'
+          : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      },
+    ]
   }, [
     budgetUsageRate,
+    costBudgetLimit,
+    grossProfitTarget,
     metrics.draft_settlements,
-    metrics.pending_top_up_amount,
+    metrics.gross_margin_rate,
+    metrics.period_cost_quota,
+    metrics.period_gross_profit_quota,
+    primaryBudgetLimit,
   ])
 
   const exportBillingCsv = async () => {
@@ -861,6 +1003,36 @@ export function EnterpriseBillingCenter(props: {
       return
     }
     downloadSettlementCsv(latestSettlement)
+  }
+
+  const exportInvoiceRequest = () => {
+    if (invoiceRequestItems.length === 0) {
+      toast.info('当前没有可申请开票的结算单')
+      return
+    }
+    downloadCsv(`invoice-request-${formatFileDate(range.end)}.csv`, [
+      [
+        '结算单ID',
+        '对象类型',
+        '对象ID',
+        '对象名称',
+        '周期开始',
+        '周期结束',
+        '开票金额',
+        '状态',
+      ],
+      ...invoiceRequestItems.map((item) => [
+        item.id,
+        item.subject_type === 'supplier' ? '供应商' : '客户',
+        item.subject_id,
+        item.subject_name,
+        formatDate(item.period_start),
+        formatDate(item.period_end),
+        item.total_sell_quota,
+        item.status,
+      ]),
+    ])
+    toast.success('发票申请清单已导出')
   }
 
   const openClassicSubscriptions = () => {
@@ -962,7 +1134,7 @@ export function EnterpriseBillingCenter(props: {
           tone='blue'
           loading={billingQuery.isLoading}
           action={
-            <MetricButton onClick={() => scrollToElement('billing-details')}>
+            <MetricButton onClick={() => setInvoiceDialogOpen(true)}>
               开票
             </MetricButton>
           }
@@ -1067,7 +1239,12 @@ export function EnterpriseBillingCenter(props: {
                       String(name),
                     ]}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Legend
+                    align='left'
+                    verticalAlign='top'
+                    height={26}
+                    wrapperStyle={{ fontSize: 11, paddingBottom: 4 }}
+                  />
                   <Bar
                     dataKey='sell_quota'
                     name='应收（Revenue）'
@@ -1201,10 +1378,7 @@ export function EnterpriseBillingCenter(props: {
                 title='发票状态'
                 description='查看开票记录与状态，支持周期申请'
                 action='去查看'
-                onClick={() => {
-                  setSettlementStatusFilter('draft')
-                  scrollToElement('billing-details')
-                }}
+                onClick={() => setInvoiceDialogOpen(true)}
               />
             </div>
           </div>
@@ -1341,9 +1515,16 @@ export function EnterpriseBillingCenter(props: {
                     : '暂无有效订阅'}
                 </p>
               </div>
-              <span className='inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600'>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 text-[10px] font-semibold',
+                  metrics.active_subscriptions > 0
+                    ? 'text-emerald-600'
+                    : 'text-slate-500'
+                )}
+              >
                 <CheckCircle2 className='size-3' />
-                已启用
+                {metrics.active_subscriptions > 0 ? '已启用' : '未启用'}
               </span>
             </div>
             <div className='flex items-center gap-2 px-3 py-2.5'>
@@ -1436,7 +1617,7 @@ export function EnterpriseBillingCenter(props: {
               <CompactAction
                 icon={FileText}
                 label='申请发票'
-                onClick={() => scrollToElement('billing-details')}
+                onClick={() => setInvoiceDialogOpen(true)}
               />
               <CompactAction icon={UsersRound} label='客户对账' to='/users' />
               <CompactAction
@@ -1557,6 +1738,119 @@ export function EnterpriseBillingCenter(props: {
               disabled={generatingSettlement}
             >
               {generatingSettlement ? '生成中' : '生成结算单'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen}>
+        <DialogContent className='sm:max-w-3xl'>
+          <DialogHeader>
+            <DialogTitle>发票申请清单</DialogTitle>
+            <DialogDescription>
+              基于当前账期结算单生成开票申请，导出后可交由财务系统处理。
+            </DialogDescription>
+          </DialogHeader>
+          <div className='grid gap-3'>
+            <div className='grid gap-2 sm:grid-cols-3'>
+              <div className='rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2'>
+                <p className='text-[11px] text-slate-500'>待开票金额</p>
+                <p className='mt-1 text-base font-semibold text-slate-950 tabular-nums'>
+                  {formatLogQuota(unsettledQuota)}
+                </p>
+              </div>
+              <div className='rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2'>
+                <p className='text-[11px] text-slate-500'>待处理结算单</p>
+                <p className='mt-1 text-base font-semibold text-slate-950 tabular-nums'>
+                  {formatNumber(pendingInvoiceItems.length)}
+                </p>
+              </div>
+              <div className='rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2'>
+                <p className='text-[11px] text-slate-500'>账期范围</p>
+                <p className='mt-1 truncate text-sm font-semibold text-slate-950'>
+                  {rangeLabel}
+                </p>
+              </div>
+            </div>
+
+            <div className='overflow-hidden rounded-md border border-slate-200'>
+              <Table>
+                <TableHeader>
+                  <TableRow className='bg-slate-50'>
+                    <TableHead className='h-8 text-[11px]'>结算单</TableHead>
+                    <TableHead className='h-8 text-[11px]'>对象</TableHead>
+                    <TableHead className='h-8 text-[11px]'>周期</TableHead>
+                    <TableHead className='h-8 text-right text-[11px]'>
+                      金额
+                    </TableHead>
+                    <TableHead className='h-8 text-right text-[11px]'>
+                      状态
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoiceRequestItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className='h-24 text-center text-[12px] text-slate-500'
+                      >
+                        当前账期暂无可开票结算单
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    invoiceRequestItems.slice(0, 6).map((item) => (
+                      <TableRow key={item.id} className='text-[12px]'>
+                        <TableCell className='py-2 font-medium text-slate-900'>
+                          #{item.id}
+                        </TableCell>
+                        <TableCell className='py-2'>
+                          <div className='min-w-0'>
+                            <p className='truncate font-medium text-slate-800'>
+                              {item.subject_name || `ID ${item.subject_id}`}
+                            </p>
+                            <p className='text-[10px] text-slate-500'>
+                              {item.subject_type === 'supplier'
+                                ? '供应商 / 上游'
+                                : '客户 / 下游'}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell className='py-2 text-slate-600'>
+                          {formatShortDate(item.period_start)} -{' '}
+                          {formatShortDate(item.period_end)}
+                        </TableCell>
+                        <TableCell className='py-2 text-right font-semibold text-slate-900 tabular-nums'>
+                          {formatLogQuota(item.total_sell_quota)}
+                        </TableCell>
+                        <TableCell className='py-2 text-right'>
+                          <InvoiceStatus status={item.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            {invoiceRequestItems.length > 6 && (
+              <p className='text-[11px] text-slate-500'>
+                仅预览前 6 条，导出会包含全部{' '}
+                {formatNumber(invoiceRequestItems.length)} 条。
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant='outline'
+              onClick={() => setInvoiceDialogOpen(false)}
+            >
+              关闭
+            </Button>
+            <Button
+              onClick={exportInvoiceRequest}
+              disabled={invoiceRequestItems.length === 0}
+            >
+              导出申请清单
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -16,8 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
-
+import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { SectionPageLayout } from '@/components/layout'
 
 import { RedemptionsDialogs } from './components/redemptions-dialogs'
@@ -26,18 +25,26 @@ import { RedemptionsProvider } from './components/redemptions-provider'
 import { RedemptionsTable } from './components/redemptions-table'
 
 export function Redemptions() {
-  const { t } = useTranslation()
   return (
     <RedemptionsProvider>
       <SectionPageLayout fixedContent>
-        <SectionPageLayout.Title>
-          {t('Redemption Codes')}
-        </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <RedemptionsPrimaryButtons />
-        </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <RedemptionsTable />
+          <div className='mx-auto flex h-full max-w-[1586px] flex-col overflow-hidden bg-[#f6f8fb] text-slate-950'>
+            <EnterprisePageHeader
+              eyebrow='组织与计费'
+              title='兑换码管理'
+              description='批量生成、启停、核销与追踪客户充值兑换额度'
+              actions={<RedemptionsPrimaryButtons />}
+            />
+            <EnterprisePanel
+              className='flex min-h-0 flex-1 flex-col'
+              bodyClassName='flex min-h-0 flex-1 flex-col p-2'
+              title='兑换码列表'
+              description='按名称、状态、额度、有效期和核销用户追踪兑换码'
+            >
+              <RedemptionsTable />
+            </EnterprisePanel>
+          </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
 

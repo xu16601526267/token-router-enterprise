@@ -174,13 +174,12 @@ export function ModelsFilter(props: ModelsFilterProps) {
       trigger={
         <Button variant='outline' size='sm'>
           <Filter className='mr-2 h-4 w-4' />
-          {t('Filter')}
+          {t('筛选')}
         </Button>
       }
-      title={t(props.titleKey ?? 'Model Analytics Filters')}
+      title={t(props.titleKey ?? '模型分析筛选')}
       description={t(
-        props.descriptionKey ??
-          'Filter the model analytics view by time range and user.'
+        props.descriptionKey ?? '按时间范围、颗粒度和用户过滤模型经营分析。'
       )}
       contentClassName='max-sm:h-dvh max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:p-4 sm:max-w-lg'
       contentHeight='min(48vh, 460px)'
@@ -189,11 +188,11 @@ export function ModelsFilter(props: ModelsFilterProps) {
         <>
           <Button onClick={handleReset} variant='outline' type='button'>
             <RotateCcw className='mr-2 h-4 w-4' />
-            {t('Reset')}
+            {t('重置')}
           </Button>
           <Button onClick={handleApply} type='submit'>
             <Search className='mr-2 h-4 w-4' />
-            {t('Apply Filters')}
+            {t('应用筛选')}
           </Button>
         </>
       }
@@ -204,7 +203,7 @@ export function ModelsFilter(props: ModelsFilterProps) {
           <div className='grid gap-2'>
             <Label className='flex items-center gap-2'>
               <Calendar className='h-4 w-4' />
-              {t('Quick Range')}
+              {t('快捷时间范围')}
             </Label>
             <div className='grid grid-cols-2 gap-2 sm:flex'>
               {TIME_RANGE_PRESETS.map((range) => (
@@ -226,37 +225,37 @@ export function ModelsFilter(props: ModelsFilterProps) {
             </div>
           </div>
 
-          <SectionDivider label={t('Custom Time Range')} />
+          <SectionDivider label={t('自定义时间范围')} />
 
           {/* Custom time range */}
           <div className='grid gap-2.5'>
             <div className='grid gap-2'>
-              <Label htmlFor='start_timestamp'>{t('Start Time')}</Label>
+              <Label htmlFor='start_timestamp'>{t('开始时间')}</Label>
               <DateTimePicker
                 value={filters.start_timestamp}
                 onChange={(date) =>
                   handleChange('start_timestamp', date || undefined)
                 }
-                placeholder={t('Select start time')}
+                placeholder={t('选择开始时间')}
               />
             </div>
 
             <div className='grid gap-2'>
-              <Label htmlFor='end_timestamp'>{t('End Time')}</Label>
+              <Label htmlFor='end_timestamp'>{t('结束时间')}</Label>
               <DateTimePicker
                 value={filters.end_timestamp}
                 onChange={(date) =>
                   handleChange('end_timestamp', date || undefined)
                 }
-                placeholder={t('Select end time')}
+                placeholder={t('选择结束时间')}
               />
             </div>
           </div>
 
-          <SectionDivider label={t('Chart Settings')} />
+          <SectionDivider label={t('图表设置')} />
 
           <div className='grid gap-2'>
-            <Label htmlFor='time_granularity'>{t('Time Granularity')}</Label>
+            <Label htmlFor='time_granularity'>{t('时间颗粒度')}</Label>
             <Select
               items={TIME_GRANULARITY_OPTIONS.map((option) => ({
                 value: option.value,
@@ -268,7 +267,7 @@ export function ModelsFilter(props: ModelsFilterProps) {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder={t('Select time granularity')} />
+                <SelectValue placeholder={t('选择时间颗粒度')} />
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
                 <SelectGroup>
@@ -285,13 +284,13 @@ export function ModelsFilter(props: ModelsFilterProps) {
           {/* Admin-only fields */}
           {isAdmin && (
             <>
-              <SectionDivider label={t('Admin Only')} />
+              <SectionDivider label={t('管理员筛选')} />
 
               <div className='grid gap-2'>
-                <Label htmlFor='username'>{t('Username')}</Label>
+                <Label htmlFor='username'>{t('用户名')}</Label>
                 <Input
                   id='username'
-                  placeholder={t('Filter by username')}
+                  placeholder={t('按用户名筛选')}
                   value={filters.username}
                   onChange={(e) => handleChange('username', e.target.value)}
                 />

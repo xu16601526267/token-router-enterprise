@@ -41,6 +41,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { EnterpriseStatCard } from '@/components/enterprise'
 import { MultiSelect } from '@/components/multi-select'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
@@ -100,24 +101,24 @@ interface FlowChartsProps {
 }
 
 const FLOW_METRIC_OPTIONS = [
-  { value: 'quota', labelKey: 'By quota', icon: WalletCards },
-  { value: 'tokens', labelKey: 'By tokens', icon: Hash },
-  { value: 'requests', labelKey: 'By requests', icon: Activity },
+  { value: 'quota', label: '按额度', icon: WalletCards },
+  { value: 'tokens', label: '按 Tokens', icon: Hash },
+  { value: 'requests', label: '按请求', icon: Activity },
 ] as const
 
 const FLOW_METRIC_LABEL_KEYS: Record<FlowMetric, string> = {
-  quota: 'Quota',
+  quota: '额度',
   tokens: 'Tokens',
-  requests: 'Requests',
+  requests: '请求',
 }
 
 const FLOW_TOP_LIMIT_OPTIONS = [10, 20, 50, 100] as const
 
-const DEFAULT_FLOW_TOP_NODE_LIMIT = 50
+const DEFAULT_FLOW_TOP_NODE_LIMIT = 10
 
 const FLOW_OVERFLOW_MODE_OPTIONS = [
-  { value: 'aggregate', labelKey: 'Merge into Other' },
-  { value: 'hide', labelKey: 'Hide' },
+  { value: 'aggregate', label: '合并为其他' },
+  { value: 'hide', label: '隐藏' },
 ] as const
 
 // A Sankey needs at least two columns to render any link.
@@ -128,28 +129,28 @@ const FLOW_STAGE_META: Record<
   { labelKey: string; descKey: string }
 > = {
   user: {
-    labelKey: 'User',
-    descKey: 'The user who made the requests',
+    labelKey: '用户',
+    descKey: '发起请求的下游用户',
   },
   node: {
-    labelKey: 'Node',
-    descKey: 'The deployment node that handled the requests',
+    labelKey: '节点',
+    descKey: '处理请求的部署节点',
   },
   token: {
-    labelKey: 'Token',
-    descKey: 'The API key used for the requests',
+    labelKey: '密钥',
+    descKey: '本次调用使用的 API Key',
   },
   group: {
-    labelKey: 'Group',
-    descKey: 'The user group applied to the requests',
+    labelKey: '分组',
+    descKey: '请求命中的用户分组',
   },
   model: {
-    labelKey: 'Model',
-    descKey: 'The model that was requested',
+    labelKey: '模型',
+    descKey: '下游请求的模型',
   },
   channel: {
-    labelKey: 'Channel',
-    descKey: 'The upstream channel that served the requests',
+    labelKey: '渠道',
+    descKey: '最终承载请求的上游渠道',
   },
 }
 
@@ -163,12 +164,12 @@ const FLOW_STAGE_LABEL_KEYS: Record<FlowNodeKind, string> = {
 }
 
 const FLOW_OTHER_NODE_LABEL_KEYS: Record<FlowNodeKind, string> = {
-  user: 'Other users',
-  node: 'Other nodes',
-  token: 'Other tokens',
-  group: 'Other groups',
-  model: 'Other models',
-  channel: 'Other channels',
+  user: '其他用户',
+  node: '其他节点',
+  token: '其他密钥',
+  group: '其他分组',
+  model: '其他模型',
+  channel: '其他渠道',
 }
 
 type FlowChartPointerEvent = EventParamsDefinition['pointerdown']
@@ -336,8 +337,7 @@ export function FlowCharts(props: FlowChartsProps) {
   } = useQuery({
     queryKey: ['dashboard', 'flow', flowQueryParams, flowRole],
     queryFn: () => getFlowQuotaDates(flowQueryParams, isAdmin),
-    select: (res) =>
-      requireSuccessfulFlowRows(res, t('Please try again later.')),
+    select: (res) => requireSuccessfulFlowRows(res, '请稍后重试。'),
     staleTime: 60_000,
   })
 
@@ -354,8 +354,8 @@ export function FlowCharts(props: FlowChartsProps) {
         topNodeLimit,
         overflowMode,
         maskSensitive,
-        deletedTokenLabel: (tokenId) => t('Deleted ({{id}})', { id: tokenId }),
-        otherNodeLabel: (kind) => t(FLOW_OTHER_NODE_LABEL_KEYS[kind]),
+        deletedTokenLabel: (tokenId) => `已删除 (${tokenId})`,
+        otherNodeLabel: (kind) => FLOW_OTHER_NODE_LABEL_KEYS[kind],
       }),
     [
       flowRole,
@@ -390,7 +390,7 @@ export function FlowCharts(props: FlowChartsProps) {
       flowData.filterOptions.nodes.filter((option) => option.kind !== 'user'),
     [flowData.filterOptions.nodes]
   )
-  const metricLabel = t(FLOW_METRIC_LABEL_KEYS[metric])
+  const metricLabel = FLOW_METRIC_LABEL_KEYS[metric]
   const formatNodeMetricValue = useCallback(
     (value: number) =>
       metric === 'quota' ? formatQuota(value) : formatFlowMetricNumber(value),
@@ -450,16 +450,16 @@ export function FlowCharts(props: FlowChartsProps) {
     chartInstanceRef.current?.clearState('selected')
     chartInstanceRef.current?.clearState('blur')
   }, [])
-  const chartTitle = t('Flow')
+  const chartTitle = '流量路径'
   const flowSpec = useMemo(
     () =>
       buildFlowSankeySpec(flowData.flow, chartTitle, formatQuota, {
-        quota: t('Quota'),
-        tokens: t('Tokens'),
-        requests: t('Requests'),
-        share: t('Share'),
+        quota: '额度',
+        tokens: 'Tokens',
+        requests: '请求',
+        share: '占比',
       }),
-    [chartTitle, flowData.flow, t]
+    [chartTitle, flowData.flow]
   )
   const chartTheme = resolvedTheme === 'dark' ? 'dark' : 'light'
   const chartKey = [
@@ -485,9 +485,7 @@ export function FlowCharts(props: FlowChartsProps) {
     themeReady,
   })
   const flowErrorMessage =
-    flowError instanceof Error
-      ? flowError.message
-      : t('Please try again later.')
+    flowError instanceof Error ? flowError.message : '请稍后重试。'
   let chartContent = (
     <VChart
       key={`flow-${chartKey}`}
@@ -522,21 +520,87 @@ export function FlowCharts(props: FlowChartsProps) {
           <EmptyMedia variant='icon'>
             <Route />
           </EmptyMedia>
-          <EmptyTitle>{t('No flow data available')}</EmptyTitle>
-          <EmptyDescription>{t('No data available')}</EmptyDescription>
+          <EmptyTitle>暂无流量链路数据</EmptyTitle>
+          <EmptyDescription>
+            当前筛选范围内没有可用于构建链路的调用记录。
+          </EmptyDescription>
         </EmptyHeader>
       </Empty>
     )
   }
 
+  const selectedNodeCount = selectedUsers.length + selectedNodes.length
+  const activeSelectionText = activeFlowNode
+    ? `${FLOW_STAGE_LABEL_KEYS[activeFlowNode.kind]}：${activeFlowNode.id}`
+    : activeFlowLink
+      ? '已聚焦一条链路'
+      : selectedNodeCount > 0
+        ? `${selectedNodeCount} 个筛选条件`
+        : '全量链路'
+
   return (
-    <div className='flex flex-col gap-3'>
-      <div className='flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between'>
+    <div className='enterprise-dashboard flex min-h-0 flex-col gap-3 overflow-auto pb-5 text-slate-950'>
+      <div className='flex flex-wrap items-end justify-between gap-3'>
+        <div className='min-w-0'>
+          <p className='text-[11px] font-semibold text-blue-600'>
+            网关调用链路
+          </p>
+          <h1 className='mt-1 text-[22px] leading-7 font-bold tracking-normal text-slate-950'>
+            流量链路分析
+          </h1>
+          <p className='mt-1 text-[12px] text-slate-500'>
+            从下游用户、密钥、分组、模型到上游渠道的真实调用路径。
+          </p>
+        </div>
+        <div className='rounded-md border border-slate-200 bg-white px-3 py-2 text-right shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+          <p className='text-[11px] text-slate-500'>当前视图</p>
+          <p className='mt-0.5 text-xs font-semibold text-slate-900'>
+            {activeSelectionText}
+          </p>
+        </div>
+      </div>
+
+      <div className='grid gap-2 sm:grid-cols-2 xl:grid-cols-4'>
+        <EnterpriseStatCard
+          title='请求量'
+          value={formatFlowMetricNumber(flowData.summary.requests)}
+          helper='当前筛选'
+          icon={Activity}
+          tone='blue'
+          loading={isLoading}
+        />
+        <EnterpriseStatCard
+          title='消耗额度'
+          value={formatQuota(flowData.summary.quota)}
+          helper='按售价口径'
+          icon={WalletCards}
+          tone='amber'
+          loading={isLoading}
+        />
+        <EnterpriseStatCard
+          title='Token 用量'
+          value={formatFlowMetricNumber(flowData.summary.tokens)}
+          helper='输入与输出合计'
+          icon={Hash}
+          tone='violet'
+          loading={isLoading}
+        />
+        <EnterpriseStatCard
+          title='链路规模'
+          value={`${flowData.flow.nodes.length} 节点`}
+          helper={`${flowData.flow.links.length} 条连接`}
+          icon={GitBranch}
+          tone='emerald'
+          loading={isLoading}
+        />
+      </div>
+
+      <div className='flex flex-col gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.035)] xl:flex-row xl:items-end xl:justify-between'>
         <div className='flex min-w-0 flex-wrap items-end gap-2'>
           <div className='flex min-w-0 flex-col gap-1.5'>
             <div className='flex items-center gap-1.5'>
               <span className='text-muted-foreground text-xs font-medium'>
-                {t('Flow width metric')}
+                流宽口径
               </span>
               <TooltipProvider>
                 <Tooltip>
@@ -545,14 +609,14 @@ export function FlowCharts(props: FlowChartsProps) {
                       <button
                         type='button'
                         className='text-muted-foreground/60 hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded-md'
-                        aria-label={t('Flow width metric')}
+                        aria-label='流宽口径'
                       />
                     }
                   >
                     <Info className='size-3.5' />
                   </TooltipTrigger>
                   <TooltipContent className='max-w-[14rem]'>
-                    {t('Choose how flow widths are calculated.')}
+                    选择链路宽度按额度、Token 还是请求次数计算。
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -562,7 +626,7 @@ export function FlowCharts(props: FlowChartsProps) {
               onValueChange={(value) => setMetric(value as FlowMetric)}
               className='shrink-0'
             >
-              <TabsList aria-label={t('Flow width metric')}>
+              <TabsList aria-label='流宽口径'>
                 {FLOW_METRIC_OPTIONS.map((option) => {
                   const Icon = option.icon
                   return (
@@ -572,7 +636,7 @@ export function FlowCharts(props: FlowChartsProps) {
                       className='gap-1.5 px-2.5 text-xs'
                     >
                       <Icon data-icon='inline-start' aria-hidden='true' />
-                      {t(option.labelKey)}
+                      {option.label}
                     </TabsTrigger>
                   )
                 })}
@@ -582,21 +646,21 @@ export function FlowCharts(props: FlowChartsProps) {
 
           <div className='flex min-w-0 flex-col gap-1.5'>
             <span className='text-muted-foreground text-xs font-medium'>
-              {t('Display limit')}
+              节点数量
             </span>
             <Tabs
               value={String(topNodeLimit)}
               onValueChange={(value) => setTopNodeLimit(Number(value))}
               className='shrink-0'
             >
-              <TabsList aria-label={t('Display limit')}>
+              <TabsList aria-label='节点数量'>
                 {FLOW_TOP_LIMIT_OPTIONS.map((limit) => (
                   <TabsTrigger
                     key={limit}
                     value={String(limit)}
                     className='px-2.5 text-xs'
                   >
-                    {t('Top {{count}}', { count: limit })}
+                    Top {limit}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -605,7 +669,7 @@ export function FlowCharts(props: FlowChartsProps) {
 
           <div className='flex min-w-0 flex-col gap-1.5'>
             <span className='text-muted-foreground text-xs font-medium'>
-              {t('Overflow items')}
+              超出节点
             </span>
             <Tabs
               value={overflowMode}
@@ -614,14 +678,14 @@ export function FlowCharts(props: FlowChartsProps) {
               }
               className='shrink-0'
             >
-              <TabsList aria-label={t('Overflow items')}>
+              <TabsList aria-label='超出节点'>
                 {FLOW_OVERFLOW_MODE_OPTIONS.map((option) => (
                   <TabsTrigger
                     key={option.value}
                     value={option.value}
                     className='px-2.5 text-xs'
                   >
-                    {t(option.labelKey)}
+                    {option.label}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -648,8 +712,8 @@ export function FlowCharts(props: FlowChartsProps) {
                 options={userFilterOptions}
                 selected={selectedUsers}
                 onChange={setSelectedUsers}
-                placeholder={t('All users')}
-                emptyText={t('No users')}
+                placeholder='全部用户'
+                emptyText='暂无用户'
                 maxVisibleChips={2}
                 renderSelectedSummary={(values) =>
                   compactFlowSelectionLabel(values.length)
@@ -663,11 +727,18 @@ export function FlowCharts(props: FlowChartsProps) {
         </div>
       </div>
 
-      <div className='overflow-hidden rounded-lg border'>
-        <div className='flex w-full flex-col gap-2 border-b px-3 py-2 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between'>
+      <div className='overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+        <div className='flex w-full flex-col gap-2 border-b border-slate-100 bg-slate-50/65 px-3 py-2 lg:flex-row lg:items-center lg:justify-between'>
           <div className='flex min-w-0 items-center gap-2'>
             <GitBranch className='text-muted-foreground/60 size-4 shrink-0' />
-            <div className='text-sm font-semibold'>{chartTitle}</div>
+            <div>
+              <div className='text-[13px] font-semibold text-slate-900'>
+                {chartTitle}
+              </div>
+              <p className='text-[11px] text-slate-500'>
+                点击节点或连线可聚焦完整上下游路径。
+              </p>
+            </div>
           </div>
           <TooltipProvider>
             <div className='flex min-w-0 items-center gap-1 overflow-x-auto pb-1 lg:justify-end lg:pb-0'>
@@ -677,14 +748,14 @@ export function FlowCharts(props: FlowChartsProps) {
                     <button
                       type='button'
                       className='text-muted-foreground/60 hover:text-foreground flex size-6 shrink-0 items-center justify-center rounded-md'
-                      aria-label={t('Show or hide flow columns')}
+                      aria-label='显示或隐藏链路阶段'
                     />
                   }
                 >
                   <Info className='size-3.5' />
                 </TooltipTrigger>
                 <TooltipContent className='max-w-[16rem]'>
-                  {t('Click a stage to show or hide that column')}
+                  点击阶段可显示或隐藏该列。
                 </TooltipContent>
               </Tooltip>
               {stages.map((stage, index) => {
@@ -703,15 +774,15 @@ export function FlowCharts(props: FlowChartsProps) {
                             size='sm'
                             pressed={visible}
                             onPressedChange={() => toggleStage(stage)}
-                            aria-label={t(meta.labelKey)}
+                            aria-label={meta.labelKey}
                             className={cn('shrink-0', !visible && 'opacity-50')}
                           />
                         }
                       >
                         {!visible && <EyeOff className='size-3' />}
-                        {t(meta.labelKey)}
+                        {meta.labelKey}
                       </TooltipTrigger>
-                      <TooltipContent>{t(meta.descKey)}</TooltipContent>
+                      <TooltipContent>{meta.descKey}</TooltipContent>
                     </Tooltip>
                   </Fragment>
                 )
@@ -719,9 +790,114 @@ export function FlowCharts(props: FlowChartsProps) {
             </div>
           </TooltipProvider>
         </div>
-        <div className='h-[560px] p-1.5 sm:h-[680px] sm:p-2 2xl:h-[760px]'>
+        <div className='h-[320px] p-1.5 sm:h-[380px] sm:p-2 2xl:h-[440px]'>
           {chartContent}
         </div>
+      </div>
+
+      <div className='grid gap-3 lg:grid-cols-3'>
+        <section className='rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.03)]'>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <h3 className='text-[13px] font-semibold text-slate-900'>
+                链路阶段
+              </h3>
+              <p className='mt-0.5 text-[11px] text-slate-500'>
+                当前参与构图的路径列。
+              </p>
+            </div>
+            <span className='rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700'>
+              {visibleStages.length}/{stages.length}
+            </span>
+          </div>
+          <div className='mt-3 flex flex-wrap gap-1.5'>
+            {stages.map((stage) => {
+              const visible = visibleStages.includes(stage)
+              return (
+                <span
+                  key={stage}
+                  className={cn(
+                    'rounded-md border px-2 py-1 text-[11px] font-medium',
+                    visible
+                      ? 'border-blue-100 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-400'
+                  )}
+                >
+                  {FLOW_STAGE_LABEL_KEYS[stage]}
+                </span>
+              )
+            })}
+          </div>
+        </section>
+
+        <section className='rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.03)]'>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <h3 className='text-[13px] font-semibold text-slate-900'>
+                筛选状态
+              </h3>
+              <p className='mt-0.5 text-[11px] text-slate-500'>
+                用户和节点筛选会直接影响构图数据。
+              </p>
+            </div>
+            <span className='rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600'>
+              {selectedNodeCount || 0}
+            </span>
+          </div>
+          <div className='mt-3 grid grid-cols-2 gap-2'>
+            <div className='rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2'>
+              <p className='text-[11px] text-slate-500'>用户筛选</p>
+              <p className='mt-1 text-sm font-semibold text-slate-900 tabular-nums'>
+                {selectedUsers.length}
+              </p>
+            </div>
+            <div className='rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2'>
+              <p className='text-[11px] text-slate-500'>节点筛选</p>
+              <p className='mt-1 text-sm font-semibold text-slate-900 tabular-nums'>
+                {selectedNodes.length}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className='rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.03)]'>
+          <div className='flex items-center justify-between gap-2'>
+            <div>
+              <h3 className='text-[13px] font-semibold text-slate-900'>
+                数据状态
+              </h3>
+              <p className='mt-0.5 text-[11px] text-slate-500'>
+                来源于真实调用流水聚合接口。
+              </p>
+            </div>
+            <span
+              className={cn(
+                'rounded-md px-2 py-1 text-[11px] font-semibold',
+                isError
+                  ? 'bg-rose-50 text-rose-700'
+                  : isLoading
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-emerald-50 text-emerald-700'
+              )}
+            >
+              {isError ? '异常' : isLoading ? '加载中' : '已同步'}
+            </span>
+          </div>
+          <div className='mt-3 grid grid-cols-2 gap-2'>
+            <div className='rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2'>
+              <p className='text-[11px] text-slate-500'>原始行数</p>
+              <p className='mt-1 text-sm font-semibold text-slate-900 tabular-nums'>
+                {formatFlowMetricNumber(flowRows?.length ?? 0)}
+              </p>
+            </div>
+            <div className='rounded-md border border-slate-200 bg-slate-50/70 px-2.5 py-2'>
+              <p className='text-[11px] text-slate-500'>接口</p>
+              <p className='mt-1 truncate text-sm font-semibold text-slate-900'>
+                {isAdmin ? '全局' : '个人'}
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   )

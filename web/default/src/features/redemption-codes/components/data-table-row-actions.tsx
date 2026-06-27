@@ -90,7 +90,7 @@ export function DataTableRowActions<TData>({
           }
         >
           <DotsHorizontalIcon className='h-4 w-4' />
-          <span className='sr-only'>{t('Open menu')}</span>
+          <span className='sr-only'>{t('打开操作菜单')}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-[160px]'>
           <DropdownMenuItem
@@ -100,7 +100,7 @@ export function DataTableRowActions<TData>({
             }}
             disabled={!canEdit}
           >
-            {t('Edit')}
+            {t('编辑')}
             <DropdownMenuShortcut>
               <Edit size={16} />
             </DropdownMenuShortcut>
@@ -109,14 +109,14 @@ export function DataTableRowActions<TData>({
             <DropdownMenuItem onClick={handleToggleStatus}>
               {isEnabled ? (
                 <>
-                  {t('Disable')}
+                  {t('禁用')}
                   <DropdownMenuShortcut>
                     <PowerOff size={16} />
                   </DropdownMenuShortcut>
                 </>
               ) : (
                 <>
-                  {t('Enable')}
+                  {t('启用')}
                   <DropdownMenuShortcut>
                     <Power size={16} />
                   </DropdownMenuShortcut>
@@ -132,7 +132,7 @@ export function DataTableRowActions<TData>({
             }}
             className='text-destructive focus:text-destructive'
           >
-            {t('Delete')}
+            {t('删除')}
             <DropdownMenuShortcut>
               <Trash2 size={16} />
             </DropdownMenuShortcut>

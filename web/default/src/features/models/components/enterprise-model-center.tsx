@@ -55,6 +55,10 @@ import {
 } from '@/components/ui/table'
 import { useEnterpriseConsole } from '@/context/enterprise-console-context'
 import { getEnterpriseOverview } from '@/features/enterprise/api'
+import type {
+  EnterpriseOverviewChannelItem,
+  EnterpriseOverviewRankingItem,
+} from '@/features/enterprise/types'
 import {
   getOptionValue,
   useSystemOptions,
@@ -81,10 +85,33 @@ type PricingMaps = {
   ratios: Record<string, number>
 }
 
+type CandidateModelRow = {
+  key: string
+  name: string
+  channels: string[]
+  requests: number
+  tokens: number
+  quota: number
+  source: 'missing' | 'channel' | 'usage'
+}
+
+type ModelCatalogRow =
+  | {
+      type: 'configured'
+      model: Model
+    }
+  | {
+      type: 'candidate'
+      candidate: CandidateModelRow
+    }
+
 const MODEL_PAGE_SIZE = 200
 const TABLE_LIMIT = 8
 const EMPTY_MODELS: Model[] = []
 const EMPTY_VENDORS: Vendor[] = []
+const EMPTY_MISSING_MODELS: string[] = []
+const EMPTY_TOP_MODELS: EnterpriseOverviewRankingItem[] = []
+const EMPTY_OVERVIEW_CHANNELS: EnterpriseOverviewChannelItem[] = []
 
 const SYSTEM_OPTION_DEFAULTS = {
   ModelPrice: '',
@@ -139,18 +166,22 @@ function getModelKeyValue(
   return matchedEntry?.[1]
 }
 
-function getPricingLabel(model: Model, pricing: PricingMaps): string {
-  const price = getModelKeyValue(pricing.prices, model.model_name)
+function getModelPricingLabel(modelName: string, pricing: PricingMaps): string {
+  const price = getModelKeyValue(pricing.prices, modelName)
   if (price != null) {
     return `$${price.toFixed(price >= 1 ? 2 : 4)}`
   }
 
-  const ratio = getModelKeyValue(pricing.ratios, model.model_name)
+  const ratio = getModelKeyValue(pricing.ratios, modelName)
   if (ratio != null) {
     return `${ratio.toFixed(ratio >= 1 ? 2 : 4)}x`
   }
 
   return '未配置'
+}
+
+function getPricingLabel(model: Model, pricing: PricingMaps): string {
+  return getModelPricingLabel(model.model_name, pricing)
 }
 
 function splitText(value?: string): string[] {
@@ -161,16 +192,9 @@ function splitText(value?: string): string[] {
     .filter(Boolean)
 }
 
-function getModelCapabilities(model: Model): string[] {
-  const source = [
-    model.model_name,
-    model.description ?? '',
-    model.tags ?? '',
-    model.endpoints ?? '',
-  ]
-    .join(' ')
-    .toLowerCase()
-  const tags = splitText(model.tags)
+function getCapabilitiesFromText(sourceText: string, tagText?: string): string[] {
+  const source = `${sourceText} ${tagText ?? ''}`.toLowerCase()
+  const tags = splitText(tagText)
   const capabilities = new Set<string>()
 
   if (/vision|image|图片|视觉|multimodal|omni/.test(source)) {
@@ -198,6 +222,17 @@ function getModelCapabilities(model: Model): string[] {
   return [...capabilities].slice(0, 4)
 }
 
+function getModelCapabilities(model: Model): string[] {
+  return getCapabilitiesFromText(
+    [model.model_name, model.description ?? '', model.endpoints ?? ''].join(' '),
+    model.tags
+  )
+}
+
+function getCandidateCapabilities(modelName: string): string[] {
+  return getCapabilitiesFromText(modelName)
+}
+
 function matchesModelType(model: Model, typeFilter: ModelTypeFilter): boolean {
   if (typeFilter === 'all') return true
   const text = [
@@ -208,6 +243,28 @@ function matchesModelType(model: Model, typeFilter: ModelTypeFilter): boolean {
   ]
     .join(' ')
     .toLowerCase()
+
+  if (typeFilter === 'vision') {
+    return /vision|image|图片|视觉|multimodal|omni/.test(text)
+  }
+  if (typeFilter === 'reasoning') {
+    return /reason|r1|thinking|推理/.test(text)
+  }
+  if (typeFilter === 'embedding') {
+    return /embed|embedding|向量/.test(text)
+  }
+  if (typeFilter === 'audio') {
+    return /audio|tts|whisper|语音|音频/.test(text)
+  }
+  return !/embed|embedding|image|vision|audio|tts|whisper/.test(text)
+}
+
+function matchesModelNameType(
+  modelName: string,
+  typeFilter: ModelTypeFilter
+): boolean {
+  if (typeFilter === 'all') return true
+  const text = modelName.toLowerCase()
 
   if (typeFilter === 'vision') {
     return /vision|image|图片|视觉|multimodal|omni/.test(text)
@@ -287,6 +344,100 @@ function getModelRiskCount(model: Model): number {
   if (model.vendor_id == null) count += 1
   if ((model.bound_channels?.length ?? 0) === 0 && !model.endpoints) count += 1
   return count
+}
+
+function normalizeModelName(value: string): string {
+  return value.trim()
+}
+
+function buildCandidateModelRows({
+  missingModels,
+  topModels,
+  channels,
+  configuredNames,
+}: {
+  missingModels: string[]
+  topModels: EnterpriseOverviewRankingItem[]
+  channels: EnterpriseOverviewChannelItem[]
+  configuredNames: Set<string>
+}): CandidateModelRow[] {
+  const rows = new Map<string, CandidateModelRow>()
+
+  const ensureRow = (
+    rawName: string,
+    source: CandidateModelRow['source']
+  ): CandidateModelRow | null => {
+    const name = normalizeModelName(rawName)
+    if (!name) return null
+
+    const key = name.toLowerCase()
+    if (configuredNames.has(key)) return null
+
+    const existing = rows.get(key)
+    if (existing) {
+      if (existing.source === 'channel' && source !== 'channel') {
+        existing.source = source
+      }
+      return existing
+    }
+
+    const row: CandidateModelRow = {
+      key,
+      name,
+      channels: [],
+      requests: 0,
+      tokens: 0,
+      quota: 0,
+      source,
+    }
+    rows.set(key, row)
+    return row
+  }
+
+  missingModels.forEach((modelName) => ensureRow(modelName, 'missing'))
+
+  channels.forEach((channel) => {
+    splitText(channel.models).forEach((modelName) => {
+      const row = ensureRow(modelName, 'channel')
+      if (!row) return
+      if (!row.channels.includes(channel.name)) {
+        row.channels.push(channel.name)
+      }
+    })
+  })
+
+  topModels.forEach((model) => {
+    const row = ensureRow(model.name, 'usage')
+    if (!row) return
+    row.requests += model.requests
+    row.tokens += model.tokens
+    row.quota += model.quota
+    if (row.source === 'channel') {
+      row.source = 'usage'
+    }
+  })
+
+  return [...rows.values()].sort((left, right) => {
+    if (right.requests !== left.requests) return right.requests - left.requests
+    if (right.channels.length !== left.channels.length) {
+      return right.channels.length - left.channels.length
+    }
+    return left.name.localeCompare(right.name)
+  })
+}
+
+function getCandidateSourceLabel(candidate: CandidateModelRow): string {
+  if (candidate.source === 'missing') return '真实请求发现'
+  if (candidate.source === 'usage') return '用量排行发现'
+  return '渠道声明发现'
+}
+
+function getCandidateChannelLabel(candidate: CandidateModelRow): string {
+  if (candidate.channels.length === 0) return getCandidateSourceLabel(candidate)
+  if (candidate.channels.length <= 2) return candidate.channels.join(' / ')
+  return `${candidate.channels.slice(0, 2).join(' / ')} +${
+    candidate.channels.length - 2
+  }`
 }
 
 function TableEmptyState({
@@ -441,6 +592,35 @@ export function EnterpriseModelCenter({
     () => summaryQuery.data?.data?.items ?? EMPTY_MODELS,
     [summaryQuery.data?.data?.items]
   )
+  const missingModelNames = useMemo(
+    () => missingModelsQuery.data?.data ?? EMPTY_MISSING_MODELS,
+    [missingModelsQuery.data?.data]
+  )
+  const topModels = useMemo(
+    () => overviewQuery.data?.data?.top_models ?? EMPTY_TOP_MODELS,
+    [overviewQuery.data?.data?.top_models]
+  )
+  const overviewChannels = useMemo(
+    () => overviewQuery.data?.data?.channels ?? EMPTY_OVERVIEW_CHANNELS,
+    [overviewQuery.data?.data?.channels]
+  )
+  const configuredNames = useMemo(
+    () =>
+      new Set(
+        summaryModels.map((model) => normalizeModelName(model.model_name).toLowerCase())
+      ),
+    [summaryModels]
+  )
+  const candidateRows = useMemo(
+    () =>
+      buildCandidateModelRows({
+        missingModels: missingModelNames,
+        topModels,
+        channels: overviewChannels,
+        configuredNames,
+      }),
+    [configuredNames, missingModelNames, overviewChannels, topModels]
+  )
   const listedCount = summaryModels.filter((model) => model.status === 1).length
   const trustedCount = summaryModels.filter(
     (model) =>
@@ -453,7 +633,8 @@ export function EnterpriseModelCenter({
     (model) => getModelRiskCount(model) > 0
   ).length
   const totalModels = summaryQuery.data?.data?.total ?? summaryModels.length
-  const missingCount = missingModelsQuery.data?.data?.length ?? 0
+  const modelCatalogCount = totalModels + candidateRows.length
+  const missingCount = missingModelNames.length
   const activeVendorCount = vendors.filter(
     (vendor) => vendor.status === 1
   ).length
@@ -473,8 +654,41 @@ export function EnterpriseModelCenter({
       ),
     [tableModels, typeFilter, visibilityFilter]
   )
-  const visibleModels = filteredModels.slice(0, TABLE_LIMIT)
-  const filteredOutCount = Math.max(0, filteredModels.length - TABLE_LIMIT)
+  const filteredCandidateRows = useMemo(
+    () =>
+      candidateRows.filter((candidate) => {
+        const keywordMatched =
+          trimmedKeyword.length === 0 ||
+          candidate.name.toLowerCase().includes(trimmedKeyword.toLowerCase()) ||
+          candidate.channels.some((channel) =>
+            channel.toLowerCase().includes(trimmedKeyword.toLowerCase())
+          )
+
+        return (
+          keywordMatched &&
+          matchesModelNameType(candidate.name, typeFilter) &&
+          vendorFilter === 'all' &&
+          statusFilter === 'all' &&
+          visibilityFilter !== 'restricted'
+        )
+      }),
+    [candidateRows, statusFilter, trimmedKeyword, typeFilter, vendorFilter, visibilityFilter]
+  )
+  const filteredCatalogRows = useMemo<ModelCatalogRow[]>(
+    () => [
+      ...filteredModels.map((model) => ({
+        type: 'configured' as const,
+        model,
+      })),
+      ...filteredCandidateRows.map((candidate) => ({
+        type: 'candidate' as const,
+        candidate,
+      })),
+    ],
+    [filteredCandidateRows, filteredModels]
+  )
+  const visibleRows = filteredCatalogRows.slice(0, TABLE_LIMIT)
+  const filteredOutCount = Math.max(0, filteredCatalogRows.length - TABLE_LIMIT)
   const hasActiveFilters =
     trimmedKeyword.length > 0 ||
     typeFilter !== 'all' ||
@@ -482,10 +696,19 @@ export function EnterpriseModelCenter({
     visibilityFilter !== 'all' ||
     statusFilter !== 'all'
   const isLoading =
-    modelsQuery.isLoading || summaryQuery.isLoading || vendorsQuery.isLoading
+    modelsQuery.isLoading ||
+    summaryQuery.isLoading ||
+    vendorsQuery.isLoading ||
+    missingModelsQuery.isLoading ||
+    overviewQuery.isLoading
 
   const openCreateModel = () => {
     setCurrentRow(null)
+    setOpen('create-model')
+  }
+
+  const openCreateCandidateModel = (modelName: string) => {
+    setCurrentRow({ model_name: modelName } as unknown as Model)
     setOpen('create-model')
   }
 
@@ -528,11 +751,13 @@ export function EnterpriseModelCenter({
         <section className='grid gap-1.5 md:grid-cols-3 xl:grid-cols-5'>
           <EnterpriseStatCard
             title='全局模型'
-            value={formatNumber(totalModels)}
-            helper={`已上架 ${formatNumber(listedCount)}`}
+            value={formatNumber(modelCatalogCount)}
+            helper={`已上架 ${formatNumber(listedCount)} · 待接入 ${formatNumber(
+              candidateRows.length
+            )}`}
             icon={Boxes}
             tone='blue'
-            loading={summaryQuery.isLoading}
+            loading={summaryQuery.isLoading || missingModelsQuery.isLoading}
           />
           <EnterpriseStatCard
             title='企业可信'
@@ -678,7 +903,7 @@ export function EnterpriseModelCenter({
                     价格
                   </TableHead>
                   <TableHead className='h-9 text-[11px] font-semibold text-slate-500'>
-                    7D 成功率
+                    范围样本
                   </TableHead>
                   <TableHead className='h-9 text-right text-[11px] font-semibold text-slate-500'>
                     状态
@@ -686,14 +911,127 @@ export function EnterpriseModelCenter({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleModels.length === 0 ? (
+                {visibleRows.length === 0 ? (
                   <TableEmptyState
                     loading={isLoading}
                     onCreate={openCreateModel}
                     onSync={openSyncWizard}
                   />
                 ) : (
-                  visibleModels.map((model) => {
+                  visibleRows.map((row) => {
+                    if (row.type === 'candidate') {
+                      const candidate = row.candidate
+                      const candidatePricing = getModelPricingLabel(
+                        candidate.name,
+                        pricing
+                      )
+
+                      return (
+                        <TableRow
+                          key={`candidate-${candidate.key}`}
+                          className='group border-slate-100 bg-amber-50/20 hover:bg-amber-50/40'
+                        >
+                          <TableCell className='px-3 py-2.5 align-top'>
+                            <div className='flex min-w-0 items-start gap-2.5'>
+                              <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600 ring-1 ring-amber-100'>
+                                <DatabaseZap className='size-4' />
+                              </span>
+                              <div className='min-w-0'>
+                                <div className='flex min-w-0 items-center gap-1.5'>
+                                  <p className='truncate text-[13px] font-semibold text-slate-950'>
+                                    {candidate.name}
+                                  </p>
+                                  <Badge className='h-5 rounded bg-amber-50 px-1.5 text-[10px] text-amber-700 ring-1 ring-amber-100'>
+                                    待接入
+                                  </Badge>
+                                </div>
+                                <p className='mt-0.5 line-clamp-1 text-[11px] text-slate-500'>
+                                  {getCandidateSourceLabel(candidate)}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className='py-2.5 align-top'>
+                            <div className='flex max-w-[260px] flex-wrap gap-1'>
+                              {getCandidateCapabilities(candidate.name).map(
+                                (capability) => (
+                                  <Badge
+                                    key={capability}
+                                    variant='outline'
+                                    className='h-5 rounded border-slate-200 bg-white px-1.5 text-[10px] text-slate-600'
+                                  >
+                                    {capability}
+                                  </Badge>
+                                )
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className='py-2.5 align-top'>
+                            <p className='text-[12px] font-semibold text-slate-800'>
+                              {getCandidateChannelLabel(candidate)}
+                            </p>
+                            <p className='mt-0.5 text-[11px] text-slate-500'>
+                              {candidate.channels.length > 0
+                                ? `${formatNumber(candidate.channels.length)} 条渠道声明`
+                                : '尚未绑定供应商'}
+                            </p>
+                          </TableCell>
+                          <TableCell className='py-2.5 align-top'>
+                            <p
+                              className={cn(
+                                'text-[12px] font-semibold tabular-nums',
+                                candidatePricing === '未配置'
+                                  ? 'text-amber-600'
+                                  : 'text-slate-900'
+                              )}
+                            >
+                              {candidatePricing}
+                            </p>
+                            <p className='mt-0.5 text-[11px] text-slate-500'>
+                              待补资产配置
+                            </p>
+                          </TableCell>
+                          <TableCell className='py-2.5 align-top'>
+                            <p className='text-[12px] font-semibold text-slate-800'>
+                              {candidate.requests > 0
+                                ? `${formatNumber(candidate.requests)} 请求`
+                                : '暂无样本'}
+                            </p>
+                            <p className='mt-0.5 text-[11px] text-slate-500'>
+                              {candidate.tokens > 0
+                                ? `${formatNumber(candidate.tokens)} tokens`
+                                : '等待路由接入'}
+                            </p>
+                          </TableCell>
+                          <TableCell className='py-2.5 pr-3 align-top'>
+                            <div className='flex justify-end'>
+                              <div className='flex items-center gap-1.5'>
+                                <Badge
+                                  variant='outline'
+                                  className='h-5 rounded border-amber-200 bg-amber-50 px-1.5 text-[10px] text-amber-700'
+                                >
+                                  <span className='size-1.5 rounded-full bg-amber-500' />
+                                  待配置
+                                </Badge>
+                                <Button
+                                  variant='ghost'
+                                  className='h-7 rounded-md px-2 text-[11px] font-semibold text-blue-600 opacity-80 group-hover:opacity-100 hover:bg-white hover:text-blue-700'
+                                  onClick={() =>
+                                    openCreateCandidateModel(candidate.name)
+                                  }
+                                  aria-label={`配置 ${candidate.name}`}
+                                >
+                                  <Plus className='size-3.5' />
+                                  配置
+                                </Button>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    }
+
+                    const model = row.model
                     const status = modelStatus(model)
                     const risks = getModelRiskCount(model)
                     return (
@@ -827,8 +1165,8 @@ export function EnterpriseModelCenter({
               <SlidersHorizontal className='size-3.5 shrink-0' />
               <span className='truncate'>
                 {hasActiveFilters
-                  ? `当前筛选 ${formatNumber(filteredModels.length)} 个模型`
-                  : `全量目录 ${formatNumber(totalModels)} 个模型`}
+                  ? `当前筛选 ${formatNumber(filteredCatalogRows.length)} 个模型`
+                  : `全量目录 ${formatNumber(modelCatalogCount)} 个模型`}
                 {filteredOutCount > 0 ? `，表格展示前 ${TABLE_LIMIT} 个` : ''}
               </span>
             </div>

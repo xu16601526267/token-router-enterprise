@@ -99,7 +99,7 @@ export function FlowNodeFilterControl(props: FlowNodeFilterControlProps) {
   return (
     <div className='flex min-w-0 flex-col gap-1.5'>
       <span className='text-muted-foreground text-xs font-medium'>
-        {t('Node filters')}
+        节点筛选
       </span>
       <div className='flex min-w-0 flex-wrap items-center gap-1.5'>
         <Popover>
@@ -109,12 +109,12 @@ export function FlowNodeFilterControl(props: FlowNodeFilterControlProps) {
                 type='button'
                 variant='outline'
                 size='sm'
-                aria-label={t('Filter by node')}
+                aria-label='按节点筛选'
               />
             }
           >
             <Filter data-icon='inline-start' aria-hidden='true' />
-            {selectedCount > 0 ? t('Selected nodes') : t('All nodes')}
+            {selectedCount > 0 ? '已选节点' : '全部节点'}
             {selectedCount > 0 && (
               <Badge variant='secondary' className='rounded-sm px-1'>
                 {selectedCount}
@@ -126,15 +126,15 @@ export function FlowNodeFilterControl(props: FlowNodeFilterControlProps) {
             align='start'
           >
             <PopoverHeader className='px-3 pt-3'>
-              <PopoverTitle>{t('Node filters')}</PopoverTitle>
+              <PopoverTitle>节点筛选</PopoverTitle>
               <PopoverDescription>
-                {t('Value metric')}: {props.metricLabel}
+                指标口径：{props.metricLabel}
               </PopoverDescription>
             </PopoverHeader>
             <Command>
-              <CommandInput placeholder={t('Filter by node')} />
+              <CommandInput placeholder='搜索节点' />
               <CommandList>
-                <CommandEmpty>{t('No nodes')}</CommandEmpty>
+                <CommandEmpty>暂无节点</CommandEmpty>
                 {optionsByStage.map((group) => {
                   const stageLabel = t(props.stageLabels[group.stage])
                   return (
@@ -187,7 +187,7 @@ export function FlowNodeFilterControl(props: FlowNodeFilterControlProps) {
                         onSelect={props.onClearNodes}
                         className='justify-center text-center'
                       >
-                        {t('Clear node filters')}
+                        清空节点筛选
                       </CommandItem>
                     </CommandGroup>
                   </>
@@ -209,7 +209,7 @@ export function FlowNodeFilterControl(props: FlowNodeFilterControlProps) {
             <button
               type='button'
               className='hover:bg-muted-foreground/15 flex size-4 shrink-0 items-center justify-center rounded-sm'
-              aria-label={t('Remove node filter')}
+              aria-label='移除节点筛选'
               onClick={() =>
                 props.onRemoveNode({ kind: option.kind, id: option.id })
               }
@@ -226,7 +226,7 @@ export function FlowNodeFilterControl(props: FlowNodeFilterControlProps) {
             size='xs'
             onClick={props.onClearNodes}
           >
-            {t('Clear')}
+            清空
           </Button>
         )}
       </div>

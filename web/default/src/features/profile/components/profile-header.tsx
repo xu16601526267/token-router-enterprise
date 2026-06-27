@@ -85,32 +85,35 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
   const roleLabel = getRoleLabel(profile.role)
   const stats = [
     {
-      label: t('Current Balance'),
+      label: t('当前余额'),
       value: formatQuota(profile.quota),
-      description: t('Remaining quota'),
+      description: t('剩余额度'),
       icon: WalletCards,
     },
     {
-      label: t('Total Usage'),
+      label: t('累计用量'),
       value: formatQuota(profile.used_quota),
-      description: t('Total consumed quota'),
+      description: t('已消费额度'),
       icon: BarChart3,
     },
     {
-      label: t('API Requests'),
+      label: t('API 请求'),
       value: formatCompactNumber(profile.request_count),
-      description: t('Total requests made'),
+      description: t('累计请求次数'),
       icon: Activity,
     },
   ]
 
   return (
-    <Card data-card-hover='false' className='gap-0 overflow-hidden py-0'>
-      <CardContent className='p-3 sm:p-5'>
+    <Card
+      data-card-hover='false'
+      className='gap-0 overflow-hidden rounded-md border-slate-200 py-0 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+    >
+      <CardContent className='p-3 sm:p-4'>
         <div className='flex items-center gap-3 text-left sm:gap-4'>
-          <Avatar className='ring-background h-12 w-12 rounded-xl text-sm ring-2 sm:h-16 sm:w-16 sm:rounded-2xl sm:text-lg sm:ring-4'>
+          <Avatar className='ring-background h-12 w-12 rounded-md text-sm ring-2 sm:h-14 sm:w-14 sm:text-base sm:ring-2'>
             <AvatarFallback
-              className='rounded-xl font-semibold text-white sm:rounded-2xl'
+              className='rounded-md font-semibold text-white'
               style={avatarFallbackStyle}
             >
               {avatarFallback}
@@ -119,7 +122,7 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
 
           <div className='min-w-0 flex-1 space-y-1.5 sm:space-y-3'>
             <div className='flex min-w-0 items-center gap-2'>
-              <h1 className='truncate text-xl font-semibold tracking-tight sm:text-2xl'>
+              <h1 className='truncate text-[22px] leading-7 font-semibold text-slate-950'>
                 {displayName}
               </h1>
               <StatusBadge
@@ -128,13 +131,13 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
                 copyable={false}
               />
               <StatusBadge
-                label={`${t('User ID')} ${profile.id}`}
+                label={`${t('用户 ID')} ${profile.id}`}
                 variant='info'
                 copyText={String(profile.id)}
               />
             </div>
 
-            <div className='text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:gap-x-4 sm:text-sm'>
+            <div className='flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 sm:gap-x-3'>
               <span className='truncate'>@{profile.username}</span>
               {profile.email && (
                 <>
@@ -153,20 +156,20 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
         </div>
       </CardContent>
       <div className='border-t'>
-        <div className='divide-border/60 grid grid-cols-3 divide-x'>
+        <div className='grid grid-cols-3 divide-x divide-slate-100'>
           {stats.map((item) => (
-            <div key={item.label} className='min-w-0 px-3 py-3 sm:px-5 sm:py-4'>
+            <div key={item.label} className='min-w-0 px-3 py-2.5 sm:px-4 sm:py-3'>
               <div className='flex items-center gap-2'>
-                <item.icon className='text-muted-foreground/60 size-3.5 shrink-0' />
-                <div className='text-muted-foreground truncate text-xs font-medium tracking-wider uppercase'>
+                <item.icon className='size-3.5 shrink-0 text-slate-400' />
+                <div className='truncate text-[11px] font-semibold text-slate-500'>
                   {item.label}
                 </div>
               </div>
 
-              <div className='text-foreground mt-1.5 truncate font-mono text-lg font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl'>
+              <div className='mt-1 truncate font-mono text-xl font-bold tracking-tight text-slate-950 tabular-nums'>
                 {item.value}
               </div>
-              <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>
+              <div className='mt-0.5 hidden text-xs text-slate-400 md:block'>
                 {item.description}
               </div>
             </div>

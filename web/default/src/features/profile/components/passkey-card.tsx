@@ -203,34 +203,39 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
   const formattedLastUsed =
     lastUsed && !Number.isNaN(Date.parse(lastUsed))
       ? dayjs(lastUsed).fromNow()
-      : t('Not used yet')
+      : t('暂未使用')
 
   const showUnsupportedNotice = !supported && !enabled
 
   return (
     <>
-      <Card data-card-hover='false' className='gap-0 overflow-hidden py-0'>
-        <CardHeader className='p-3 sm:p-5'>
-          <CardTitle className='text-lg tracking-tight sm:text-xl'>
-            {t('Passkey Login')}
+      <Card
+        data-card-hover='false'
+        className='gap-0 overflow-hidden rounded-md border-slate-200 py-0 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+      >
+        <CardHeader className='border-b border-slate-100 bg-slate-50/65 p-3'>
+          <CardTitle className='text-[14px] leading-5 font-semibold text-slate-900'>
+            {t('通行密钥登录')}
           </CardTitle>
-          <CardDescription className='text-xs sm:text-sm'>
-            {t('Use Passkey to sign in without entering your password.')}
+          <CardDescription className='text-[11px] leading-4 text-slate-500'>
+            {t('无需输入密码，使用设备凭据完成登录。')}
           </CardDescription>
         </CardHeader>
 
-        <CardContent className='p-3 sm:p-5'>
-          <div className='space-y-6'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between xl:flex-col 2xl:flex-row'>
-              <div className='flex items-start gap-4'>
-                <div className='bg-muted rounded-md p-2'>
-                  <KeyRound className='h-5 w-5' />
+        <CardContent className='p-3'>
+          <div className='space-y-4'>
+            <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between xl:flex-col 2xl:flex-row'>
+              <div className='flex items-start gap-3'>
+                <div className='rounded-md bg-slate-50 p-2 text-slate-600 ring-1 ring-slate-100'>
+                  <KeyRound className='size-4' />
                 </div>
                 <div className='space-y-1'>
                   <div className='flex flex-wrap items-center gap-2'>
-                    <p className='font-medium'>{t('Passkey Authentication')}</p>
+                    <p className='text-[13px] font-semibold text-slate-900'>
+                      {t('Passkey 认证')}
+                    </p>
                     <StatusBadge
-                      label={enabled ? t('Enabled') : t('Disabled')}
+                      label={enabled ? t('已启用') : t('未启用')}
                       variant={enabled ? 'success' : 'neutral'}
                       showDot
                       copyable={false}
@@ -240,9 +245,9 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
                         label={
                           status.backup_eligible
                             ? status.backup_state
-                              ? t('Backed up')
-                              : t('Not backed up')
-                            : t('No backup')
+                              ? t('已备份')
+                              : t('未备份')
+                            : t('无备份')
                         }
                         variant={
                           status.backup_eligible
@@ -256,8 +261,8 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
                       />
                     )}
                   </div>
-                  <p className='text-muted-foreground text-sm'>
-                    {t('Last used:')} {formattedLastUsed}
+                  <p className='text-xs text-slate-500'>
+                    {t('最近使用:')} {formattedLastUsed}
                   </p>
                 </div>
               </div>
@@ -271,13 +276,13 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
                   {registering && (
                     <Loader2 className='mr-2 h-4 w-4 animate-spin' />
                   )}
-                  {t('Enable Passkey')}
+                  {t('启用 Passkey')}
                 </Button>
               )}
             </div>
 
             {enabled && (
-              <div className='flex flex-col gap-3 border-t pt-6 sm:flex-row xl:flex-col 2xl:flex-row'>
+              <div className='flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row xl:flex-col 2xl:flex-row'>
                 <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                   <AlertDialogTrigger
                     render={
@@ -293,22 +298,22 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
                     ) : (
                       <AlertTriangle className='mr-2 h-4 w-4' />
                     )}
-                    {t('Remove Passkey')}
+                    {t('移除 Passkey')}
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>
-                        {t('Remove Passkey?')}
+                        {t('移除 Passkey？')}
                       </AlertDialogTitle>
                       <AlertDialogDescription>
                         {t(
-                          'Removing Passkey will require you to sign in with your password next time. You can re-register anytime.'
+                          '移除后下次登录需要使用密码。后续可以重新注册 Passkey。'
                         )}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel disabled={removing}>
-                        {t('Cancel')}
+                        {t('取消')}
                       </AlertDialogCancel>
                       <AlertDialogAction
                         className='bg-destructive text-destructive-foreground'
@@ -318,7 +323,7 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
                           handleRemove()
                         }}
                       >
-                        {t('Remove')}
+                        {t('移除')}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -327,15 +332,15 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
             )}
 
             {showUnsupportedNotice && (
-              <div className='bg-muted/60 text-muted-foreground flex items-start gap-3 rounded-md p-4 text-sm'>
+              <div className='flex items-start gap-3 rounded-md bg-amber-50 p-3 text-xs text-amber-700'>
                 <ShieldAlert className='mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500' />
                 <div>
                   <p className='text-foreground font-medium'>
-                    {t('Passkey not supported on this device')}
+                    {t('当前设备不支持 Passkey')}
                   </p>
                   <p>
                     {t(
-                      'Use a compatible browser or device with biometric authentication or a security key to register a Passkey.'
+                      '请使用支持生物识别或安全密钥的浏览器和设备注册 Passkey。'
                     )}
                   </p>
                 </div>

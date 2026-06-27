@@ -109,6 +109,7 @@ export function ConsumptionDistributionChart(
   )
   const spec = chartType === 'bar' ? chartData.spec_line : chartData.spec_area
   const specType = typeof spec?.type === 'string' ? spec.type : chartType
+  const isEmpty = !props.loading && props.data.length === 0
   const chartKey = [
     chartType,
     specType,
@@ -119,17 +120,19 @@ export function ConsumptionDistributionChart(
   ].join('-')
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
-      <div className='flex w-full flex-col gap-1.5 border-b px-3 py-2 sm:gap-3 sm:px-5 sm:py-3 lg:flex-row lg:items-center lg:justify-between'>
+    <div className='overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+      <div className='flex w-full flex-col gap-1.5 border-b border-slate-100 bg-slate-50/65 px-3 py-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between'>
         <div className='flex items-center gap-2'>
           <WalletCards className='text-muted-foreground/60 size-4' />
-          <div className='text-sm font-semibold'>{t('Quota Distribution')}</div>
+          <div className='text-[13px] font-semibold text-slate-900'>
+            {t('额度消耗分布')}
+          </div>
           <span className='text-muted-foreground text-xs'>
-            {t('Total:')} {chartData.totalQuotaDisplay}
+            {t('合计')} {chartData.totalQuotaDisplay}
           </span>
         </div>
 
-        <div className='bg-muted/60 inline-flex h-7 w-full overflow-x-auto rounded-lg border p-0.5 sm:h-8 sm:w-auto'>
+        <div className='inline-flex h-7 w-full overflow-x-auto rounded-md border border-slate-200 bg-white p-0.5 sm:w-auto'>
           {CONSUMPTION_DISTRIBUTION_CHART_OPTIONS.map((item) => {
             const Icon = CHART_TYPE_ICONS[item.value]
             return (
@@ -151,17 +154,28 @@ export function ConsumptionDistributionChart(
         </div>
       </div>
 
-      <div className='h-[300px] p-1.5 sm:h-96 sm:p-2'>
-        {themeReady && spec && (
-          <VChart
-            key={chartKey}
-            spec={{
-              ...spec,
-              theme: resolvedTheme === 'dark' ? 'dark' : 'light',
-              background: 'transparent',
-            }}
-            option={VCHART_OPTION}
-          />
+      <div
+        className={
+          isEmpty
+            ? 'flex h-[150px] items-center justify-center p-3 text-xs text-slate-500'
+            : 'h-[260px] p-1.5 sm:h-[300px] sm:p-2'
+        }
+      >
+        {isEmpty ? (
+          <span>当前筛选范围暂无额度消耗数据</span>
+        ) : (
+          themeReady &&
+          spec && (
+            <VChart
+              key={chartKey}
+              spec={{
+                ...spec,
+                theme: resolvedTheme === 'dark' ? 'dark' : 'light',
+                background: 'transparent',
+              }}
+              option={VCHART_OPTION}
+            />
+          )
         )}
       </div>
     </div>

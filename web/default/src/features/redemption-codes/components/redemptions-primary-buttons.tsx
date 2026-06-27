@@ -17,20 +17,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Plus } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 
 import { useRedemptions } from './redemptions-provider'
 
 export function RedemptionsPrimaryButtons() {
-  const { t } = useTranslation()
   const { setOpen } = useRedemptions()
   return (
     <div className='flex gap-2'>
-      <Button size='sm' onClick={() => setOpen('create')}>
-        <Plus className='h-4 w-4' />
-        {t('Create Code')}
+      <Button
+        size='sm'
+        className='h-8 rounded-md bg-blue-600 px-2.5 text-[12px] font-semibold text-white shadow-none hover:bg-blue-700'
+        onClick={() => setOpen('create')}
+      >
+        <Plus className='size-3.5' />
+        新建兑换码
       </Button>
     </div>
   )

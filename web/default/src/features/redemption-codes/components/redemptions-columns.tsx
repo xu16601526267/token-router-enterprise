@@ -45,7 +45,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
           checked={table.getIsAllPageRowsSelected()}
           indeterminate={table.getIsSomePageRowsSelected()}
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label={t('Select all')}
+          aria-label={t('全选')}
           className='translate-y-[2px]'
         />
       ),
@@ -53,7 +53,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label={t('Select row')}
+          aria-label={t('选择此行')}
           className='translate-y-[2px]'
         />
       ),
@@ -74,7 +74,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       accessorKey: 'name',
-      header: t('Name'),
+      header: t('名称'),
       meta: { mobileTitle: true },
       cell: ({ row }) => (
         <span className='font-medium'>{row.getValue('name')}</span>
@@ -83,7 +83,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       accessorKey: 'status',
-      header: t('Status'),
+      header: t('状态'),
       meta: { mobileBadge: true },
       cell: ({ row }) => {
         const redemption = row.original
@@ -93,7 +93,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
         if (isRedemptionExpired(redemption.expired_time, statusValue)) {
           return (
             <StatusBadge
-              label={t('Expired')}
+              label={t('已过期')}
               variant='warning'
               copyable={false}
               className='-ml-1.5'
@@ -135,7 +135,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     {
       id: 'code',
       accessorKey: 'key',
-      header: t('Code'),
+      header: t('兑换码'),
       cell: function CodeCell({ row }) {
         const redemption = row.original
         const key = redemption.key
@@ -143,11 +143,11 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
 
         return (
           <MaskedValueDisplay
-            label={t('Full Code')}
+            label={t('完整兑换码')}
             fullValue={key}
             maskedValue={maskedKey}
-            copyTooltip={t('Copy code')}
-            copyAriaLabel={t('Copy redemption code')}
+            copyTooltip={t('复制兑换码')}
+            copyAriaLabel={t('复制兑换码')}
           />
         )
       },
@@ -156,7 +156,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       accessorKey: 'quota',
-      header: t('Quota'),
+      header: t('额度'),
       cell: ({ row }) => {
         const quota = row.getValue('quota') as number
         return (
@@ -172,7 +172,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       accessorKey: 'created_time',
-      header: t('Created'),
+      header: t('创建时间'),
       meta: { mobileHidden: true },
       cell: ({ row }) => {
         return (
@@ -185,14 +185,14 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       accessorKey: 'expired_time',
-      header: t('Expires'),
+      header: t('过期时间'),
       meta: { mobileHidden: true },
       cell: ({ row }) => {
         const expiredTime = row.getValue('expired_time') as number
         if (expiredTime === 0) {
           return (
             <StatusBadge
-              label={t('Never')}
+              label={t('永久')}
               variant='neutral'
               copyable={false}
               className='-ml-1.5'
@@ -212,7 +212,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       accessorKey: 'used_user_id',
-      header: t('Redeemed By'),
+      header: t('核销用户'),
       meta: { mobileHidden: true },
       cell: ({ row }) => {
         const userId = row.getValue('used_user_id') as number
@@ -227,7 +227,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
             <TooltipTrigger
               render={
                 <StatusBadge
-                  label={t('User {{id}}', { id: userId })}
+                  label={t('用户 {{id}}', { id: userId })}
                   variant='neutral'
                   copyable={false}
                   className='cursor-help'
@@ -237,11 +237,11 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
             <TooltipContent>
               <div className='space-y-1 text-xs'>
                 <div>
-                  {t('User ID:')} {userId}
+                  {t('用户 ID:')} {userId}
                 </div>
                 {redemption.redeemed_time > 0 && (
                   <div>
-                    {t('Redeemed:')}{' '}
+                    {t('核销时间:')}{' '}
                     {formatTimestampToDate(redemption.redeemed_time)}
                   </div>
                 )}
@@ -254,7 +254,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
     },
     {
       id: 'actions',
-      header: () => t('Actions'),
+      header: () => t('操作'),
       cell: ({ row }) => <DataTableRowActions row={row} />,
       meta: { pinned: 'right' as const },
       size: 88,

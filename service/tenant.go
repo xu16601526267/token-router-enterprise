@@ -73,6 +73,32 @@ func normalizeBillingMode(mode string) string {
 	}
 }
 
+func NormalizeTenantStatus(status string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case model.TenantStatusActive:
+		return model.TenantStatusActive, nil
+	case model.TenantStatusSuspended:
+		return model.TenantStatusSuspended, nil
+	case model.TenantStatusDisabled:
+		return model.TenantStatusDisabled, nil
+	default:
+		return "", fmt.Errorf("invalid tenant status: %s", status)
+	}
+}
+
+func normalizeOverCreditPolicy(policy string) string {
+	switch strings.ToLower(strings.TrimSpace(policy)) {
+	case "allow":
+		return "allow"
+	case "warn", "alert":
+		return "warn"
+	case "manual_review":
+		return "manual_review"
+	default:
+		return "block"
+	}
+}
+
 func CreateTenantWithDefaults(input TenantCreateInput, actorId int, ip string) (*model.Tenant, error) {
 	tenant := &model.Tenant{
 		Name:        input.Name,
@@ -128,6 +154,7 @@ func SetTenantBillingConfig(tenantId int, config *model.BillingConfig, actorId i
 	}
 	config.TenantId = tenantId
 	config.BillingMode = normalizeBillingMode(config.BillingMode)
+	config.OverCreditPolicy = normalizeOverCreditPolicy(config.OverCreditPolicy)
 	if err := model.UpsertBillingConfig(config); err != nil {
 		return err
 	}
@@ -379,8 +406,8 @@ func EnsureTenantCreditAvailable(tenantId int, quota int) error {
 	if err != nil {
 		return err
 	}
-	switch strings.ToLower(strings.TrimSpace(config.OverCreditPolicy)) {
-	case "allow", "alert", "manual_review":
+	switch normalizeOverCreditPolicy(config.OverCreditPolicy) {
+	case "allow", "warn", "manual_review":
 		return nil
 	}
 	account, err := model.GetCreditAccountByTenantId(tenantId)

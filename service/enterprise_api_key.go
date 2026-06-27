@@ -150,6 +150,28 @@ func enterpriseAPIKeyItem(record model.EnterpriseTokenRecord) dto.EnterpriseAPIK
 	}
 }
 
+func countEnterpriseAPIKeyRateLimitHits(filters model.EnterpriseTokenFilters, since int64) int64 {
+	query := model.LOG_DB.Model(&model.Log{}).
+		Where("type = ? AND created_at >= ? AND token_id > 0", model.LogTypeError, since).
+		Where("(other LIKE ? OR content LIKE ? OR content LIKE ? OR content LIKE ?)",
+			`%"status_code":429%`, "%rate limit%", "%Too Many Requests%", "%请求数限制%")
+
+	if filters.RestrictByManagerRole && filters.ManagerRole < common.RoleRootUser {
+		var tokenIds []int
+		if err := model.DB.Model(&model.Token{}).
+			Joins("LEFT JOIN users ON users.id = tokens.user_id").
+			Where("users.role < ? OR users.id = ?", filters.ManagerRole, filters.ManagerId).
+			Pluck("tokens.id", &tokenIds).Error; err != nil || len(tokenIds) == 0 {
+			return 0
+		}
+		query = query.Where("token_id IN ?", tokenIds)
+	}
+
+	var count int64
+	_ = query.Count(&count).Error
+	return count
+}
+
 func ListEnterpriseAPIKeys(filters model.EnterpriseTokenFilters, offset int, limit int) ([]dto.EnterpriseAPIKeyItem, int64, dto.EnterpriseAPIKeySummary, error) {
 	records, total, err := model.SearchEnterpriseTokens(filters, offset, limit)
 	if err != nil {
@@ -203,6 +225,7 @@ func ListEnterpriseAPIKeys(filters model.EnterpriseTokenFilters, offset int, lim
 	var quotaSum struct{ Value int64 }
 	_ = base.Select("COALESCE(SUM(used_quota), 0) AS value").Scan(&quotaSum).Error
 	summary.TotalUsedQuota = quotaSum.Value
+	summary.RateLimitHits = countEnterpriseAPIKeyRateLimitHits(filters, now-24*60*60)
 	return items, total, summary, nil
 }
 

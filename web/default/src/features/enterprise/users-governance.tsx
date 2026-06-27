@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -16,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import {
   Activity,
   Building2,
@@ -42,12 +43,22 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 
 import { EnterprisePanel, EnterpriseStatCard } from '@/components/enterprise'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableBody,
@@ -56,6 +67,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
+import { createUser } from '@/features/users/api'
 import { formatNumber } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 import { cn } from '@/lib/utils'
@@ -84,59 +97,66 @@ const ROLE_META: Record<
 > = {
   [ROLE.SUPER_ADMIN]: {
     label: '超级管理员',
-    shortLabel: 'Owner',
+    shortLabel: '所有者',
     className: 'border-violet-200 bg-violet-50 text-violet-700',
   },
   [ROLE.ADMIN]: {
     label: '管理员',
-    shortLabel: 'Admin',
+    shortLabel: '管理员',
     className: 'border-blue-200 bg-blue-50 text-blue-700',
   },
   [ROLE.USER]: {
     label: '普通用户',
-    shortLabel: 'User',
+    shortLabel: '成员',
     className: 'border-slate-200 bg-slate-50 text-slate-600',
   },
 }
 
 const ROLE_CARD_DEFS: Array<{
+  key: string
   label: string
   detail: string
   icon: LucideIcon
   tone: string
 }> = [
   {
-    label: 'Owner',
+    key: 'Owner',
+    label: '所有者',
     detail: '系统所有者',
     icon: ShieldCheck,
     tone: 'bg-blue-50 text-blue-600',
   },
   {
-    label: 'Admin',
+    key: 'Admin',
+    label: '管理员',
     detail: '管理员',
     icon: UserCog,
     tone: 'bg-violet-50 text-violet-600',
   },
   {
-    label: 'Finance',
+    key: 'Finance',
+    label: '财务',
     detail: '财务专员',
     icon: KeyRound,
     tone: 'bg-orange-50 text-orange-600',
   },
   {
-    label: 'Ops',
+    key: 'Ops',
+    label: '运维',
     detail: '运维人员',
     icon: ShieldAlert,
     tone: 'bg-rose-50 text-rose-600',
   },
   {
-    label: 'Developer',
+    key: 'Developer',
+    label: '开发',
     detail: '开发者',
     icon: UsersRound,
     tone: 'bg-sky-50 text-sky-600',
   },
   {
-    label: 'Viewer',
+    key: 'Viewer',
+    label: '只读',
     detail: '只读用户',
     icon: CircleOff,
     tone: 'bg-slate-50 text-slate-500',
@@ -144,9 +164,109 @@ const ROLE_CARD_DEFS: Array<{
 ]
 
 const PERMISSION_COLUMNS = ['Owner', 'Admin', 'Finance', 'Ops', 'Dev', 'Viewer']
+const PERMISSION_COLUMN_LABELS = [
+  '所有者',
+  '管理员',
+  '财务',
+  '运维',
+  '开发',
+  '只读',
+]
 
 const USERS_PANEL_CHROME =
   'border-slate-200/75 shadow-[0_1px_1px_rgb(15_23_42/0.025)]'
+
+const ORGANIZATION_IMPORT_TEMPLATE =
+  'username,display_name,email,password,role,group\n' +
+  'zhangsan,张三,zhangsan@example.com,Gang1022!,user,default\n' +
+  'lisi,李四,lisi@example.com,Gang1022!,admin,finance'
+
+type OrganizationImportRow = {
+  username: string
+  displayName: string
+  email: string
+  password: string
+  role: number
+  group: string
+}
+
+function splitCsvLine(line: string): string[] {
+  const cells: string[] = []
+  let current = ''
+  let quoted = false
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    const next = line[index + 1]
+
+    if (char === '"' && next === '"') {
+      current += '"'
+      index += 1
+      continue
+    }
+    if (char === '"') {
+      quoted = !quoted
+      continue
+    }
+    if ((char === ',' || char === '\t') && !quoted) {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+    current += char
+  }
+
+  cells.push(current.trim())
+  return cells
+}
+
+function parseImportRole(value: string): number {
+  const normalized = value.trim().toLowerCase()
+  if (['admin', '管理员', '10'].includes(normalized)) return ROLE.ADMIN
+  return ROLE.USER
+}
+
+function parseOrganizationImport(input: string): {
+  rows: OrganizationImportRow[]
+  errors: string[]
+} {
+  const lines = input
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const body =
+    lines[0]?.toLowerCase().includes('username') === true
+      ? lines.slice(1)
+      : lines
+  const rows: OrganizationImportRow[] = []
+  const errors: string[] = []
+
+  body.forEach((line, index) => {
+    const [username, displayName, email, password, role, group] =
+      splitCsvLine(line)
+    const rowNumber = index + 1
+
+    if (!username) {
+      errors.push(`第 ${rowNumber} 行缺少 username`)
+      return
+    }
+    if (!password || password.length < 8 || password.length > 20) {
+      errors.push(`第 ${rowNumber} 行密码需为 8-20 位`)
+      return
+    }
+
+    rows.push({
+      username,
+      displayName: displayName || username,
+      email: email || '',
+      password,
+      role: parseImportRole(role || 'user'),
+      group: group || 'default',
+    })
+  })
+
+  return { rows, errors }
+}
 
 function initials(user: EnterpriseUserItem): string {
   const name = user.display_name || user.username
@@ -234,6 +354,226 @@ function AuditRow(props: {
   )
 }
 
+function ImportOrganizationDialog(props: {
+  open: boolean
+  value: string
+  rows: OrganizationImportRow[]
+  errors: string[]
+  importing: boolean
+  onChange: (value: string) => void
+  onImport: () => void
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className='rounded-md sm:max-w-2xl'>
+        <DialogHeader>
+          <DialogTitle>导入组织成员</DialogTitle>
+          <DialogDescription className='text-xs leading-5'>
+            使用 CSV 或制表符格式批量创建成员，字段顺序为
+            username、display_name、email、password、role、group。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='space-y-3'>
+          <div className='flex items-center justify-between gap-3'>
+            <Label htmlFor='organization-import-csv' className='text-xs'>
+              导入内容
+            </Label>
+            <Button
+              type='button'
+              variant='outline'
+              className='h-7 rounded-md px-2 text-[11px]'
+              onClick={() => props.onChange(ORGANIZATION_IMPORT_TEMPLATE)}
+            >
+              使用模板
+            </Button>
+          </div>
+          <Textarea
+            id='organization-import-csv'
+            value={props.value}
+            onChange={(event) => props.onChange(event.target.value)}
+            className='min-h-44 rounded-md font-mono text-xs leading-5'
+            placeholder={ORGANIZATION_IMPORT_TEMPLATE}
+          />
+          <div className='grid gap-2 rounded-md border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 sm:grid-cols-3'>
+            <span>
+              可导入{' '}
+              <strong className='text-slate-950 tabular-nums'>
+                {props.rows.length}
+              </strong>{' '}
+              个成员
+            </span>
+            <span>
+              管理员{' '}
+              <strong className='text-slate-950 tabular-nums'>
+                {props.rows.filter((row) => row.role === ROLE.ADMIN).length}
+              </strong>{' '}
+              个
+            </span>
+            <span>
+              团队{' '}
+              <strong className='text-slate-950 tabular-nums'>
+                {new Set(props.rows.map((row) => row.group)).size}
+              </strong>{' '}
+              个
+            </span>
+          </div>
+          {props.errors.length > 0 && (
+            <div className='rounded-md border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-700'>
+              {props.errors.slice(0, 4).map((error) => (
+                <p key={error}>{error}</p>
+              ))}
+              {props.errors.length > 4 && (
+                <p>还有 {props.errors.length - 4} 个错误未展示</p>
+              )}
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            type='button'
+            variant='outline'
+            className='rounded-md'
+            onClick={() => props.onOpenChange(false)}
+          >
+            取消
+          </Button>
+          <Button
+            type='button'
+            className='rounded-md bg-blue-600 hover:bg-blue-700'
+            disabled={
+              props.importing ||
+              props.rows.length === 0 ||
+              props.errors.length > 0
+            }
+            onClick={props.onImport}
+          >
+            {props.importing ? '导入中...' : '开始导入'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function TeamGuideDialog(props: {
+  open: boolean
+  groups: EnterpriseUsersData['group_counts']
+  onOpenClassicUsers: () => void
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className='rounded-md sm:max-w-lg'>
+        <DialogHeader>
+          <DialogTitle>创建与维护团队</DialogTitle>
+          <DialogDescription className='text-xs leading-5'>
+            当前系统以用户分组作为团队来源。新团队会在成员被分配到新的 group
+            后自动出现在组织结构里。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='space-y-2'>
+          {props.groups.slice(0, 6).map((group) => (
+            <div
+              key={group.name}
+              className='flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-xs'
+            >
+              <span className='font-medium text-slate-800'>{group.name}</span>
+              <span className='text-slate-500 tabular-nums'>
+                {group.count} 人
+              </span>
+            </div>
+          ))}
+          {props.groups.length === 0 && (
+            <div className='rounded-md border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500'>
+              暂无团队分组
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            type='button'
+            variant='outline'
+            className='rounded-md'
+            onClick={() => props.onOpenChange(false)}
+          >
+            关闭
+          </Button>
+          <Button
+            type='button'
+            className='rounded-md bg-blue-600 hover:bg-blue-700'
+            onClick={() => {
+              props.onOpenClassicUsers()
+              props.onOpenChange(false)
+            }}
+          >
+            打开完整用户管理
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function RoleTemplatesDialog(props: {
+  open: boolean
+  counts: Record<string, number>
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className='rounded-md sm:max-w-2xl'>
+        <DialogHeader>
+          <DialogTitle>角色与权限模板</DialogTitle>
+          <DialogDescription className='text-xs leading-5'>
+            这里展示企业工作台的权限模板。系统内真实角色仍由用户角色和分组策略共同决定。
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-3'>
+          {ROLE_CARD_DEFS.map((role) => {
+            const Icon = role.icon
+            return (
+              <div
+                key={role.label}
+                className='rounded-md border border-slate-200 bg-white p-3'
+              >
+                <div className='flex items-center gap-2'>
+                  <span
+                    className={cn(
+                      'flex size-8 items-center justify-center rounded-md',
+                      role.tone
+                    )}
+                  >
+                    <Icon className='size-4' />
+                  </span>
+                  <div>
+                    <p className='text-sm font-semibold text-slate-900'>
+                      {role.label}
+                    </p>
+                    <p className='text-xs text-slate-500'>{role.detail}</p>
+                  </div>
+                </div>
+                <p className='mt-3 text-xs text-slate-600'>
+                  当前 {formatNumber(props.counts[role.label] ?? 0)} 人
+                </p>
+              </div>
+            )
+          })}
+        </div>
+        <DialogFooter>
+          <Button
+            type='button'
+            className='rounded-md'
+            onClick={() => props.onOpenChange(false)}
+          >
+            知道了
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function EnterpriseUsersGovernance(props: {
   actions?: ReactNode
   classicTable?: ReactNode
@@ -242,6 +582,12 @@ export function EnterpriseUsersGovernance(props: {
   const [search, setSearch] = useState('')
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [showClassicUsers, setShowClassicUsers] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [teamGuideOpen, setTeamGuideOpen] = useState(false)
+  const [roleTemplatesOpen, setRoleTemplatesOpen] = useState(false)
+  const queryClient = useQueryClient()
   const usersQuery = useQuery({
     queryKey: ['enterprise-users', 250],
     queryFn: () => getEnterpriseUsers({ limit: 250 }),
@@ -250,6 +596,10 @@ export function EnterpriseUsersGovernance(props: {
 
   const data = usersQuery.data?.data ?? EMPTY_USERS
   const summary = data.summary
+  const parsedImport = useMemo(
+    () => parseOrganizationImport(importText),
+    [importText]
+  )
   const filteredUsers = useMemo(() => {
     const keyword = search.trim().toLowerCase()
     return data.users.filter((user) => {
@@ -287,6 +637,63 @@ export function EnterpriseUsersGovernance(props: {
     Viewer: summary.disabled_users,
   }
 
+  const openClassicUsers = () => setShowClassicUsers(true)
+
+  const handleImportOrganization = async () => {
+    if (parsedImport.rows.length === 0 || parsedImport.errors.length > 0) {
+      toast.error('请先修正导入内容')
+      return
+    }
+
+    setImporting(true)
+    let successCount = 0
+    const failedMessages: string[] = []
+
+    for (const row of parsedImport.rows) {
+      try {
+        const result = await createUser({
+          username: row.username,
+          display_name: row.displayName,
+          email: row.email,
+          password: row.password,
+          role: row.role,
+          group: row.group,
+        })
+        if (result.success) {
+          successCount += 1
+        } else {
+          failedMessages.push(
+            `${row.username}: ${result.message || '创建失败'}`
+          )
+        }
+      } catch (error) {
+        failedMessages.push(
+          `${row.username}: ${error instanceof Error ? error.message : '请求失败'}`
+        )
+      }
+    }
+
+    setImporting(false)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['enterprise-users'] }),
+      queryClient.invalidateQueries({ queryKey: ['users'] }),
+    ])
+    void usersQuery.refetch()
+
+    if (failedMessages.length === 0) {
+      toast.success(`已导入 ${successCount} 个成员`)
+      setImportOpen(false)
+      setImportText('')
+      return
+    }
+
+    toast.error(
+      `已导入 ${successCount} 个成员，失败 ${failedMessages.length} 个：${failedMessages
+        .slice(0, 2)
+        .join('；')}`
+    )
+  }
+
   return (
     <div className='enterprise-users-governance mx-auto max-w-[1586px] space-y-2 bg-[#f6f8fb] pb-2 text-slate-950'>
       <header className='flex flex-col gap-1.5 px-1 pt-0.5 sm:flex-row sm:items-center sm:justify-between'>
@@ -302,6 +709,7 @@ export function EnterpriseUsersGovernance(props: {
           <Button
             variant='outline'
             className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
+            onClick={() => setImportOpen(true)}
           >
             <Upload className='size-3.5' />
             导入组织
@@ -385,7 +793,7 @@ export function EnterpriseUsersGovernance(props: {
         />
       </section>
 
-      <section className='grid items-start gap-2 xl:grid-cols-[230px_minmax(0,1fr)_380px]'>
+      <section className='grid items-start gap-2 xl:grid-cols-[220px_minmax(0,1fr)_380px]'>
         <EnterprisePanel
           className={cn('h-full', USERS_PANEL_CHROME)}
           title='组织结构'
@@ -444,6 +852,7 @@ export function EnterpriseUsersGovernance(props: {
           <Button
             variant='outline'
             className='mt-2 h-8 w-full rounded-md border-slate-200 bg-white text-xs shadow-none'
+            onClick={() => setTeamGuideOpen(true)}
           >
             <UserPlus className='size-3.5' />
             创建团队
@@ -454,22 +863,24 @@ export function EnterpriseUsersGovernance(props: {
           className={cn('h-full', USERS_PANEL_CHROME)}
           title={
             activeGroup === 'all'
-              ? `Platform Team (${filteredUsers.length})`
+              ? `平台团队 (${filteredUsers.length})`
               : `${activeGroup} (${filteredUsers.length})`
           }
           description='选择成员后可查看权限与资产概况'
-          bodyClassName='flex min-h-[342px] flex-col p-0'
+          bodyClassName='flex min-h-[384px] flex-col p-0'
           action={
             <div className='flex items-center gap-1.5'>
               <Button
                 variant='outline'
                 className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] shadow-none'
+                onClick={openClassicUsers}
               >
                 分配角色
               </Button>
               <Button
                 variant='outline'
                 className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] shadow-none'
+                onClick={openClassicUsers}
               >
                 批量操作
               </Button>
@@ -477,20 +888,24 @@ export function EnterpriseUsersGovernance(props: {
           }
         >
           <div className='min-h-0 flex-1 overflow-x-auto'>
-            <Table className='text-[11px] [&_td]:h-8 [&_td]:py-1 [&_td]:text-[11px] [&_td_*]:text-[11px] [&_th]:h-7 [&_th]:text-[11px]'>
+            <Table className='w-full table-fixed text-[11px] [&_td]:h-8 [&_td]:px-1.5 [&_td]:py-1 [&_td]:text-[11px] [&_td_*]:text-[11px] [&_th]:h-7 [&_th]:px-1.5 [&_th]:text-[11px]'>
               <TableHeader className='bg-slate-50'>
                 <TableRow>
-                  <TableHead className='w-8'>
+                  <TableHead className='w-7'>
                     <span className='sr-only'>选择</span>
                   </TableHead>
-                  <TableHead className='min-w-40'>姓名</TableHead>
-                  <TableHead className='min-w-36'>邮箱</TableHead>
-                  <TableHead className='min-w-28'>部门</TableHead>
-                  <TableHead className='min-w-24'>角色</TableHead>
-                  <TableHead className='text-right'>API 权限</TableHead>
-                  <TableHead className='min-w-24'>最近活跃</TableHead>
-                  <TableHead>MFA</TableHead>
-                  <TableHead>状态</TableHead>
+                  <TableHead className='w-[132px]'>姓名</TableHead>
+                  <TableHead className='w-[138px]'>
+                    邮箱
+                  </TableHead>
+                  <TableHead className='w-[92px]'>部门</TableHead>
+                  <TableHead className='w-[72px]'>角色</TableHead>
+                  <TableHead className='w-[66px] text-right'>API 权限</TableHead>
+                  <TableHead className='w-[68px]'>
+                    最近活跃
+                  </TableHead>
+                  <TableHead className='w-9'>MFA</TableHead>
+                  <TableHead className='w-14'>状态</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -533,10 +948,10 @@ export function EnterpriseUsersGovernance(props: {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className='max-w-36 truncate text-slate-600'>
+                      <TableCell className='truncate text-slate-600'>
                         {user.email || user.username}
                       </TableCell>
-                      <TableCell className='text-slate-600'>
+                      <TableCell className='truncate text-slate-600'>
                         {user.group || '默认分组'}
                       </TableCell>
                       <TableCell>
@@ -600,6 +1015,7 @@ export function EnterpriseUsersGovernance(props: {
               <Button
                 variant='link'
                 className='h-6 px-0 text-[11px] font-semibold text-blue-600'
+                onClick={() => setRoleTemplatesOpen(true)}
               >
                 查看全部角色
                 <ChevronRight className='size-3' />
@@ -611,7 +1027,7 @@ export function EnterpriseUsersGovernance(props: {
                 const Icon = role.icon
                 return (
                   <div
-                    key={role.label}
+                    key={role.key}
                     className='rounded-md border border-slate-200/80 bg-white p-2'
                   >
                     <div className='flex items-center gap-1.5'>
@@ -633,7 +1049,7 @@ export function EnterpriseUsersGovernance(props: {
                       </div>
                     </div>
                     <p className='mt-1.5 text-xs text-slate-600 tabular-nums'>
-                      {formatNumber(roleCardCounts[role.label] ?? 0)} 人
+                      {formatNumber(roleCardCounts[role.key] ?? 0)} 人
                     </p>
                   </div>
                 )
@@ -648,21 +1064,20 @@ export function EnterpriseUsersGovernance(props: {
                   <TableHeader className='bg-slate-50'>
                     <TableRow>
                       <TableHead className='w-[78px]'>模块</TableHead>
-                      <TableHead className='text-center'>Owner</TableHead>
-                      <TableHead className='text-center'>Admin</TableHead>
-                      <TableHead className='text-center'>Finance</TableHead>
-                      <TableHead className='text-center'>Ops</TableHead>
-                      <TableHead className='text-center'>Dev</TableHead>
-                      <TableHead className='text-center'>Viewer</TableHead>
+                      {PERMISSION_COLUMN_LABELS.map((label) => (
+                        <TableHead key={label} className='text-center'>
+                          {label}
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {[
-                      ['API Keys', true, true, true, true, true, false],
-                      ['Channels', true, true, false, true, true, true],
-                      ['Token Router', true, true, false, true, true, false],
-                      ['Billing', true, true, true, false, false, false],
-                      ['System', true, true, false, false, false, false],
+                      ['API 密钥', true, true, true, true, true, false],
+                      ['渠道管理', true, true, false, true, true, true],
+                      ['路由控制', true, true, false, true, true, false],
+                      ['计费结算', true, true, true, false, false, false],
+                      ['系统设置', true, true, false, false, false, false],
                     ].map((row) => (
                       <TableRow
                         key={String(row[0])}
@@ -703,6 +1118,12 @@ export function EnterpriseUsersGovernance(props: {
             <Button
               variant='link'
               className='h-6 px-0 text-[11px] font-semibold text-blue-600'
+              render={
+                <Link
+                  to='/system-settings/auth/$section'
+                  params={{ section: 'custom-oauth' }}
+                />
+              }
             >
               配置
               <ChevronRight className='size-3' />
@@ -767,6 +1188,12 @@ export function EnterpriseUsersGovernance(props: {
             <Button
               variant='link'
               className='h-6 px-0 text-[11px] font-semibold text-blue-600'
+              render={
+                <Link
+                  to='/usage-logs/$section'
+                  params={{ section: 'common' }}
+                />
+              }
             >
               查看审计日志
               <ChevronRight className='size-3' />
@@ -810,6 +1237,7 @@ export function EnterpriseUsersGovernance(props: {
             <Button
               variant='link'
               className='h-6 px-0 text-[11px] font-semibold text-blue-600'
+              onClick={openClassicUsers}
             >
               查看报告
               <ChevronRight className='size-3' />
@@ -834,7 +1262,7 @@ export function EnterpriseUsersGovernance(props: {
               },
               {
                 icon: ShieldCheck,
-                label: '高权限账号（Owner/Admin）',
+                label: '高权限账号（所有者/管理员）',
                 value: summary.admin_users,
                 badge: '正常',
                 danger: false,
@@ -875,6 +1303,28 @@ export function EnterpriseUsersGovernance(props: {
           </div>
         </EnterprisePanel>
       </section>
+
+      <ImportOrganizationDialog
+        open={importOpen}
+        value={importText}
+        rows={parsedImport.rows}
+        errors={parsedImport.errors}
+        importing={importing}
+        onChange={setImportText}
+        onImport={handleImportOrganization}
+        onOpenChange={setImportOpen}
+      />
+      <TeamGuideDialog
+        open={teamGuideOpen}
+        groups={data.group_counts}
+        onOpenClassicUsers={openClassicUsers}
+        onOpenChange={setTeamGuideOpen}
+      />
+      <RoleTemplatesDialog
+        open={roleTemplatesOpen}
+        counts={roleCardCounts}
+        onOpenChange={setRoleTemplatesOpen}
+      />
 
       {props.classicTable && showClassicUsers && (
         <EnterprisePanel

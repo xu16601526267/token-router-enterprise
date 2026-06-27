@@ -69,12 +69,12 @@ interface PlaygroundInputProps {
 }
 
 const suggestions = [
-  { icon: BarChartIcon, text: 'Analyze data', color: '#76d0eb' },
-  { icon: BoxIcon, text: 'Surprise me', color: '#76d0eb' },
-  { icon: NotepadTextIcon, text: 'Summarize text', color: '#ea8444' },
-  { icon: CodeSquareIcon, text: 'Code', color: '#6c71ff' },
-  { icon: GraduationCapIcon, text: 'Get advice', color: '#76d0eb' },
-  { icon: null, text: 'More' },
+  { icon: BarChartIcon, text: '分析调用数据', color: '#2563eb' },
+  { icon: BoxIcon, text: '生成测试样例', color: '#16a34a' },
+  { icon: NotepadTextIcon, text: '总结文本', color: '#f59e0b' },
+  { icon: CodeSquareIcon, text: '编写代码', color: '#8b5cf6' },
+  { icon: GraduationCapIcon, text: '给出建议', color: '#2563eb' },
+  { icon: null, text: '更多' },
 ]
 
 export function PlaygroundInput({
@@ -114,73 +114,76 @@ export function PlaygroundInput({
   }
 
   return (
-    <div className='grid shrink-0 gap-4 px-1 md:pb-4'>
-      <PromptInput groupClassName='rounded-xl' onSubmit={handleSubmit}>
+    <div className='grid shrink-0 gap-3 px-1 md:pb-4'>
+      <PromptInput
+        groupClassName='rounded-md border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+        onSubmit={handleSubmit}
+      >
         <PromptInputTextarea
           autoComplete='off'
           autoCorrect='off'
           autoCapitalize='off'
           spellCheck={false}
-          className='px-5 md:text-base'
+          className='px-4 text-[13px] md:text-sm'
           disabled={disabled}
           onChange={(event) => setText(event.target.value)}
-          placeholder={t('Ask anything')}
+          placeholder={t('输入测试消息')}
           value={text}
         />
 
-        <PromptInputFooter className='p-2.5'>
+        <PromptInputFooter className='p-2'>
           <PromptInputTools>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <PromptInputButton
-                    className='border font-medium'
+                    className='h-8 rounded-md border border-slate-200 text-[12px] font-medium'
                     disabled={disabled}
                     variant='outline'
                   />
                 }
               >
                 <PaperclipIcon size={16} />
-                <span className='hidden sm:inline'>{t('Attach')}</span>
-                <span className='sr-only sm:hidden'>{t('Attach')}</span>
+                <span className='hidden sm:inline'>{t('附件')}</span>
+                <span className='sr-only sm:hidden'>{t('附件')}</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='start'>
                 <DropdownMenuItem
                   onClick={() => handleFileAction('upload-file')}
                 >
                   <FileIcon className='mr-2' size={16} />
-                  {t('Upload file')}
+                  {t('上传文件')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleFileAction('upload-photo')}
                 >
                   <ImageIcon className='mr-2' size={16} />
-                  {t('Upload photo')}
+                  {t('上传图片')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleFileAction('take-screenshot')}
                 >
                   <ScreenShareIcon className='mr-2' size={16} />
-                  {t('Take screenshot')}
+                  {t('截取屏幕')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => handleFileAction('take-photo')}
                 >
                   <CameraIcon className='mr-2' size={16} />
-                  {t('Take photo')}
+                  {t('拍照')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
             <PromptInputButton
-              className='border font-medium'
+              className='h-8 rounded-md border border-slate-200 text-[12px] font-medium'
               disabled={disabled}
-              onClick={() => toast.info(t('Search feature in development'))}
+              onClick={() => toast.info(t('搜索能力开发中'))}
               variant='outline'
             >
               <GlobeIcon size={16} />
-              <span className='hidden sm:inline'>{t('Search')}</span>
-              <span className='sr-only sm:hidden'>{t('Search')}</span>
+              <span className='hidden sm:inline'>{t('搜索')}</span>
+              <span className='sr-only sm:hidden'>{t('搜索')}</span>
             </PromptInputButton>
           </PromptInputTools>
 
@@ -197,24 +200,24 @@ export function PlaygroundInput({
 
             {isGenerating && onStop ? (
               <PromptInputButton
-                className='text-foreground font-medium'
+                className='h-8 rounded-md text-[12px] font-medium'
                 onClick={onStop}
                 variant='secondary'
               >
                 <SquareIcon className='fill-current' size={16} />
-                <span className='hidden sm:inline'>{t('Stop')}</span>
-                <span className='sr-only sm:hidden'>{t('Stop')}</span>
+                <span className='hidden sm:inline'>{t('停止')}</span>
+                <span className='sr-only sm:hidden'>{t('停止')}</span>
               </PromptInputButton>
             ) : (
               <PromptInputButton
-                className='text-foreground font-medium'
+                className='h-8 rounded-md text-[12px] font-medium'
                 disabled={disabled || !text.trim()}
                 type='submit'
                 variant='secondary'
               >
                 <SendIcon size={16} />
-                <span className='hidden sm:inline'>{t('Send')}</span>
-                <span className='sr-only sm:hidden'>{t('Send')}</span>
+                <span className='hidden sm:inline'>{t('发送')}</span>
+                <span className='sr-only sm:hidden'>{t('发送')}</span>
               </PromptInputButton>
             )}
           </div>
@@ -225,7 +228,7 @@ export function PlaygroundInput({
         {suggestions.map(({ icon: Icon, text, color }) => (
           <Suggestion
             className={`text-xs font-normal sm:text-sm ${
-              text === 'More' ? 'hidden sm:flex' : ''
+              text === '更多' ? 'hidden sm:flex' : ''
             }`}
             key={text}
             onClick={() => handleSuggestionClick(text)}

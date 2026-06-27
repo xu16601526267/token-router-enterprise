@@ -98,17 +98,17 @@ export function AccountBindingsTab({
       const res = await unbindCustomOAuth(unbindTarget.provider_id)
       if (res.success) {
         toast.success(
-          t('Unbound {{provider}}', {
+          t('已解绑 {{provider}}', {
             provider: unbindTarget.provider_name,
           })
         )
         await fetchCustomBindings()
         onUpdate()
       } else {
-        toast.error(res.message || t('Unbind failed'))
+        toast.error(res.message || t('解绑失败'))
       }
     } catch {
-      toast.error(t('Unbind failed'))
+      toast.error(t('解绑失败'))
     } finally {
       setUnbinding(false)
       setUnbindTarget(null)
@@ -155,7 +155,7 @@ export function AccountBindingsTab({
     return [
       {
         id: 'email',
-        label: t('Email'),
+        label: t('邮箱'),
         icon: Mail,
         value: profile.email,
         isBound: Boolean(profile.email),
@@ -269,10 +269,10 @@ export function AccountBindingsTab({
         {bindings.map((binding) => (
           <div
             key={binding.id}
-            className='flex items-center justify-between gap-2.5 rounded-lg border p-2.5 sm:gap-3 sm:p-3'
+            className='flex items-center justify-between gap-2.5 rounded-md border border-slate-200 bg-white p-2.5 sm:gap-3'
           >
             <div className='flex min-w-0 items-center gap-2.5 sm:gap-3'>
-              <div className='bg-muted shrink-0 rounded-md p-1.5 sm:p-2'>
+              <div className='shrink-0 rounded-md bg-slate-50 p-1.5 text-slate-600 ring-1 ring-slate-100 sm:p-2'>
                 <binding.icon className='h-4 w-4' />
               </div>
               <div className='min-w-0'>
@@ -280,14 +280,14 @@ export function AccountBindingsTab({
                   <p className='text-sm font-medium'>{binding.label}</p>
                   {binding.isBound && (
                     <StatusBadge
-                      label={t('Bound')}
+                      label={t('已绑定')}
                       variant='success'
                       copyable={false}
                     />
                   )}
                 </div>
-                <p className='text-muted-foreground truncate text-xs'>
-                  {binding.value || t('Not bound')}
+                <p className='truncate text-xs text-slate-500'>
+                  {binding.value || t('未绑定')}
                 </p>
               </div>
             </div>
@@ -299,10 +299,10 @@ export function AccountBindingsTab({
               disabled={binding.isBound && binding.id !== 'email'}
             >
               {binding.isBound
-                ? binding.id === 'email'
-                  ? t('Change')
-                  : t('Bound')
-                : t('Bind')}
+                  ? binding.id === 'email'
+                  ? t('更换')
+                  : t('已绑定')
+                : t('绑定')}
             </Button>
           </div>
         ))}
@@ -313,7 +313,7 @@ export function AccountBindingsTab({
         <>
           <Separator className='my-4' />
           <p className='text-muted-foreground mb-3 text-sm font-medium'>
-            {t('Custom OAuth')}
+            {t('自定义 OAuth')}
           </p>
           <div className='grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3'>
             {customProviders.map((provider) => {
@@ -324,10 +324,10 @@ export function AccountBindingsTab({
               return (
                 <div
                   key={provider.id}
-                  className='flex items-center justify-between gap-2.5 rounded-lg border p-2.5 sm:gap-3 sm:p-3'
+                  className='flex items-center justify-between gap-2.5 rounded-md border border-slate-200 bg-white p-2.5 sm:gap-3'
                 >
                   <div className='flex min-w-0 items-center gap-2.5 sm:gap-3'>
-                    <div className='bg-muted shrink-0 rounded-md p-1.5 sm:p-2'>
+                    <div className='shrink-0 rounded-md bg-slate-50 p-1.5 text-slate-600 ring-1 ring-slate-100 sm:p-2'>
                       <Link2 className='h-4 w-4' />
                     </div>
                     <div className='min-w-0'>
@@ -335,7 +335,7 @@ export function AccountBindingsTab({
                         <p className='text-sm font-medium'>{provider.name}</p>
                         {isBound && (
                           <StatusBadge
-                            label={t('Bound')}
+                            label={t('已绑定')}
                             variant='success'
                             copyable={false}
                           />
@@ -343,8 +343,8 @@ export function AccountBindingsTab({
                       </div>
                       <p className='text-muted-foreground truncate text-xs'>
                         {isBound
-                          ? binding?.external_id || t('Bound')
-                          : t('Not bound')}
+                          ? binding?.external_id || t('已绑定')
+                          : t('未绑定')}
                       </p>
                     </div>
                   </div>
@@ -356,7 +356,7 @@ export function AccountBindingsTab({
                       onClick={() => setUnbindTarget(binding)}
                     >
                       <Unlink className='mr-1 h-3 w-3' />
-                      {t('Unbind')}
+                      {t('解绑')}
                     </Button>
                   ) : (
                     <Button
@@ -365,7 +365,7 @@ export function AccountBindingsTab({
                       className='h-7 shrink-0 px-2.5 text-xs'
                       onClick={() => handleBindCustomOAuth(provider)}
                     >
-                      {t('Bind')}
+                      {t('绑定')}
                     </Button>
                   )}
                 </div>
@@ -379,14 +379,14 @@ export function AccountBindingsTab({
       <ConfirmDialog
         open={!!unbindTarget}
         onOpenChange={(open) => !open && setUnbindTarget(null)}
-        title={t('Confirm Unbind')}
+        title={t('确认解绑')}
         desc={t(
-          'Are you sure you want to unbind {{provider}}? You will no longer be able to log in via this method.',
+          '确定要解绑 {{provider}} 吗？解绑后将无法继续通过该方式登录。',
           {
             provider: unbindTarget?.provider_name || '',
           }
         )}
-        confirmText={t('Confirm Unbind')}
+        confirmText={t('确认解绑')}
         destructive
         handleConfirm={handleUnbindCustom}
         isLoading={unbinding}

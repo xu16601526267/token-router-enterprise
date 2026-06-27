@@ -170,6 +170,20 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
   })
 
   const isCommon = logCategory === 'common'
+  const emptyTitle =
+    logCategory === 'drawing'
+      ? '暂无绘图任务'
+      : logCategory === 'task'
+        ? '暂无异步任务'
+        : t('No Logs Found')
+  const emptyDescription =
+    logCategory === 'drawing'
+      ? '绘图任务提交后会出现在这里，可按任务 ID、渠道和时间范围排查。'
+      : logCategory === 'task'
+        ? '音乐、视频等异步生成任务提交后会出现在这里。'
+        : t(
+            'No usage logs available. Logs will appear here once API calls are made.'
+          )
 
   return (
     <DataTablePage
@@ -177,10 +191,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       columns={columns as ColumnDef<Record<string, unknown>>[]}
       isLoading={isLoadingData}
       isFetching={isFetching}
-      emptyTitle={t('No Logs Found')}
-      emptyDescription={t(
-        'No usage logs available. Logs will appear here once API calls are made.'
-      )}
+      emptyTitle={emptyTitle}
+      emptyDescription={emptyDescription}
       skeletonKeyPrefix='usage-log-skeleton'
       applyHeaderSize
       tableClassName={cn(

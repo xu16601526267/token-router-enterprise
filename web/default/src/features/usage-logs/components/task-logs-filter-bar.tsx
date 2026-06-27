@@ -20,7 +20,6 @@ import { useQueryClient, useIsFetching } from '@tanstack/react-query'
 import { useNavigate, getRouteApi } from '@tanstack/react-router'
 import type { Table } from '@tanstack/react-table'
 import { useState, useEffect, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { useIsAdmin } from '@/hooks/use-admin'
 
@@ -66,7 +65,6 @@ function setFilterValue(
 }
 
 export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const searchParams = route.useSearch()
@@ -163,8 +161,8 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const filterValue = getFilterValue(filters, props.logCategory)
   const placeholder =
     props.logCategory === 'drawing'
-      ? t('Filter by MjProxy task ID')
-      : t('Filter by task ID')
+      ? '搜索绘图任务 ID'
+      : '搜索异步任务 ID'
   const hasAdditionalFilters = !!filterValue || !!filters.channel
   const dateRangeFilter = (
     <LogsFilterField wide>
@@ -181,7 +179,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const taskIdFilter = (
     <LogsFilterField>
       <LogsFilterInput
-        aria-label={t('Task ID')}
+        aria-label='任务 ID'
         placeholder={placeholder}
         value={filterValue}
         onChange={(e) => handleFilterChange(e.target.value)}
@@ -192,7 +190,7 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
   const channelFilter = isAdmin ? (
     <LogsFilterField>
       <LogsFilterInput
-        placeholder={t('Channel ID')}
+        placeholder='渠道 ID'
         value={filters.channel || ''}
         onChange={(e) => handleChange('channel', e.target.value)}
         onKeyDown={handleKeyDown}

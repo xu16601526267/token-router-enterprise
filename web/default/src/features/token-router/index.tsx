@@ -7278,48 +7278,28 @@ export function TokenRouter() {
               {activeTab !== 'control-tower' && (
                 <div className='min-w-0 overflow-x-auto pb-1'>
                   <TabsList className='inline-flex w-max max-w-none flex-nowrap justify-start group-data-horizontal/tabs:h-auto [&_[data-slot=tabs-trigger]]:flex-none'>
-                <TabsTrigger value='control-tower'>控制塔</TabsTrigger>
-                <TabsTrigger value='overview'>{t('Overview')}</TabsTrigger>
-                <TabsTrigger value='suppliers'>{t('Suppliers')}</TabsTrigger>
-                <TabsTrigger value='quality'>{t('Quality')}</TabsTrigger>
-                <TabsTrigger value='capacity'>
-                  {t('Supply Capacity')}
-                </TabsTrigger>
-                <TabsTrigger value='cost-profiles'>
-                  {t('Cost Profiles')}
-                </TabsTrigger>
-                <TabsTrigger value='prepaid-lots'>
-                  {t('Prepaid Lots')}
-                </TabsTrigger>
-                <TabsTrigger value='profiles'>
-                  {t('Traffic Profiles')}
-                </TabsTrigger>
-                <TabsTrigger value='forecasts'>{t('Forecasts')}</TabsTrigger>
-                <TabsTrigger value='pricing'>{t('Pricing')}</TabsTrigger>
-                <TabsTrigger value='insights'>
-                  {t('Operating Insights')}
-                </TabsTrigger>
-                <TabsTrigger value='sla-evidence'>
-                  {t('SLA Evidence')}
-                </TabsTrigger>
-                <TabsTrigger value='scorecards'>{t('Scorecards')}</TabsTrigger>
-                <TabsTrigger value='evaluations'>
-                  {t('Evaluations')}
-                </TabsTrigger>
-                <TabsTrigger value='posture'>{t('Posture')}</TabsTrigger>
-                <TabsTrigger value='decisions'>{t('Decisions')}</TabsTrigger>
-                <TabsTrigger value='opportunities'>
-                  {t('Opportunities')}
-                </TabsTrigger>
-                <TabsTrigger value='actions'>{t('Action Plans')}</TabsTrigger>
-                <TabsTrigger value='executions'>{t('Executions')}</TabsTrigger>
-                <TabsTrigger value='routing'>
-                  {t('Routing Policies')}
-                </TabsTrigger>
-                <TabsTrigger value='ledger'>{t('Usage Ledger')}</TabsTrigger>
-                <TabsTrigger value='settlements'>
-                  {t('Settlements')}
-                </TabsTrigger>
+                    <TabsTrigger value='control-tower'>控制塔</TabsTrigger>
+                    <TabsTrigger value='overview'>总览</TabsTrigger>
+                    <TabsTrigger value='suppliers'>供应商</TabsTrigger>
+                    <TabsTrigger value='quality'>质量</TabsTrigger>
+                    <TabsTrigger value='capacity'>供给容量</TabsTrigger>
+                    <TabsTrigger value='cost-profiles'>成本档案</TabsTrigger>
+                    <TabsTrigger value='prepaid-lots'>预付批次</TabsTrigger>
+                    <TabsTrigger value='profiles'>流量画像</TabsTrigger>
+                    <TabsTrigger value='forecasts'>预测</TabsTrigger>
+                    <TabsTrigger value='pricing'>定价</TabsTrigger>
+                    <TabsTrigger value='insights'>运营洞察</TabsTrigger>
+                    <TabsTrigger value='sla-evidence'>SLA 证据</TabsTrigger>
+                    <TabsTrigger value='scorecards'>评分卡</TabsTrigger>
+                    <TabsTrigger value='evaluations'>评估</TabsTrigger>
+                    <TabsTrigger value='posture'>供应状态</TabsTrigger>
+                    <TabsTrigger value='decisions'>决策</TabsTrigger>
+                    <TabsTrigger value='opportunities'>机会</TabsTrigger>
+                    <TabsTrigger value='actions'>行动计划</TabsTrigger>
+                    <TabsTrigger value='executions'>执行记录</TabsTrigger>
+                    <TabsTrigger value='routing'>路由策略</TabsTrigger>
+                    <TabsTrigger value='ledger'>用量账本</TabsTrigger>
+                    <TabsTrigger value='settlements'>结算</TabsTrigger>
                   </TabsList>
                 </div>
               )}
@@ -7332,29 +7312,18 @@ export function TokenRouter() {
                   nav={
                     <div className='min-w-0 overflow-x-auto border-b border-slate-200'>
                       <TabsList
-                        variant='line'
-                        className='inline-flex w-max max-w-none flex-nowrap justify-start rounded-none p-0 [&_[data-slot=tabs-trigger]]:h-9 [&_[data-slot=tabs-trigger]]:flex-none [&_[data-slot=tabs-trigger]]:px-4'
+                        className='inline-flex h-10 w-max max-w-none flex-nowrap justify-start gap-1 rounded-none bg-transparent p-0 [&_[data-slot=tabs-trigger]]:h-8 [&_[data-slot=tabs-trigger]]:flex-none [&_[data-slot=tabs-trigger]]:rounded-md [&_[data-slot=tabs-trigger]]:px-3.5 [&_[data-slot=tabs-trigger]]:text-[13px] [&_[data-slot=tabs-trigger]]:font-medium [&_[data-slot=tabs-trigger][data-active]]:bg-blue-50 [&_[data-slot=tabs-trigger][data-active]]:text-blue-600 [&_[data-slot=tabs-trigger][data-active]]:shadow-none'
                       >
                         <TabsTrigger value='control-tower'>
                           流量画像
                         </TabsTrigger>
-                        <TabsTrigger value='forecasts'>
-                          {t('Forecasts')}
-                        </TabsTrigger>
-                        <TabsTrigger value='pricing'>{t('Pricing')}</TabsTrigger>
-                        <TabsTrigger value='insights'>
-                          {t('Operating Insights')}
-                        </TabsTrigger>
+                        <TabsTrigger value='forecasts'>预测</TabsTrigger>
+                        <TabsTrigger value='pricing'>定价</TabsTrigger>
+                        <TabsTrigger value='insights'>运营洞察</TabsTrigger>
                         <TabsTrigger value='sla-evidence'>SLA</TabsTrigger>
-                        <TabsTrigger value='decisions'>
-                          {t('Decisions')}
-                        </TabsTrigger>
-                        <TabsTrigger value='actions'>
-                          {t('Action Plans')}
-                        </TabsTrigger>
-                        <TabsTrigger value='executions'>
-                          {t('Executions')}
-                        </TabsTrigger>
+                        <TabsTrigger value='decisions'>决策</TabsTrigger>
+                        <TabsTrigger value='actions'>行动计划</TabsTrigger>
+                        <TabsTrigger value='executions'>执行记录</TabsTrigger>
                       </TabsList>
                     </div>
                   }

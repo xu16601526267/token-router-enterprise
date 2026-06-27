@@ -56,6 +56,13 @@ import { toast } from 'sonner'
 import { EnterprisePanel, EnterpriseStatCard } from '@/components/enterprise'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
@@ -89,6 +96,7 @@ import type {
   EnterpriseUsageAnalyticsData,
   EnterpriseUsageBreakdownItem,
   EnterpriseUsageLogItem,
+  EnterpriseUsageTrendPoint,
 } from './types'
 
 const EMPTY_USAGE: EnterpriseUsageAnalyticsData = {
@@ -167,6 +175,15 @@ function formatDate(timestamp: number): string {
   }).format(timestamp * 1000)
 }
 
+function formatFullDate(timestamp: number): string {
+  if (timestamp <= 0) return '-'
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(timestamp * 1000)
+}
+
 function formatDateTime(timestamp: number): string {
   if (timestamp <= 0) return '-'
   return new Intl.DateTimeFormat('zh-CN', {
@@ -215,6 +232,104 @@ function formatRequestType(value: string) {
   return REQUEST_TYPE_LABELS[value] ?? '对话'
 }
 
+function getBucketSeconds(granularity: TimeGranularity) {
+  if (granularity === 'hour') return 60 * 60
+  if (granularity === 'week') return 7 * 24 * 60 * 60
+  return 24 * 60 * 60
+}
+
+function getBucketStart(timestamp: number, granularity: TimeGranularity) {
+  const date = new Date(timestamp * 1000)
+  if (granularity === 'hour') {
+    date.setMinutes(0, 0, 0)
+  } else if (granularity === 'week') {
+    date.setHours(0, 0, 0, 0)
+    const day = date.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    date.setDate(date.getDate() + diff)
+  } else {
+    date.setHours(0, 0, 0, 0)
+  }
+  return Math.floor(date.getTime() / 1000)
+}
+
+function createEmptyTrendPoint(timestamp: number): EnterpriseUsageTrendPoint {
+  return {
+    timestamp,
+    requests: 0,
+    errors: 0,
+    prompt_tokens: 0,
+    completion_tokens: 0,
+    quota: 0,
+    average_latency_ms: 0,
+    cache_hit_rate: 0,
+  }
+}
+
+function mergeTrendPoint(
+  current: EnterpriseUsageTrendPoint,
+  next: EnterpriseUsageTrendPoint
+): EnterpriseUsageTrendPoint {
+  const requestTotal = current.requests + next.requests
+  const latency =
+    requestTotal > 0
+      ? (current.average_latency_ms * current.requests +
+          next.average_latency_ms * next.requests) /
+        requestTotal
+      : Math.max(current.average_latency_ms, next.average_latency_ms)
+  const cacheHitRate =
+    requestTotal > 0
+      ? (current.cache_hit_rate * current.requests +
+          next.cache_hit_rate * next.requests) /
+        requestTotal
+      : Math.max(current.cache_hit_rate, next.cache_hit_rate)
+
+  return {
+    timestamp: current.timestamp,
+    requests: requestTotal,
+    errors: current.errors + next.errors,
+    prompt_tokens: current.prompt_tokens + next.prompt_tokens,
+    completion_tokens: current.completion_tokens + next.completion_tokens,
+    quota: current.quota + next.quota,
+    average_latency_ms: latency,
+    cache_hit_rate: cacheHitRate,
+  }
+}
+
+function fillUsageTrend(
+  trend: EnterpriseUsageTrendPoint[],
+  range: { start: number; end: number },
+  granularity: TimeGranularity
+) {
+  const step = getBucketSeconds(granularity)
+  const maxBuckets =
+    granularity === 'hour' ? 168 : granularity === 'week' ? 26 : 45
+  const end = getBucketStart(range.end, granularity)
+  let start = getBucketStart(range.start, granularity)
+  if (end - start > (maxBuckets - 1) * step) {
+    start = end - (maxBuckets - 1) * step
+  }
+
+  const buckets = new Map<number, EnterpriseUsageTrendPoint>()
+  for (const point of trend) {
+    const key = getBucketStart(point.timestamp, granularity)
+    if (key < start || key > end) continue
+    const normalized = { ...point, timestamp: key }
+    const current = buckets.get(key)
+    buckets.set(
+      key,
+      current ? mergeTrendPoint(current, normalized) : normalized
+    )
+  }
+
+  const filled: EnterpriseUsageTrendPoint[] = []
+  for (let timestamp = start; timestamp <= end; timestamp += step) {
+    filled.push(buckets.get(timestamp) ?? createEmptyTrendPoint(timestamp))
+  }
+
+  return filled
+}
+
 function applyRangePreset(
   value: string,
   setRangePreset: (rangePreset: EnterpriseRangePreset) => void
@@ -240,6 +355,17 @@ function LogStatusBadge(props: { status: string }) {
   )
 }
 
+function LogDetailItem(props: { label: string; value: ReactNode }) {
+  return (
+    <div className='min-w-0 rounded-md border border-slate-100 bg-slate-50/60 px-2.5 py-2'>
+      <p className='text-[11px] font-medium text-slate-500'>{props.label}</p>
+      <div className='mt-1 min-w-0 truncate text-xs font-semibold text-slate-900'>
+        {props.value}
+      </div>
+    </div>
+  )
+}
+
 function TopBreakdownList(props: {
   items: EnterpriseUsageBreakdownItem[]
   value: 'cost' | 'quota'
@@ -249,14 +375,14 @@ function TopBreakdownList(props: {
 }) {
   if (props.items.length === 0) {
     return (
-      <div className='flex min-h-24 items-center justify-center text-xs text-slate-500'>
+      <div className='flex min-h-20 items-center justify-center text-xs text-slate-500'>
         {props.emptyText}
       </div>
     )
   }
 
   return (
-    <div className='space-y-2.5'>
+    <div className={cn(props.compact ? 'space-y-2' : 'space-y-2.5')}>
       {props.items.slice(0, props.limit ?? 6).map((item, index) => (
         <div
           key={`${item.name}-${item.quota}`}
@@ -331,12 +457,12 @@ function CostDonutPanel(props: {
       className={cn(
         'grid h-full min-h-0 items-center gap-2',
         props.compact
-          ? 'grid-cols-[86px_minmax(0,1fr)]'
+          ? 'grid-cols-[96px_minmax(0,1fr)]'
           : 'grid-cols-[118px_minmax(0,1fr)]'
       )}
     >
       <div
-        className={cn('relative', props.compact ? 'h-[104px]' : 'h-[124px]')}
+        className={cn('relative', props.compact ? 'h-[112px]' : 'h-[124px]')}
       >
         {props.items.length === 0 ? (
           <div className='flex h-full items-center justify-center rounded-md bg-slate-50 text-xs text-slate-400'>
@@ -354,8 +480,8 @@ function CostDonutPanel(props: {
                   data={props.items.slice(0, 6)}
                   dataKey='cost'
                   nameKey='name'
-                  innerRadius={props.compact ? 27 : 34}
-                  outerRadius={props.compact ? 41 : 52}
+                  innerRadius={props.compact ? 30 : 34}
+                  outerRadius={props.compact ? 45 : 52}
                   paddingAngle={3}
                 >
                   {props.items.slice(0, 6).map((item, index) => (
@@ -405,6 +531,7 @@ function UsageLogTable(props: {
   fetching: boolean
   onPrev: () => void
   onNext: () => void
+  onInspect: (log: EnterpriseUsageLogItem) => void
 }) {
   if (props.logs.length === 0) {
     return (
@@ -417,23 +544,23 @@ function UsageLogTable(props: {
   return (
     <>
       <div className='max-h-[224px] overflow-auto'>
-        <Table className='w-full table-fixed text-[10.5px] [&_td]:h-6 [&_td]:px-2 [&_td]:py-0.5 [&_td]:text-[10.5px] [&_td_*]:text-[10.5px] [&_th]:h-6 [&_th]:px-2 [&_th]:text-[10.5px] [&_th_*]:text-[10.5px]'>
+        <Table className='min-w-[940px] table-fixed text-[10.5px] [&_td]:h-6 [&_td]:px-1.5 [&_td]:py-0.5 [&_td]:text-[10.5px] [&_td_*]:text-[10.5px] [&_th]:h-6 [&_th]:px-1.5 [&_th]:text-[10.5px] [&_th_*]:text-[10.5px]'>
           <TableHeader className='sticky top-0 z-10 bg-slate-50 shadow-[0_1px_0_rgb(226_232_240)]'>
             <TableRow>
-              <TableHead className='w-[11%]'>请求 ID</TableHead>
-              <TableHead className='w-[9%]'>时间</TableHead>
-              <TableHead className='w-[8%]'>客户</TableHead>
-              <TableHead className='w-[8%]'>用户</TableHead>
-              <TableHead className='w-[10%]'>模型</TableHead>
-              <TableHead className='w-[5%]'>类型</TableHead>
-              <TableHead className='w-[7%] text-right'>输入</TableHead>
-              <TableHead className='w-[7%] text-right'>输出</TableHead>
-              <TableHead className='w-[8%] text-right'>单价</TableHead>
-              <TableHead className='w-[7%] text-right'>总成本</TableHead>
-              <TableHead className='w-[8%]'>渠道</TableHead>
-              <TableHead className='w-[6%] text-right'>延迟</TableHead>
-              <TableHead className='w-[5%]'>状态</TableHead>
-              <TableHead className='w-[4%] text-right'>操作</TableHead>
+              <TableHead className='w-[92px]'>请求 ID</TableHead>
+              <TableHead className='w-[78px]'>时间</TableHead>
+              <TableHead className='w-[66px]'>客户</TableHead>
+              <TableHead className='w-[66px]'>用户</TableHead>
+              <TableHead className='w-[88px]'>模型</TableHead>
+              <TableHead className='w-[44px]'>类型</TableHead>
+              <TableHead className='w-[56px] text-right'>输入</TableHead>
+              <TableHead className='w-[56px] text-right'>输出</TableHead>
+              <TableHead className='w-[76px] text-right'>单价</TableHead>
+              <TableHead className='w-[72px] text-right'>总成本</TableHead>
+              <TableHead className='w-[86px]'>渠道</TableHead>
+              <TableHead className='w-[54px] text-right'>延迟</TableHead>
+              <TableHead className='w-[50px]'>状态</TableHead>
+              <TableHead className='w-[34px] text-right'>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -490,10 +617,12 @@ function UsageLogTable(props: {
                   {formatTokens(log.completion_tokens)}
                 </TableCell>
                 <TableCell className='text-right text-[11px] tabular-nums'>
-                  {logUnitPrice(log)}
+                  <span className='block truncate'>{logUnitPrice(log)}</span>
                 </TableCell>
                 <TableCell className='text-right font-semibold tabular-nums'>
-                  {formatLogQuota(log.quota)}
+                  <span className='block truncate'>
+                    {formatLogQuota(log.quota)}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className='block truncate'>
@@ -512,6 +641,7 @@ function UsageLogTable(props: {
                     variant='ghost'
                     size='icon-xs'
                     aria-label='查看日志详情'
+                    onClick={() => props.onInspect(log)}
                   >
                     <Eye className='size-3.5' />
                   </Button>
@@ -554,14 +684,8 @@ function UsageLogTable(props: {
 export function EnterpriseUsageAnalytics(props: {
   classicContent?: ReactNode
 }) {
-  const {
-    range,
-    rangeLabel,
-    rangePreset,
-    granularity,
-    setRangePreset,
-    setGranularity,
-  } = useEnterpriseConsole()
+  const { range, rangePreset, granularity, setRangePreset, setGranularity } =
+    useEnterpriseConsole()
   const [search, setSearch] = useState('')
   const [modelFilter, setModelFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
@@ -573,6 +697,9 @@ export function EnterpriseUsageAnalytics(props: {
   const [page, setPage] = useState(1)
   const [exportingUsage, setExportingUsage] = useState(false)
   const [showClassicLogs, setShowClassicLogs] = useState(false)
+  const [showAllCustomers, setShowAllCustomers] = useState(false)
+  const [inspectingLog, setInspectingLog] =
+    useState<EnterpriseUsageLogItem | null>(null)
 
   const usageParams = useMemo(
     () => ({
@@ -619,7 +746,11 @@ export function EnterpriseUsageAnalytics(props: {
 
   const usage = usageQuery.data?.data ?? EMPTY_USAGE
   const metrics = usage.metrics
-  const chartData = usage.trend.map((point) => ({
+  const filledTrend = useMemo(
+    () => fillUsageTrend(usage.trend, range, granularity),
+    [granularity, range, usage.trend]
+  )
+  const chartData = filledTrend.map((point) => ({
     ...point,
     label: formatTrendLabel(point.timestamp, granularity),
     inputTokens: point.prompt_tokens,
@@ -627,6 +758,7 @@ export function EnterpriseUsageAnalytics(props: {
     cacheRate: point.cache_hit_rate,
     errorRate: point.requests > 0 ? point.errors / point.requests : 0,
   }))
+  const filterRangeLabel = `${formatFullDate(range.start)} ~ ${formatFullDate(range.end)}`
   const totalLogPages = Math.max(
     1,
     Math.ceil((usage.total_logs ?? 0) / (usage.page_size ?? 20))
@@ -739,11 +871,35 @@ export function EnterpriseUsageAnalytics(props: {
     }
   }
 
+  const saveCurrentView = () => {
+    try {
+      window.localStorage.setItem(
+        'enterprise-usage-analytics:saved-view',
+        JSON.stringify({
+          saved_at: Date.now(),
+          range_preset: rangePreset,
+          granularity,
+          search,
+          model_filter: modelFilter,
+          user_filter: userFilter,
+          group_filter: groupFilter,
+          channel_filter: channelFilter,
+          status_filter: statusFilter,
+          request_type_filter: requestTypeFilter,
+          sort_by: sortBy,
+        })
+      )
+      toast.success('当前视图已保存到本机')
+    } catch {
+      toast.error('保存视图失败，请检查浏览器存储权限')
+    }
+  }
+
   return (
-    <div className='enterprise-usage-analytics mx-auto max-w-[1586px] space-y-2 bg-[#f6f8fb] pb-2 text-slate-950'>
+    <div className='enterprise-usage-analytics mx-auto max-w-[1586px] space-y-2.5 bg-[#f6f8fb] pb-2 text-slate-950'>
       <header className='flex flex-col gap-1.5 px-1 pt-0.5 sm:flex-row sm:items-center sm:justify-between'>
         <div className='min-w-0'>
-          <h1 className='text-lg leading-5 font-semibold text-slate-950'>
+          <h1 className='text-[20px] leading-6 font-semibold text-slate-950'>
             用量日志与成本分析
           </h1>
           <p className='mt-0.5 text-[11px] leading-4 text-slate-500'>
@@ -763,9 +919,10 @@ export function EnterpriseUsageAnalytics(props: {
           <Button
             variant='outline'
             className='h-7 rounded-md border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-none hover:bg-slate-50'
+            onClick={() => setShowClassicLogs((open) => !open)}
           >
             <SlidersHorizontal className='size-3' />
-            自定义视图
+            {showClassicLogs ? '收起视图' : '自定义视图'}
           </Button>
           <Button
             variant='outline'
@@ -785,7 +942,7 @@ export function EnterpriseUsageAnalytics(props: {
         </div>
       </header>
 
-      <section className='grid gap-1.5 md:grid-cols-3 xl:grid-cols-6'>
+      <section className='grid gap-2 md:grid-cols-3 xl:grid-cols-6'>
         <EnterpriseStatCard
           title='总请求数'
           value={formatCompactNumber(metrics.total_requests)}
@@ -837,7 +994,7 @@ export function EnterpriseUsageAnalytics(props: {
       </section>
 
       <EnterprisePanel className={USAGE_PANEL_CHROME} bodyClassName='p-1.5'>
-        <div className='grid gap-1.5 min-[1420px]:grid-cols-[170px_repeat(6,minmax(104px,1fr))_minmax(190px,1.5fr)_72px_72px_86px]'>
+        <div className='grid gap-1.5 min-[1420px]:grid-cols-[228px_repeat(6,minmax(96px,1fr))_minmax(172px,1.25fr)_64px_72px_82px]'>
           <div className='relative'>
             <CalendarDays className='pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-slate-400' />
             <NativeSelect
@@ -848,12 +1005,12 @@ export function EnterpriseUsageAnalytics(props: {
                 setPage(1)
               }}
             >
-              {rangePreset === 'custom' && (
-                <NativeSelectOption value='custom'>
-                  {rangeLabel}
-                </NativeSelectOption>
-              )}
-              {ENTERPRISE_TIME_RANGE_OPTIONS.map((option) => (
+              <NativeSelectOption value={rangePreset}>
+                {filterRangeLabel}
+              </NativeSelectOption>
+              {ENTERPRISE_TIME_RANGE_OPTIONS.filter(
+                (option) => option.value !== rangePreset
+              ).map((option) => (
                 <NativeSelectOption key={option.value} value={option.value}>
                   {option.label}
                 </NativeSelectOption>
@@ -977,15 +1134,16 @@ export function EnterpriseUsageAnalytics(props: {
           <Button
             variant='outline'
             className='h-8 rounded-md border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-none hover:bg-slate-50'
+            onClick={saveCurrentView}
           >
             保存视图
           </Button>
         </div>
       </EnterprisePanel>
 
-      <section className='grid items-start gap-2 min-[1360px]:grid-cols-[minmax(0,1fr)_350px]'>
+      <section className='grid items-start gap-2 min-[1360px]:grid-cols-[minmax(0,1fr)_348px]'>
         <div className='grid min-w-0 gap-2'>
-          <div className='grid gap-2 min-[1180px]:grid-cols-[minmax(360px,1.28fr)_minmax(260px,.82fr)_minmax(280px,.9fr)]'>
+          <div className='grid gap-2 min-[1180px]:grid-cols-[minmax(360px,1.18fr)_minmax(270px,.86fr)_minmax(300px,.96fr)]'>
             <EnterprisePanel
               title='Tokens 趋势'
               description='输入 Tokens、输出 Tokens 与缓存命中率'
@@ -1231,6 +1389,7 @@ export function EnterpriseUsageAnalytics(props: {
               onNext={() =>
                 setPage((value) => Math.min(totalLogPages, value + 1))
               }
+              onInspect={setInspectingLog}
             />
           </EnterprisePanel>
         </div>
@@ -1259,13 +1418,15 @@ export function EnterpriseUsageAnalytics(props: {
             title='热点客户'
             description='按成本贡献排序'
             className={USAGE_PANEL_CHROME}
+            bodyClassName='p-2.5'
             action={
               <Button
                 variant='ghost'
                 size='xs'
                 className='h-6 px-1.5 text-[11px] text-blue-600'
+                onClick={() => setShowAllCustomers((open) => !open)}
               >
-                查看全部
+                {showAllCustomers ? '收起' : '查看全部'}
                 <MoreHorizontal className='size-3.5' />
               </Button>
             }
@@ -1274,14 +1435,14 @@ export function EnterpriseUsageAnalytics(props: {
               items={usage.by_user}
               value='cost'
               emptyText='暂无客户用量数据'
-              limit={5}
+              limit={showAllCustomers ? 10 : 5}
             />
           </EnterprisePanel>
 
           <EnterprisePanel
             title='优化建议'
             className={USAGE_PANEL_CHROME}
-            bodyClassName='min-h-[214px] p-2.5'
+            bodyClassName='min-h-[236px] p-2.5'
           >
             <div className='space-y-2'>
               {anomalyItems.map((item) => {
@@ -1353,6 +1514,7 @@ export function EnterpriseUsageAnalytics(props: {
 
       {props.classicContent && (
         <details
+          open={showClassicLogs}
           className='rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600'
           onToggle={(event) => setShowClassicLogs(event.currentTarget.open)}
         >
@@ -1365,6 +1527,87 @@ export function EnterpriseUsageAnalytics(props: {
           )}
         </details>
       )}
+
+      <Dialog
+        open={inspectingLog != null}
+        onOpenChange={(open) => {
+          if (!open) setInspectingLog(null)
+        }}
+      >
+        <DialogContent className='sm:max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>调用日志详情</DialogTitle>
+            <DialogDescription>
+              核对单次请求的客户、模型、Token、成本、渠道和延迟。
+            </DialogDescription>
+          </DialogHeader>
+          {inspectingLog && (
+            <div className='grid gap-2 sm:grid-cols-3'>
+              <LogDetailItem
+                label='请求 ID'
+                value={
+                  <code className='text-[11px]'>
+                    {inspectingLog.request_id || `log_${inspectingLog.id}`}
+                  </code>
+                }
+              />
+              <LogDetailItem
+                label='请求时间'
+                value={formatDateTime(inspectingLog.created_at)}
+              />
+              <LogDetailItem
+                label='状态'
+                value={<LogStatusBadge status={inspectingLog.status} />}
+              />
+              <LogDetailItem
+                label='客户 / 分组'
+                value={
+                  inspectingLog.group || inspectingLog.username || '默认客户'
+                }
+              />
+              <LogDetailItem
+                label='用户'
+                value={inspectingLog.username || 'system'}
+              />
+              <LogDetailItem
+                label='模型'
+                value={inspectingLog.model_name || '未知模型'}
+              />
+              <LogDetailItem
+                label='输入 Tokens'
+                value={formatTokens(inspectingLog.prompt_tokens)}
+              />
+              <LogDetailItem
+                label='输出 Tokens'
+                value={formatTokens(inspectingLog.completion_tokens)}
+              />
+              <LogDetailItem
+                label='总成本'
+                value={formatLogQuota(inspectingLog.quota)}
+              />
+              <LogDetailItem label='单价' value={logUnitPrice(inspectingLog)} />
+              <LogDetailItem
+                label='渠道'
+                value={
+                  inspectingLog.channel_name ||
+                  (inspectingLog.channel_id > 0
+                    ? `渠道 #${inspectingLog.channel_id}`
+                    : '-')
+                }
+              />
+              <LogDetailItem
+                label='延迟'
+                value={`${formatNumber(inspectingLog.use_time_ms)} ms`}
+              />
+              <LogDetailItem
+                label='请求类型'
+                value={formatRequestType(inspectingLog.request_type)}
+              />
+              <LogDetailItem label='IP' value={inspectingLog.ip || '未记录'} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

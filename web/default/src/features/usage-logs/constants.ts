@@ -227,35 +227,35 @@ export interface StatusMapping {
  * MjProxy task type mappings
  */
 export const MJ_TASK_TYPE_MAPPINGS: Record<string, StatusMapping> = {
-  [MJ_TASK_TYPES.IMAGINE]: { label: 'Draw', variant: 'blue' },
-  [MJ_TASK_TYPES.UPSCALE]: { label: 'Upscale', variant: 'orange' },
-  [MJ_TASK_TYPES.VIDEO]: { label: 'Video', variant: 'orange' },
-  [MJ_TASK_TYPES.EDITS]: { label: 'Edit', variant: 'orange' },
-  [MJ_TASK_TYPES.VARIATION]: { label: 'Vary', variant: 'violet' },
-  [MJ_TASK_TYPES.HIGH_VARIATION]: { label: 'Vary (Strong)', variant: 'violet' },
-  [MJ_TASK_TYPES.LOW_VARIATION]: { label: 'Vary (Subtle)', variant: 'violet' },
-  [MJ_TASK_TYPES.PAN]: { label: 'Pan', variant: 'cyan' },
-  [MJ_TASK_TYPES.DESCRIBE]: { label: 'Describe', variant: 'yellow' },
-  [MJ_TASK_TYPES.BLEND]: { label: 'Blend', variant: 'lime' },
-  [MJ_TASK_TYPES.UPLOAD]: { label: 'Upload', variant: 'blue' },
-  [MJ_TASK_TYPES.SHORTEN]: { label: 'Shorten', variant: 'pink' },
-  [MJ_TASK_TYPES.REROLL]: { label: 'Reroll', variant: 'indigo' },
-  [MJ_TASK_TYPES.INPAINT]: { label: 'Inpaint', variant: 'teal' },
-  [MJ_TASK_TYPES.SWAP_FACE]: { label: 'Swap Face', variant: 'purple' },
-  [MJ_TASK_TYPES.ZOOM]: { label: 'Zoom', variant: 'green' },
-  [MJ_TASK_TYPES.CUSTOM_ZOOM]: { label: 'Custom Zoom', variant: 'green' },
+  [MJ_TASK_TYPES.IMAGINE]: { label: '绘图', variant: 'blue' },
+  [MJ_TASK_TYPES.UPSCALE]: { label: '放大', variant: 'orange' },
+  [MJ_TASK_TYPES.VIDEO]: { label: '视频', variant: 'orange' },
+  [MJ_TASK_TYPES.EDITS]: { label: '编辑', variant: 'orange' },
+  [MJ_TASK_TYPES.VARIATION]: { label: '变体', variant: 'violet' },
+  [MJ_TASK_TYPES.HIGH_VARIATION]: { label: '强变体', variant: 'violet' },
+  [MJ_TASK_TYPES.LOW_VARIATION]: { label: '弱变体', variant: 'violet' },
+  [MJ_TASK_TYPES.PAN]: { label: '平移', variant: 'cyan' },
+  [MJ_TASK_TYPES.DESCRIBE]: { label: '描述', variant: 'yellow' },
+  [MJ_TASK_TYPES.BLEND]: { label: '融合', variant: 'lime' },
+  [MJ_TASK_TYPES.UPLOAD]: { label: '上传', variant: 'blue' },
+  [MJ_TASK_TYPES.SHORTEN]: { label: '缩短', variant: 'pink' },
+  [MJ_TASK_TYPES.REROLL]: { label: '重绘', variant: 'indigo' },
+  [MJ_TASK_TYPES.INPAINT]: { label: '局部重绘', variant: 'teal' },
+  [MJ_TASK_TYPES.SWAP_FACE]: { label: '换脸', variant: 'purple' },
+  [MJ_TASK_TYPES.ZOOM]: { label: '缩放', variant: 'green' },
+  [MJ_TASK_TYPES.CUSTOM_ZOOM]: { label: '自定义缩放', variant: 'green' },
 }
 
 /**
  * MjProxy task status mappings
  */
 export const MJ_STATUS_MAPPINGS: Record<string, StatusMapping> = {
-  [MJ_TASK_STATUS.SUCCESS]: { label: 'Success', variant: 'green' },
-  [MJ_TASK_STATUS.NOT_START]: { label: 'Not Started', variant: 'neutral' },
-  [MJ_TASK_STATUS.SUBMITTED]: { label: 'Queued', variant: 'yellow' },
-  [MJ_TASK_STATUS.IN_PROGRESS]: { label: 'In Progress', variant: 'blue' },
-  [MJ_TASK_STATUS.FAILURE]: { label: 'Failed', variant: 'red' },
-  [MJ_TASK_STATUS.MODAL]: { label: 'Waiting', variant: 'amber' },
+  [MJ_TASK_STATUS.SUCCESS]: { label: '成功', variant: 'green' },
+  [MJ_TASK_STATUS.NOT_START]: { label: '未启动', variant: 'neutral' },
+  [MJ_TASK_STATUS.SUBMITTED]: { label: '队列中', variant: 'yellow' },
+  [MJ_TASK_STATUS.IN_PROGRESS]: { label: '执行中', variant: 'blue' },
+  [MJ_TASK_STATUS.FAILURE]: { label: '失败', variant: 'red' },
+  [MJ_TASK_STATUS.MODAL]: { label: '等待确认', variant: 'amber' },
 }
 
 /**
@@ -263,19 +263,19 @@ export const MJ_STATUS_MAPPINGS: Record<string, StatusMapping> = {
  */
 export const MJ_SUBMIT_RESULT_MAPPINGS: Record<string, StatusMapping> = {
   [String(MJ_SUBMIT_RESULT_CODES.SUBMITTED)]: {
-    label: 'Submitted',
+    label: '已提交',
     variant: 'green',
   },
   [String(MJ_SUBMIT_RESULT_CODES.WAITING)]: {
-    label: 'Waiting',
+    label: '等待中',
     variant: 'lime',
   },
   [String(MJ_SUBMIT_RESULT_CODES.DUPLICATE)]: {
-    label: 'Duplicate',
+    label: '重复任务',
     variant: 'orange',
   },
   [String(MJ_SUBMIT_RESULT_CODES.NOT_SUBMITTED)]: {
-    label: 'Not Submitted',
+    label: '未提交',
     variant: 'yellow',
   },
 }
@@ -284,20 +284,20 @@ export const MJ_SUBMIT_RESULT_MAPPINGS: Record<string, StatusMapping> = {
  * Task action type mappings
  */
 export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
-  [TASK_ACTIONS.MUSIC]: { label: 'Generate Music', variant: 'neutral' },
-  [TASK_ACTIONS.LYRICS]: { label: 'Generate Lyrics', variant: 'pink' },
-  [TASK_ACTIONS.GENERATE]: { label: 'Image to Video', variant: 'blue' },
-  [TASK_ACTIONS.TEXT_GENERATE]: { label: 'Text to Video', variant: 'blue' },
+  [TASK_ACTIONS.MUSIC]: { label: '生成音乐', variant: 'neutral' },
+  [TASK_ACTIONS.LYRICS]: { label: '生成歌词', variant: 'pink' },
+  [TASK_ACTIONS.GENERATE]: { label: '图生视频', variant: 'blue' },
+  [TASK_ACTIONS.TEXT_GENERATE]: { label: '文生视频', variant: 'blue' },
   [TASK_ACTIONS.FIRST_TAIL_GENERATE]: {
-    label: 'First/Last Frame to Video',
+    label: '首尾帧生视频',
     variant: 'blue',
   },
   [TASK_ACTIONS.REFERENCE_GENERATE]: {
-    label: 'Reference Video',
+    label: '参考视频',
     variant: 'blue',
   },
   [TASK_ACTIONS.REMIX_GENERATE]: {
-    label: 'Video Remix',
+    label: '视频 Remix',
     variant: 'blue',
   },
 }
@@ -306,13 +306,13 @@ export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
  * Task status mappings
  */
 export const TASK_STATUS_MAPPINGS: Record<string, StatusMapping> = {
-  [TASK_STATUS.SUCCESS]: { label: 'Success', variant: 'green' },
-  [TASK_STATUS.NOT_START]: { label: 'Not Started', variant: 'neutral' },
-  [TASK_STATUS.SUBMITTED]: { label: 'Queued', variant: 'yellow' },
-  [TASK_STATUS.IN_PROGRESS]: { label: 'In Progress', variant: 'blue' },
-  [TASK_STATUS.FAILURE]: { label: 'Failed', variant: 'red' },
-  [TASK_STATUS.QUEUED]: { label: 'Queued', variant: 'orange' },
-  [TASK_STATUS.UNKNOWN]: { label: 'Unknown', variant: 'neutral' },
+  [TASK_STATUS.SUCCESS]: { label: '成功', variant: 'green' },
+  [TASK_STATUS.NOT_START]: { label: '未启动', variant: 'neutral' },
+  [TASK_STATUS.SUBMITTED]: { label: '队列中', variant: 'yellow' },
+  [TASK_STATUS.IN_PROGRESS]: { label: '执行中', variant: 'blue' },
+  [TASK_STATUS.FAILURE]: { label: '失败', variant: 'red' },
+  [TASK_STATUS.QUEUED]: { label: '排队中', variant: 'orange' },
+  [TASK_STATUS.UNKNOWN]: { label: '未知', variant: 'neutral' },
 }
 
 /**
@@ -334,9 +334,9 @@ export const TASK_PLATFORM_MAPPINGS: Record<string, StatusMapping> = {
  * Log category display labels
  */
 export const LOG_CATEGORY_LABELS: Record<LogCategory, string> = {
-  common: 'Common',
-  drawing: 'Drawing',
-  task: 'Task',
+  common: '用量',
+  drawing: '绘图',
+  task: '异步任务',
 }
 
 // ============================================================================

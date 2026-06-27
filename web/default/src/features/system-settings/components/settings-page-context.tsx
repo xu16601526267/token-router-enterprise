@@ -115,8 +115,8 @@ type SettingsPageFormActionsProps = {
 export function SettingsPageFormActions(props: SettingsPageFormActionsProps) {
   const { t } = useTranslation()
   const saveLabel = props.isSaving
-    ? (props.savingLabel ?? 'Saving...')
-    : (props.saveLabel ?? 'Save Changes')
+    ? (props.savingLabel ?? '保存中...')
+    : (props.saveLabel ?? '保存更改')
 
   return (
     <SettingsPageActionsPortal>
@@ -127,9 +127,10 @@ export function SettingsPageFormActions(props: SettingsPageFormActionsProps) {
           variant={props.resetVariant ?? 'outline'}
           onClick={props.onReset}
           disabled={props.isResetDisabled || props.isSaving}
+          className='h-8 rounded-md border-slate-200 px-2.5 text-[12px] font-semibold shadow-none'
         >
-          <RotateCcw data-icon='inline-start' />
-          <span>{t(props.resetLabel ?? 'Reset')}</span>
+          <RotateCcw data-icon='inline-start' className='size-3.5' />
+          <span>{t(props.resetLabel ?? '重置')}</span>
         </Button>
       )}
       <Button
@@ -138,8 +139,9 @@ export function SettingsPageFormActions(props: SettingsPageFormActionsProps) {
         size='sm'
         onClick={props.onSave}
         disabled={props.isSaving || props.isSaveDisabled}
+        className='h-8 rounded-md bg-slate-950 px-2.5 text-[12px] font-semibold text-white shadow-none hover:bg-slate-800'
       >
-        <Save data-icon='inline-start' />
+        <Save data-icon='inline-start' className='size-3.5' />
         <span>{t(saveLabel)}</span>
       </Button>
     </SettingsPageActionsPortal>

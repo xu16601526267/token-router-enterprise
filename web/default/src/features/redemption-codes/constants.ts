@@ -34,7 +34,8 @@ export const REDEMPTION_STATUS_VALUES = Object.values(REDEMPTION_STATUS).map(
   (value) => String(value)
 ) as `${number}`[]
 
-// labelKey values are i18n keys; use t(config.labelKey) in components
+// labelKey values are user-facing labels; components can still pass them through
+// i18n for deployments that provide overrides.
 export const REDEMPTION_STATUSES: Record<
   number,
   Pick<StatusBadgeProps, 'variant'> & {
@@ -43,17 +44,17 @@ export const REDEMPTION_STATUSES: Record<
   }
 > = {
   [REDEMPTION_STATUS.ENABLED]: {
-    labelKey: 'Unused',
+    labelKey: '未使用',
     variant: 'success',
     value: REDEMPTION_STATUS.ENABLED,
   },
   [REDEMPTION_STATUS.DISABLED]: {
-    labelKey: 'Disabled',
+    labelKey: '已禁用',
     variant: 'neutral',
     value: REDEMPTION_STATUS.DISABLED,
   },
   [REDEMPTION_STATUS.USED]: {
-    labelKey: 'Used',
+    labelKey: '已使用',
     variant: 'neutral',
     value: REDEMPTION_STATUS.USED,
   },
@@ -70,7 +71,7 @@ export function getRedemptionStatusOptions(t: TFunction) {
       value: String(config.value),
     })),
     {
-      label: t('Expired'),
+      label: t('已过期'),
       value: REDEMPTION_FILTER_EXPIRED,
     },
   ]
@@ -93,17 +94,17 @@ export const REDEMPTION_VALIDATION = {
 
 // i18n keys; use t(ERROR_MESSAGES.xxx) when displaying. For form schema with interpolation use getRedemptionFormErrorMessages(t).
 export const ERROR_MESSAGES = {
-  UNEXPECTED: 'An unexpected error occurred',
-  LOAD_FAILED: 'Failed to load redemption codes',
-  SEARCH_FAILED: 'Failed to search redemption codes',
-  CREATE_FAILED: 'Failed to create redemption code',
-  UPDATE_FAILED: 'Failed to update redemption code',
-  DELETE_FAILED: 'Failed to delete redemption code',
-  DELETE_INVALID_FAILED: 'Failed to delete invalid redemption codes',
-  STATUS_UPDATE_FAILED: 'Failed to update redemption code status',
-  NAME_LENGTH_INVALID: 'Name must be between {{min}} and {{max}} characters',
-  COUNT_INVALID: 'Count must be between {{min}} and {{max}}',
-  EXPIRED_TIME_INVALID: 'Expired time cannot be earlier than current time',
+  UNEXPECTED: '发生未知错误',
+  LOAD_FAILED: '兑换码加载失败',
+  SEARCH_FAILED: '兑换码搜索失败',
+  CREATE_FAILED: '兑换码创建失败',
+  UPDATE_FAILED: '兑换码更新失败',
+  DELETE_FAILED: '兑换码删除失败',
+  DELETE_INVALID_FAILED: '失效兑换码清理失败',
+  STATUS_UPDATE_FAILED: '兑换码状态更新失败',
+  NAME_LENGTH_INVALID: '名称长度需在 {{min}} 到 {{max}} 个字符之间',
+  COUNT_INVALID: '生成数量需在 {{min}} 到 {{max}} 之间',
+  EXPIRED_TIME_INVALID: '过期时间不能早于当前时间',
 } as const
 
 /** For form schema only: returns translated messages with interpolation. */
@@ -126,10 +127,10 @@ export function getRedemptionFormErrorMessages(t: TFunction) {
 // ============================================================================
 
 export const SUCCESS_MESSAGES = {
-  REDEMPTION_CREATED: 'Redemption code(s) created successfully',
-  REDEMPTION_UPDATED: 'Redemption code updated successfully',
-  REDEMPTION_DELETED: 'Redemption code deleted successfully',
-  REDEMPTION_ENABLED: 'Redemption code enabled successfully',
-  REDEMPTION_DISABLED: 'Redemption code disabled successfully',
-  COPY_SUCCESS: 'Copied to clipboard',
+  REDEMPTION_CREATED: '兑换码创建成功',
+  REDEMPTION_UPDATED: '兑换码更新成功',
+  REDEMPTION_DELETED: '兑换码删除成功',
+  REDEMPTION_ENABLED: '兑换码已启用',
+  REDEMPTION_DISABLED: '兑换码已禁用',
+  COPY_SUCCESS: '已复制到剪贴板',
 } as const

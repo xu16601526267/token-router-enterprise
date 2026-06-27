@@ -106,7 +106,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
       frontend: z.enum(['default', 'classic']),
     }),
     SystemName: z.string().min(1, {
-      error: () => t('System name is required'),
+      error: () => t('系统名称不能为空'),
     }),
     ServerAddress: z.string().optional(),
     Logo: z.string().url().optional().or(z.literal('')),
@@ -145,7 +145,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
     <>
       <FormNavigationGuard when={isDirty} />
 
-      <SettingsSection title={t('System Information')}>
+      <SettingsSection title={t('系统信息')}>
         <Form {...form}>
           <SettingsForm onSubmit={handleSubmit}>
             <SettingsPageFormActions
@@ -161,16 +161,16 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='theme.frontend'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Frontend Theme')}</FormLabel>
+                    <FormLabel>{t('前端主题')}</FormLabel>
                     <Select
                       items={[
                         {
                           value: 'default',
-                          label: t('Default (New Frontend)'),
+                          label: t('默认新版前端'),
                         },
                         {
                           value: 'classic',
-                          label: t('Classic (Legacy Frontend)'),
+                          label: t('经典旧版前端'),
                         },
                       ]}
                       onValueChange={field.onChange}
@@ -184,17 +184,17 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                       <SelectContent alignItemWithTrigger={false}>
                         <SelectGroup>
                           <SelectItem value='default'>
-                            {t('Default (New Frontend)')}
+                            {t('默认新版前端')}
                           </SelectItem>
                           <SelectItem value='classic'>
-                            {t('Classic (Legacy Frontend)')}
+                            {t('经典旧版前端')}
                           </SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                     <FormDescription>
                       {t(
-                        'Switch between the new frontend and the classic frontend. Changes take effect after page reload.'
+                        '切换新版前端与经典前端，保存后刷新页面生效。'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -207,12 +207,12 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='SystemName'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('System Name')}</FormLabel>
+                    <FormLabel>{t('系统名称')}</FormLabel>
                     <FormControl>
                       <Input placeholder={t('New API')} {...field} />
                     </FormControl>
                     <FormDescription>
-                      {t('The name displayed across the application')}
+                      {t('显示在控制台、登录页和浏览器标题中的系统名称。')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -224,13 +224,13 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='ServerAddress'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Server Address')}</FormLabel>
+                    <FormLabel>{t('服务器地址')}</FormLabel>
                     <FormControl>
                       <Input placeholder='https://yourdomain.com' {...field} />
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'The public URL of your server, used for OAuth callbacks, webhooks, and other external integrations'
+                        '系统对外访问地址，用于 OAuth 回调、Webhook 与外部集成。'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -243,7 +243,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='Logo'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Logo URL')}</FormLabel>
+                    <FormLabel>{t('Logo 地址')}</FormLabel>
                     <FormControl>
                       <Input
                         placeholder={t('https://example.com/logo.png')}
@@ -251,7 +251,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('URL to your logo image (optional)')}
+                      {t('可选，填写用于控制台展示的品牌 Logo 图片地址。')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -263,18 +263,18 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='Footer'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Footer')}</FormLabel>
+                    <FormLabel>{t('页脚文案')}</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder={t(
-                          '© 2025 Your Company. All rights reserved.'
+                          '© 2026 趋境科技. All rights reserved.'
                         )}
                         rows={4}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Footer text displayed at the bottom of pages')}
+                      {t('显示在页面底部的版权或备案信息。')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -286,11 +286,11 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='About'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('About')}</FormLabel>
+                    <FormLabel>{t('关于页面')}</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder={t(
-                          'Enter HTML code (e.g., <p>About us...</p>) or a URL (e.g., https://example.com) to embed as iframe'
+                          '输入 HTML 内容或完整 URL，URL 会自动嵌入为 iframe。'
                         )}
                         rows={4}
                         {...field}
@@ -298,7 +298,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'Supports HTML markup or iframe embedding. Enter HTML code directly, or provide a complete URL to automatically embed it as an iframe.'
+                        '支持 HTML、Markdown 或外部 URL，用于展示产品介绍和服务说明。'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -312,17 +312,17 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                   name='HomePageContent'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Home Page Content')}</FormLabel>
+                      <FormLabel>{t('首页内容')}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder={t('Welcome to our New API...')}
+                          placeholder={t('欢迎使用 Token Router...')}
                           rows={6}
                           {...field}
                         />
                       </FormControl>
                       <FormDescription>
                         {t(
-                          'Content displayed on the home page (supports Markdown)'
+                          '显示在首页的内容，支持 Markdown。'
                         )}
                       </FormDescription>
                       <FormMessage />
@@ -336,11 +336,11 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='legal.user_agreement'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('User Agreement')}</FormLabel>
+                    <FormLabel>{t('用户协议')}</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder={t(
-                          'Provide Markdown, HTML, or an external URL for the user agreement'
+                          '填写用户协议的 Markdown、HTML 或外部 URL。'
                         )}
                         rows={6}
                         {...field}
@@ -348,7 +348,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'Leave empty to disable the agreement requirement. Supports Markdown, HTML, or a full URL to redirect users.'
+                        '留空表示不启用强制协议确认，支持 Markdown、HTML 或跳转 URL。'
                       )}
                     </FormDescription>
                     <FormMessage />
@@ -361,11 +361,11 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                 name='legal.privacy_policy'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Privacy Policy')}</FormLabel>
+                    <FormLabel>{t('隐私政策')}</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder={t(
-                          'Provide Markdown, HTML, or an external URL for the privacy policy'
+                          '填写隐私政策的 Markdown、HTML 或外部 URL。'
                         )}
                         rows={6}
                         {...field}
@@ -373,7 +373,7 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
                     </FormControl>
                     <FormDescription>
                       {t(
-                        'Leave empty to disable the privacy policy requirement. Supports Markdown, HTML, or a full URL to redirect users.'
+                        '留空表示不展示隐私政策入口，支持 Markdown、HTML 或跳转 URL。'
                       )}
                     </FormDescription>
                     <FormMessage />

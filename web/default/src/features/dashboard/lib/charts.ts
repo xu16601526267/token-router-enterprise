@@ -136,7 +136,7 @@ export function processChartData(
       }
 
       array.unshift({
-        key: tt('Total:'),
+        key: tt('合计'),
         value: formatQuotaValue(sum),
       })
       return array
@@ -155,8 +155,8 @@ export function processChartData(
         categoryField: 'type',
         title: {
           visible: true,
-          text: tt('Call Count Distribution'),
-          subtext: tt('No data available'),
+          text: tt('调用占比'),
+          subtext: tt('暂无数据'),
         },
         legends: { visible: false },
         label: { visible: false },
@@ -193,7 +193,7 @@ export function processChartData(
         legends: { visible: true, selectMode: 'single' },
         title: {
           visible: true,
-          text: tt('Call Trend'),
+          text: tt('调用趋势'),
         },
       },
       spec_rank_bar: {
@@ -205,7 +205,7 @@ export function processChartData(
         legends: { visible: true, selectMode: 'single' },
         title: {
           visible: true,
-          text: tt('Call Count Ranking'),
+          text: tt('调用排行'),
         },
       },
       totalQuotaDisplay: formatQuotaTotal(0),
@@ -471,7 +471,7 @@ export function processChartData(
       },
       title: {
         visible: true,
-        text: tt('Call Count Distribution'),
+        text: tt('调用占比'),
       },
       legends: { visible: true, orient: 'left' },
       label: { visible: true },
@@ -587,7 +587,7 @@ export function processChartData(
       color: modelColor,
       title: {
         visible: true,
-        text: tt('Call Trend'),
+        text: tt('调用趋势'),
       },
       tooltip: {
         mark: {
@@ -631,7 +631,7 @@ export function processChartData(
               array[i].value = formatInt(v)
             }
             array.unshift({
-              key: tt('Total:'),
+              key: tt('合计'),
               value: formatInt(sum),
             })
             return array
@@ -664,7 +664,7 @@ export function processChartData(
       color: modelColor,
       title: {
         visible: true,
-        text: tt('Call Count Ranking'),
+        text: tt('调用排行'),
       },
       bar: {
         state: {
@@ -725,8 +725,8 @@ export function processUserChartData(
       direction: 'horizontal',
       title: {
         visible: true,
-        text: tt('User Consumption Ranking'),
-        subtext: tt('No data available'),
+        text: tt('用户消耗排行'),
+        subtext: tt('暂无数据'),
       },
       legends: { visible: false },
       color: { type: 'ordinal', range: USER_COLORS },
@@ -740,8 +740,8 @@ export function processUserChartData(
       seriesField: 'User',
       title: {
         visible: true,
-        text: tt('User Consumption Trend'),
-        subtext: tt('No data available'),
+        text: tt('用户消耗趋势'),
+        subtext: tt('暂无数据'),
       },
       legends: { visible: true, selectMode: 'single' },
       color: { type: 'ordinal', range: USER_COLORS },
@@ -826,7 +826,7 @@ export function processUserChartData(
       title: {
         visible: true,
         text: tt('User Consumption Ranking'),
-        subtext: `${tt('Total:')} ${formatVal(totalQuota)}`,
+        subtext: `${tt('合计')} ${formatVal(totalQuota)}`,
       },
       legends: { visible: false },
       bar: {
@@ -882,7 +882,7 @@ export function processUserChartData(
       title: {
         visible: true,
         text: tt('User Consumption Trend'),
-        subtext: `${tt('Total:')} ${formatVal(totalQuota)}`,
+        subtext: `${tt('合计')} ${formatVal(totalQuota)}`,
       },
       legends: { visible: true, selectMode: 'single' },
       axes: [
@@ -929,7 +929,7 @@ export function processUserChartData(
               array[i].value = formatVal(v)
             }
             array.unshift({
-              key: tt('Total:'),
+              key: tt('合计'),
               value: formatVal(sum),
             })
             return array

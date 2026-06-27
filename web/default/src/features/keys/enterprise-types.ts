@@ -53,6 +53,7 @@ export type EnterpriseApiKeySummary = {
   disabled: number
   active_users: number
   total_used_quota: number
+  rate_limit_hits: number
 }
 
 export type EnterpriseApiKeyPage = {

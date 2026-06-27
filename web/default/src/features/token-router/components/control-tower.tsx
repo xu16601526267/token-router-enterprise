@@ -219,6 +219,12 @@ function policyStatus(policy: RoutingPolicyItem): {
       className: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
     }
   }
+  if (policy.status === 'standby') {
+    return {
+      label: '备用',
+      className: 'bg-blue-50 text-blue-600 ring-1 ring-blue-100',
+    }
+  }
   return {
     label: '未启用',
     className: 'bg-slate-100 text-slate-500 ring-1 ring-slate-200',
@@ -229,6 +235,12 @@ function approvalStatus(policy: RoutingPolicyItem): {
   label: string
   className: string
 } {
+  if (policy.action_type === 'runtime_pool') {
+    return {
+      label: '运行态',
+      className: 'bg-blue-50 text-blue-600 ring-1 ring-blue-100',
+    }
+  }
   if (policy.status === 'active') {
     return {
       label: '已通过',
@@ -259,11 +271,11 @@ function MetricTile(props: {
   const Icon = props.icon
 
   return (
-    <div className='rounded-md border border-slate-200 bg-white px-3 py-2.5 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+    <div className='min-h-[92px] rounded-md border border-slate-200 bg-white px-3 py-3 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
       <div className='flex items-start gap-2.5'>
         <span
           className={cn(
-            'flex size-8 shrink-0 items-center justify-center rounded-md ring-1',
+            'flex size-9 shrink-0 items-center justify-center rounded-md ring-1',
             toneClass
           )}
         >
@@ -276,7 +288,7 @@ function MetricTile(props: {
             </p>
             <ArrowRight className='size-3.5 shrink-0 text-slate-400' />
           </div>
-          <p className='mt-1 text-[22px] leading-6 font-semibold tracking-normal text-slate-950'>
+          <p className='mt-1 text-[24px] leading-7 font-semibold tracking-normal text-slate-950'>
             {props.loading ? '...' : props.value}
           </p>
           <p className='mt-1 text-[11px] text-slate-500'>{props.helper}</p>
@@ -345,12 +357,50 @@ function EventList(props: {
   )
 }
 
+function ProviderSparkline(props: { provider: ProviderHealth }) {
+  const status = providerStatus(props.provider)
+  const color =
+    status.label === '健康良好'
+      ? '#22c55e'
+      : status.label === '需关注'
+        ? '#f59e0b'
+        : '#94a3b8'
+  const latency =
+    props.provider.average_latency_ms || props.provider.response_time_ms || 0
+  const pressure = Math.min(1, Math.max(0, 1 - props.provider.success_rate))
+  const latencyBump = Math.min(10, latency / 80)
+  const points = [
+    [0, 11],
+    [8, 8 + pressure * 5],
+    [16, 10 - latencyBump * 0.35],
+    [24, 6 + pressure * 7],
+    [32, 9 - latencyBump * 0.25],
+    [40, 5 + pressure * 6],
+    [48, 8],
+  ]
+    .map(([x, y]) => `${x},${y}`)
+    .join(' ')
+
+  return (
+    <svg className='h-4 w-12' viewBox='0 0 48 16' aria-hidden='true'>
+      <polyline
+        points={points}
+        fill='none'
+        stroke={color}
+        strokeLinecap='round'
+        strokeLinejoin='round'
+        strokeWidth='1.6'
+      />
+    </svg>
+  )
+}
+
 function HealthRow(props: { provider: ProviderHealth }) {
   const status = providerStatus(props.provider)
   const latency =
     props.provider.average_latency_ms || props.provider.response_time_ms
   return (
-    <div className='grid grid-cols-[minmax(0,1fr)_54px_48px_54px] items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-slate-50'>
+    <div className='grid grid-cols-[minmax(0,1fr)_54px_50px_48px_54px] items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-slate-50'>
       <div className='flex min-w-0 items-center gap-2'>
         <span className={cn('size-1.5 rounded-full', status.dotClassName)} />
         <div className='min-w-0'>
@@ -364,6 +414,9 @@ function HealthRow(props: { provider: ProviderHealth }) {
       </div>
       <div className='text-right text-[11px] font-medium text-slate-700'>
         {formatPercent(props.provider.success_rate)}
+      </div>
+      <div className='flex justify-end'>
+        <ProviderSparkline provider={props.provider} />
       </div>
       <div className='text-right text-[11px] text-slate-500'>
         {formatCount(props.provider.requests)}
@@ -387,7 +440,7 @@ function ProviderRouteNode(props: {
     props.provider.average_latency_ms || props.provider.response_time_ms
 
   return (
-    <div className='rounded-md border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
+    <div className='min-h-[62px] rounded-md border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
       <div className='flex items-center justify-between gap-2'>
         <div className='flex min-w-0 items-center gap-2'>
           <span
@@ -582,33 +635,37 @@ function buildRuntimePolicies(
   if (activeProviders.length === 0) {
     return []
   }
-  const primary = activeProviders[0]
-  const trafficPercent =
-    requestTotal > 0 && primary.requests > 0
-      ? Math.max(1, Math.round((primary.requests / requestTotal) * 100))
-      : 100
-  return [
-    {
+  return activeProviders.slice(0, 5).map((provider, index) => {
+    const trafficPercent =
+      requestTotal > 0 && provider.requests > 0
+        ? Math.max(1, Math.round((provider.requests / requestTotal) * 100))
+        : index === 0
+          ? 100
+          : 0
+    return {
       id: 0,
-      name: '默认渠道路由池',
-      slice_key: 'global',
-      model_name: firstModelName(primary.models || ''),
+      name: index === 0 ? '默认渠道路由池' : `${provider.channel_name} 备用路由`,
+      slice_key: provider.region || 'global',
+      model_name: firstModelName(provider.models || ''),
       sla_tier: 'default',
       track: 'runtime',
       action_type: 'runtime_pool',
-      status: 'active',
-      supplier_id: primary.supplier_id,
-      supplier_name: primary.supplier_name,
-      channel_id: primary.channel_id,
-      channel_name: primary.channel_name,
-      priority: 1,
+      status: index === 0 ? 'active' : 'standby',
+      supplier_id: provider.supplier_id,
+      supplier_name: provider.supplier_name,
+      channel_id: provider.channel_id,
+      channel_name: provider.channel_name,
+      priority: index + 1,
       traffic_percent: trafficPercent,
       effective_from: range.start,
       effective_to: range.end,
       updated_at: generatedAt,
-      reason: '由当前启用渠道和请求日志实时派生',
-    },
-  ]
+      reason:
+        index === 0
+          ? '由当前主路由健康状态和请求日志实时派生'
+          : '由当前备用供应商健康状态实时派生',
+    }
+  })
 }
 
 function TopologyConnectors(props: { providerCount: number }) {
@@ -720,8 +777,21 @@ export function ControlTower(props: {
       }),
     [data?.generated_at, providers, range.end, range.start, requestTotal]
   )
+  const rawPolicyChannelIds = useMemo(
+    () =>
+      new Set(
+        rawPolicies
+          .map((policy) => policy.channel_id)
+          .filter((channelId) => channelId > 0)
+      ),
+    [rawPolicies]
+  )
+  const standbyRuntimePolicies = runtimePolicies.filter(
+    (policy) =>
+      policy.status === 'standby' && !rawPolicyChannelIds.has(policy.channel_id)
+  )
   const policies = hasActiveRawPolicy
-    ? rawPolicies
+    ? [...rawPolicies, ...standbyRuntimePolicies]
     : [...runtimePolicies, ...rawPolicies]
   const primaryPolicy =
     policies.find((policy) => policy.status === 'active') ?? policies[0]
@@ -921,7 +991,7 @@ export function ControlTower(props: {
 
       {props.nav != null && <div className='min-w-0'>{props.nav}</div>}
 
-      <div className='grid grid-cols-1 items-stretch gap-2 xl:grid-cols-[minmax(0,1fr)_360px]'>
+      <div className='grid grid-cols-1 items-stretch gap-2 xl:grid-cols-[minmax(0,1fr)_376px]'>
         <div className='grid min-w-0 gap-2'>
           <EnterprisePanel
             title='路由拓扑与流量路径'
@@ -944,8 +1014,8 @@ export function ControlTower(props: {
             }
             bodyClassName='p-3'
           >
-            <div className='grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(286px,0.72fr)]'>
-              <div className='relative grid min-h-[300px] gap-2 overflow-hidden sm:grid-cols-[164px_1fr_1.2fr]'>
+            <div className='grid gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.72fr)]'>
+              <div className='relative grid min-h-[326px] gap-2 overflow-hidden sm:grid-cols-[164px_minmax(150px,0.9fr)_minmax(220px,1.25fr)]'>
                 <TopologyConnectors providerCount={providers.length} />
                 <div className='relative z-10 self-center rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_1px_rgb(15_23_42/0.03)]'>
                   <div className='flex items-center gap-2'>
@@ -1292,9 +1362,10 @@ export function ControlTower(props: {
                   tone='blue'
                 />
               </div>
-              <div className='grid grid-cols-[minmax(0,1fr)_54px_48px_54px] gap-2 px-1.5 pb-1 text-right text-[10px] text-slate-400'>
+              <div className='grid grid-cols-[minmax(0,1fr)_54px_50px_48px_54px] gap-2 px-1.5 pb-1 text-right text-[10px] text-slate-400'>
                 <span className='text-left'>供应商</span>
                 <span>成功率</span>
+                <span>趋势</span>
                 <span>请求</span>
                 <span>延迟</span>
               </div>

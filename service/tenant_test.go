@@ -287,15 +287,30 @@ func TestTenantCreditPrecheckBlocksOnlyWhenOverPolicyBlocks(t *testing.T) {
 	require.NotNil(t, apiErr)
 	require.Equal(t, types.ErrorCodeInsufficientUserQuota, apiErr.GetErrorCode())
 
-	require.NoError(t, SetTenantBillingConfig(tenant.Id, &model.BillingConfig{
-		BillingMode:      model.BillingModePostpaid,
-		CreditLimit:      50,
-		OverCreditPolicy: "allow",
-	}, owner.Id, "127.0.0.1"))
-	relayInfo = &relaycommon.RelayInfo{TenantId: tenant.Id, OriginModelName: "gpt-credit"}
-	apiErr = PreConsumeBilling(ctx, 100, relayInfo)
-	require.Nil(t, apiErr)
-	require.Equal(t, BillingSourceTenantPostpaid, relayInfo.BillingSource)
+	for _, policy := range []string{"warn", "allow"} {
+		require.NoError(t, SetTenantBillingConfig(tenant.Id, &model.BillingConfig{
+			BillingMode:      model.BillingModePostpaid,
+			CreditLimit:      50,
+			OverCreditPolicy: policy,
+		}, owner.Id, "127.0.0.1"))
+		relayInfo = &relaycommon.RelayInfo{TenantId: tenant.Id, OriginModelName: "gpt-credit"}
+		apiErr = PreConsumeBilling(ctx, 100, relayInfo)
+		require.Nil(t, apiErr, policy)
+		require.Equal(t, BillingSourceTenantPostpaid, relayInfo.BillingSource, policy)
+	}
+}
+
+func TestNormalizeTenantStatusAllowsOnlyKnownStatuses(t *testing.T) {
+	status, err := NormalizeTenantStatus(" suspended ")
+	require.NoError(t, err)
+	require.Equal(t, model.TenantStatusSuspended, status)
+
+	status, err = NormalizeTenantStatus("DISABLED")
+	require.NoError(t, err)
+	require.Equal(t, model.TenantStatusDisabled, status)
+
+	_, err = NormalizeTenantStatus("archived")
+	require.Error(t, err)
 }
 
 func TestFrontChannelAndTenantRoutingPreferenceAudited(t *testing.T) {

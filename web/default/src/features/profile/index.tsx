@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Main } from '@/components/layout'
+import { EnterprisePageHeader } from '@/components/enterprise'
 import {
   CardStaggerContainer,
   CardStaggerItem,
@@ -48,15 +49,22 @@ export function Profile() {
 
   return (
     <Main>
-      <div className='min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-4 sm:py-6'>
-        <CardStaggerContainer className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-6'>
+      <div className='min-h-0 flex-1 overflow-auto bg-[#f6f8fb] px-4 py-3 sm:px-6 sm:py-4'>
+        <CardStaggerContainer className='mx-auto flex w-full max-w-[1586px] flex-col gap-3'>
+          <CardStaggerItem>
+            <EnterprisePageHeader
+              eyebrow='个人中心'
+              title='个人资料'
+              description='管理账户资料、安全绑定、语言偏好与个人访问凭证'
+            />
+          </CardStaggerItem>
           <CardStaggerItem>
             <ProfileHeader profile={profile} loading={loading} />
           </CardStaggerItem>
 
           <CardStaggerItem>
-            <div className='grid gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.46fr)] xl:items-start'>
-              <div className='space-y-4 sm:space-y-6'>
+            <div className='grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.42fr)] xl:items-start'>
+              <div className='space-y-3'>
                 <ProfileSettingsCard
                   profile={profile}
                   loading={loading}
@@ -69,7 +77,7 @@ export function Profile() {
                 <ProfileSecurityCard profile={profile} loading={loading} />
               </div>
 
-              <div className='space-y-4 sm:space-y-6 xl:sticky xl:top-6'>
+              <div className='space-y-3 xl:sticky xl:top-4'>
                 {checkinEnabled && (
                   <CheckinCalendarCard
                     checkinEnabled={checkinEnabled}

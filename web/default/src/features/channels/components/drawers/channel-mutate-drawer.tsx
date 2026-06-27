@@ -70,6 +70,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  useFormField,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import {
@@ -271,6 +272,20 @@ function SubHeading({ title, icon }: { title: string; icon?: ReactNode }) {
       <h4 className='text-muted-foreground text-xs font-medium tracking-wide uppercase'>
         {title}
       </h4>
+    </div>
+  )
+}
+
+function BlockFormDescription({ children }: { children: ReactNode }) {
+  const { formDescriptionId } = useFormField()
+
+  return (
+    <div
+      data-slot='form-description'
+      id={formDescriptionId}
+      className='text-muted-foreground text-sm'
+    >
+      {children}
     </div>
   )
 }
@@ -889,6 +904,8 @@ export function ChannelMutateDrawer({
   // Handle successful submission
   const handleSuccess = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: channelsQueryKeys.lists() })
+    queryClient.invalidateQueries({ queryKey: ['enterprise-channel-center'] })
+    queryClient.invalidateQueries({ queryKey: ['enterprise-channel-detail'] })
     if (channelId) {
       queryClient.invalidateQueries({
         queryKey: channelsQueryKeys.detail(channelId),
@@ -1976,7 +1993,7 @@ export function ChannelMutateDrawer({
                                   {...field}
                                 />
                               </FormControl>
-                              <FormDescription>
+                              <BlockFormDescription>
                                 <div className='flex flex-col gap-2'>
                                   <span>
                                     {keyFieldDescription}
@@ -2002,7 +2019,7 @@ export function ChannelMutateDrawer({
                                     </Button>
                                   )}
                                 </div>
-                              </FormDescription>
+                              </BlockFormDescription>
                               {isEditing && (
                                 <div className='border-border/60 mt-4 flex flex-col gap-3 border-y border-dashed py-4'>
                                   <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>

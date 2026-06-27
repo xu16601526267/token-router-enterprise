@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { EnterprisePageHeader } from '@/components/enterprise'
 import { getUserModels, getUserGroups } from './api'
 import { PlaygroundChat } from './components/playground-chat'
 import { PlaygroundInput } from './components/playground-input'
@@ -190,7 +191,14 @@ export function Playground() {
   }
 
   return (
-    <div className='relative flex size-full flex-col overflow-hidden'>
+    <div className='relative flex size-full flex-col overflow-hidden bg-[#f6f8fb] text-slate-950'>
+      <div className='mx-auto w-full max-w-[1586px] px-4 pt-4 sm:px-6'>
+        <EnterprisePageHeader
+          eyebrow='开发与体验'
+          title='在线调试台'
+          description='按当前账号权限选择分组和模型，直接验证下游 API 调用效果'
+        />
+      </div>
       {/* Full-width scroll container: scrolling works even over side whitespace */}
       <div className='flex flex-1 flex-col overflow-hidden'>
         <PlaygroundChat
@@ -208,7 +216,7 @@ export function Playground() {
       </div>
 
       {/* Input area: center content and constrain to the same container width */}
-      <div className='mx-auto w-full max-w-4xl'>
+      <div className='mx-auto w-full max-w-4xl px-4 sm:px-0'>
         <PlaygroundInput
           disabled={isGenerating}
           groups={groups}

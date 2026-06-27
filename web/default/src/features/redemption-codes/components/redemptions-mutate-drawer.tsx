@@ -124,7 +124,7 @@ export function RedemptionsMutateDrawer({
           const count = result.data?.length || 0
           toast.success(
             count > 1
-              ? t('Successfully created {{count}} redemption codes', {
+              ? t('已创建 {{count}} 个兑换码', {
                   count,
                 })
               : t(SUCCESS_MESSAGES.REDEMPTION_CREATED)
@@ -158,10 +158,10 @@ export function RedemptionsMutateDrawer({
   const { meta: currencyMeta } = getCurrencyDisplay()
   const currencyLabel = getCurrencyLabel()
   const tokensOnly = currencyMeta.kind === 'tokens'
-  const quotaLabel = t('Quota ({{currency}})', { currency: currencyLabel })
+  const quotaLabel = t('额度（{{currency}}）', { currency: currencyLabel })
   const quotaPlaceholder = tokensOnly
-    ? t('Enter quota in tokens')
-    : t('Enter quota in {{currency}}', { currency: currencyLabel })
+    ? t('输入 Token 额度')
+    : t('输入{{currency}}额度', { currency: currencyLabel })
 
   return (
     <Sheet
@@ -177,16 +177,14 @@ export function RedemptionsMutateDrawer({
         <SheetHeader className={sideDrawerHeaderClassName()}>
           <SheetTitle>
             {isUpdate
-              ? t('Update Redemption Code')
-              : t('Create Redemption Code')}
+              ? t('编辑兑换码')
+              : t('新建兑换码')}
           </SheetTitle>
           <SheetDescription>
             {isUpdate
-              ? t('Update the redemption code by providing necessary info.')
-              : t(
-                  'Add new redemption code(s) by providing necessary info.'
-                )}{' '}
-            {t('Click save when you&apos;re done.')}
+              ? t('修改兑换码名称、额度和有效期。')
+              : t('批量生成可供客户充值核销的兑换码。')}{' '}
+            {t('填写完成后点击保存。')}
           </SheetDescription>
         </SheetHeader>
         <Form {...form}>
@@ -201,12 +199,12 @@ export function RedemptionsMutateDrawer({
                 name='name'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Name')}</FormLabel>
+                    <FormLabel>{t('名称')}</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder={t('Enter a name')} />
+                      <Input {...field} placeholder={t('输入兑换码名称')} />
                     </FormControl>
                     <FormDescription>
-                      {t('Name for this redemption code (1-20 characters)')}
+                      {t('用于识别这批兑换码，长度 1-20 个字符。')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -232,8 +230,8 @@ export function RedemptionsMutateDrawer({
                     </FormControl>
                     <FormDescription>
                       {tokensOnly
-                        ? t('Enter the quota amount in tokens')
-                        : t('Enter the quota amount in {{currency}}', {
+                        ? t('输入 Token 额度。')
+                        : t('输入按 {{currency}} 计价的兑换额度。', {
                             currency: currencyLabel,
                           })}
                     </FormDescription>
@@ -247,13 +245,13 @@ export function RedemptionsMutateDrawer({
                 name='expired_time'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Expiration Time')}</FormLabel>
+                    <FormLabel>{t('过期时间')}</FormLabel>
                     <div className='flex flex-col gap-2'>
                       <FormControl>
                         <DateTimePicker
                           value={field.value}
                           onChange={field.onChange}
-                          placeholder={t('Never expires')}
+                          placeholder={t('永久有效')}
                         />
                       </FormControl>
                       <div className='grid grid-cols-4 gap-1.5 sm:flex sm:gap-2'>
@@ -263,7 +261,7 @@ export function RedemptionsMutateDrawer({
                           size='sm'
                           onClick={() => handleSetExpiry(0, 0, 0)}
                         >
-                          {t('Never')}
+                          {t('永久')}
                         </Button>
                         <Button
                           type='button'
@@ -271,7 +269,7 @@ export function RedemptionsMutateDrawer({
                           size='sm'
                           onClick={() => handleSetExpiry(1, 0, 0)}
                         >
-                          {t('1M')}
+                          {t('1 个月')}
                         </Button>
                         <Button
                           type='button'
@@ -279,7 +277,7 @@ export function RedemptionsMutateDrawer({
                           size='sm'
                           onClick={() => handleSetExpiry(0, 7, 0)}
                         >
-                          {t('1W')}
+                          {t('1 周')}
                         </Button>
                         <Button
                           type='button'
@@ -287,12 +285,12 @@ export function RedemptionsMutateDrawer({
                           size='sm'
                           onClick={() => handleSetExpiry(0, 1, 0)}
                         >
-                          {t('1 Day')}
+                          {t('1 天')}
                         </Button>
                       </div>
                     </div>
                     <FormDescription>
-                      {t('Leave empty for never expires')}
+                      {t('留空表示永久有效。')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -305,14 +303,14 @@ export function RedemptionsMutateDrawer({
                   name='count'
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('Quantity')}</FormLabel>
+                      <FormLabel>{t('生成数量')}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type='number'
                           min='1'
                           max='100'
-                          placeholder={t('Number of codes to create')}
+                          placeholder={t('本次生成数量')}
                           onChange={(e) =>
                             field.onChange(
                               Number.parseInt(e.target.value, 10) || 1
@@ -321,7 +319,7 @@ export function RedemptionsMutateDrawer({
                         />
                       </FormControl>
                       <FormDescription>
-                        {t('Create multiple redemption codes at once (1-100)')}
+                        {t('支持一次生成多个兑换码，范围 1-100。')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -333,10 +331,10 @@ export function RedemptionsMutateDrawer({
         </Form>
         <SheetFooter className={sideDrawerFooterClassName()}>
           <SheetClose render={<Button variant='outline' />}>
-            {t('Close')}
+            {t('取消')}
           </SheetClose>
           <Button form='redemption-form' type='submit' disabled={isSubmitting}>
-            {isSubmitting ? t('Saving...') : t('Save changes')}
+            {isSubmitting ? t('保存中...') : t('保存')}
           </Button>
         </SheetFooter>
       </SheetContent>

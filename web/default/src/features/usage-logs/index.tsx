@@ -18,8 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 
+import { EnterprisePageHeader, EnterprisePanel } from '@/components/enterprise'
 import { SectionPageLayout } from '@/components/layout'
 import type { NavGroup } from '@/components/layout/types'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -44,20 +44,28 @@ import {
 const route = getRouteApi('/_authenticated/usage-logs/$section')
 const TASK_LOG_SECTIONS = ['drawing', 'task'] as const
 
-const SECTION_META: Record<UsageLogsSectionId, { titleKey: string }> = {
+const SECTION_META: Record<
+  UsageLogsSectionId,
+  { title: string; description: string; panelTitle: string }
+> = {
   common: {
-    titleKey: 'Common Logs',
+    title: '用量与成本日志',
+    description: '按客户、部门、模型、渠道追踪请求、Token 与成本',
+    panelTitle: '用量日志',
   },
   drawing: {
-    titleKey: 'Drawing Logs',
+    title: '绘图任务日志',
+    description: '跟踪绘图代理任务的提交、队列、结果与失败原因',
+    panelTitle: '绘图任务列表',
   },
   task: {
-    titleKey: 'Task Logs',
+    title: '异步任务日志',
+    description: '跟踪音乐、视频等异步生成任务的提交、渠道、进度与结果',
+    panelTitle: '异步任务列表',
   },
 }
 
 function UsageLogsContent() {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   const isAdmin = useIsAdmin()
   const params = route.useParams()
@@ -76,9 +84,9 @@ function UsageLogsContent() {
   const tabNavGroups = useMemo<NavGroup[]>(
     () => [
       {
-        title: 'Task Logs',
+        title: '任务日志',
         items: TASK_LOG_SECTIONS.map((section) => ({
-          title: SECTION_META[section].titleKey,
+          title: SECTION_META[section].title,
           url: `/usage-logs/${section}`,
         })),
       },
@@ -109,8 +117,7 @@ function UsageLogsContent() {
     [navigate]
   )
 
-  const pageMeta =
-    activeCategory === 'common' ? SECTION_META.common : SECTION_META.task
+  const pageMeta = SECTION_META[activeCategory]
   const showTaskSwitcher =
     activeCategory !== 'common' && visibleSections.length > 1
   let content = null
@@ -135,21 +142,37 @@ function UsageLogsContent() {
     )
   } else {
     content = (
-      <div className='flex h-full min-h-0 flex-col gap-4'>
-        {showTaskSwitcher && (
-          <Tabs value={activeCategory} onValueChange={handleSectionChange}>
-            <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
-              {visibleSections.map((section) => (
-                <TabsTrigger key={section} value={section}>
-                  {t(SECTION_META[section].titleKey)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
-        <div className='min-h-0 flex-1'>
+      <div className='mx-auto flex h-full max-w-[1586px] flex-col overflow-hidden bg-[#f6f8fb] text-slate-950'>
+        <EnterprisePageHeader
+          eyebrow='业务运营'
+          title={pageMeta.title}
+          description={pageMeta.description}
+          actions={
+            showTaskSwitcher ? (
+              <Tabs value={activeCategory} onValueChange={handleSectionChange}>
+                <TabsList className='h-8 rounded-md border border-slate-200 bg-white p-1 shadow-none'>
+                  {visibleSections.map((section) => (
+                    <TabsTrigger
+                      key={section}
+                      value={section}
+                      className='h-6 rounded px-2.5 text-[12px] font-semibold text-slate-600 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-none'
+                    >
+                      {SECTION_META[section].title}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            ) : null
+          }
+        />
+        <EnterprisePanel
+          className='flex min-h-0 flex-1 flex-col'
+          bodyClassName='flex min-h-0 flex-1 flex-col p-2'
+          title={pageMeta.panelTitle}
+          description='按提交时间、渠道、用户、任务 ID 和状态排查异步任务执行链路'
+        >
           <UsageLogsTable logCategory={activeCategory} />
-        </div>
+        </EnterprisePanel>
       </div>
     )
   }
@@ -157,11 +180,6 @@ function UsageLogsContent() {
   return (
     <>
       <SectionPageLayout fixedContent>
-        {activeCategory !== 'common' && (
-          <SectionPageLayout.Title>
-            {t(pageMeta.titleKey)}
-          </SectionPageLayout.Title>
-        )}
         <SectionPageLayout.Content>{content}</SectionPageLayout.Content>
       </SectionPageLayout>
 

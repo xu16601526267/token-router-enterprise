@@ -18,7 +18,6 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { Table } from '@tanstack/react-table'
 import * as React from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -37,8 +36,6 @@ type DataTableViewOptionsProps<TData> = {
 export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
-  const { t } = useTranslation()
-
   const hideableColumns = React.useMemo(
     () =>
       table
@@ -56,16 +53,16 @@ export function DataTableViewOptions<TData>({
         render={
           <Button
             variant='outline'
-            className='shrink-0'
-            aria-label={t('View')}
+            className='h-7 shrink-0 rounded-md px-2 text-[12px]'
+            aria-label='视图'
           />
         }
       >
-        {t('View')}
+        视图
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-[150px]'>
         <DropdownMenuGroup>
-          <DropdownMenuLabel>{t('Toggle columns')}</DropdownMenuLabel>
+          <DropdownMenuLabel>显示列</DropdownMenuLabel>
           {hideableColumns.map((column) => {
             return (
               <DropdownMenuCheckboxItem

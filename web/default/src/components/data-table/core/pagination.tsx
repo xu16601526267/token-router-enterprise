@@ -23,7 +23,6 @@ import {
   ChevronsLeft as DoubleArrowLeftIcon,
   ChevronsRight as DoubleArrowRightIcon,
 } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -49,7 +48,6 @@ const PAGE_SIZE_SELECT_ITEMS = PAGE_SIZE_OPTIONS.map((pageSize) => ({
 export function DataTablePagination<TData>({
   table,
 }: DataTablePaginationProps<TData>) {
-  const { t } = useTranslation()
   const pagination = table.getState().pagination
   const currentPage = pagination.pageIndex + 1
   const pageSize = pagination.pageSize
@@ -65,16 +63,17 @@ export function DataTablePagination<TData>({
       style={{ overflowClipMargin: 1 }}
     >
       <div className='flex min-w-0 shrink-0 items-center gap-2 @xl/pagination:gap-3'>
-        <div className='flex shrink-0 items-baseline gap-1.5 text-xs font-medium whitespace-nowrap sm:text-sm'>
-          <span className='text-muted-foreground/80'>{t('Total:')}</span>
+        <div className='flex shrink-0 items-baseline gap-1.5 text-[12px] font-medium whitespace-nowrap'>
+          <span className='text-muted-foreground/80'>共</span>
           <span className='text-foreground tabular-nums'>
             {totalRows.toLocaleString()}
           </span>
+          <span className='text-muted-foreground/80'>条</span>
         </div>
 
         <div className='flex shrink-0 items-center gap-1.5 @lg/pagination:gap-2'>
-          <p className='text-muted-foreground/80 hidden text-sm font-medium whitespace-nowrap @2xl/pagination:block'>
-            {t('Rows per page')}
+          <p className='text-muted-foreground/80 hidden text-[12px] font-medium whitespace-nowrap @2xl/pagination:block'>
+            每页
           </p>
           <Select
             items={PAGE_SIZE_SELECT_ITEMS}
@@ -83,7 +82,7 @@ export function DataTablePagination<TData>({
               table.setPageSize(Number(value))
             }}
           >
-            <SelectTrigger className='text-foreground h-8 w-[64px] font-medium tabular-nums sm:w-[70px]'>
+            <SelectTrigger className='text-foreground h-7 w-[64px] rounded-md text-[12px] font-medium tabular-nums'>
               <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side='top' alignItemWithTrigger={false}>
@@ -105,7 +104,7 @@ export function DataTablePagination<TData>({
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
           >
-            <span className='sr-only'>{t('Go to first page')}</span>
+            <span className='sr-only'>第一页</span>
             <DoubleArrowLeftIcon className='h-4 w-4' />
           </Button>
           <Button
@@ -114,7 +113,7 @@ export function DataTablePagination<TData>({
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
-            <span className='sr-only'>{t('Go to previous page')}</span>
+            <span className='sr-only'>上一页</span>
             <ChevronLeftIcon className='h-4 w-4' />
           </Button>
 
@@ -136,7 +135,7 @@ export function DataTablePagination<TData>({
                   onClick={() => table.setPageIndex((pageNumber as number) - 1)}
                 >
                   <span className='sr-only'>
-                    {t('Go to page {{page}}', { page: pageNumber })}
+                    跳转到第 {pageNumber} 页
                   </span>
                   {pageNumber}
                 </Button>
@@ -150,7 +149,7 @@ export function DataTablePagination<TData>({
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
           >
-            <span className='sr-only'>{t('Go to next page')}</span>
+            <span className='sr-only'>下一页</span>
             <ChevronRightIcon className='h-4 w-4' />
           </Button>
           <Button
@@ -159,7 +158,7 @@ export function DataTablePagination<TData>({
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
             disabled={!table.getCanNextPage()}
           >
-            <span className='sr-only'>{t('Go to last page')}</span>
+            <span className='sr-only'>最后一页</span>
             <DoubleArrowRightIcon className='h-4 w-4' />
           </Button>
         </div>

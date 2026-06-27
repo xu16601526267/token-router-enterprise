@@ -143,58 +143,58 @@ export function LogStatCards(props: LogStatCardsProps) {
   })
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
-      <div className='divide-border/60 grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
-        {items.map((it, idx) => {
-          const Icon = it.icon
-          return (
-            <div
-              key={it.title}
-              className={cn(
-                'min-w-0 px-3 py-2.5 sm:px-5 sm:py-4',
-                idx === items.length - 1 &&
-                  items.length % 2 !== 0 &&
-                  'col-span-2 sm:col-span-1'
-              )}
-            >
-              <div className='flex min-w-0 items-center gap-2'>
-                <Icon className='text-muted-foreground/60 size-3.5 shrink-0' />
-                <div className='text-muted-foreground truncate text-xs font-medium tracking-wider uppercase'>
-                  {it.title}
-                </div>
+    <div className='grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5'>
+      {items.map((it, idx) => {
+        const Icon = it.icon
+        return (
+          <div
+            key={it.title}
+            className={cn(
+              'min-h-[84px] min-w-0 rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.035)]',
+              idx === items.length - 1 &&
+                items.length % 2 !== 0 &&
+                'col-span-2 sm:col-span-1'
+            )}
+          >
+            <div className='flex min-w-0 items-center gap-2'>
+              <span className='flex size-8 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100'>
+                <Icon className='size-4' strokeWidth={1.9} />
+              </span>
+              <div className='truncate text-[11px] leading-4 font-medium text-slate-500'>
+                {it.title}
               </div>
-
-              {loading ? (
-                <div className='mt-2 flex flex-col gap-1.5'>
-                  <Skeleton className='h-7 w-20' />
-                  <Skeleton className='h-3.5 w-28' />
-                </div>
-              ) : error ? (
-                <>
-                  <div className='text-muted-foreground mt-1.5 font-mono text-lg font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl'>
-                    --
-                  </div>
-                  <div className='text-muted-foreground/40 mt-1 hidden text-xs md:block'>
-                    {it.desc}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div
-                    className='text-foreground mt-1.5 max-w-full truncate font-mono text-lg font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl'
-                    title={it.fullValue}
-                  >
-                    {it.value}
-                  </div>
-                  <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>
-                    {it.desc}
-                  </div>
-                </>
-              )}
             </div>
-          )
-        })}
-      </div>
+
+            {loading ? (
+              <div className='mt-2 flex flex-col gap-1.5 pl-10'>
+                <Skeleton className='h-7 w-20' />
+                <Skeleton className='h-3.5 w-28' />
+              </div>
+            ) : error ? (
+              <>
+                <div className='mt-1.5 pl-10 text-[19px] leading-6 font-semibold tracking-tight text-slate-400 tabular-nums'>
+                  --
+                </div>
+                <div className='mt-1 pl-10 text-[11px] text-slate-400'>
+                  {it.desc}
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  className='mt-1.5 max-w-full truncate pl-10 text-[19px] leading-6 font-semibold tracking-tight text-slate-950 tabular-nums'
+                  title={it.fullValue}
+                >
+                  {it.value}
+                </div>
+                <div className='mt-1 pl-10 text-[11px] text-slate-500'>
+                  {it.desc}
+                </div>
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

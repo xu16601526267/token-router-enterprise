@@ -95,7 +95,7 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
   const columns: ColumnDef<TaskLog>[] = [
     {
       accessorKey: 'submit_time',
-      header: t('Submit Time'),
+      header: '提交时间',
       cell: ({ row }) => {
         const log = row.original
         const submitTime = row.getValue('submit_time') as number
@@ -120,9 +120,9 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
   ]
 
   if (isAdmin) {
-    columns.push(createChannelColumn<TaskLog>({ headerLabel: t('Channel') }), {
+    columns.push(createChannelColumn<TaskLog>({ headerLabel: '渠道' }), {
       id: 'user',
-      header: t('User'),
+      header: '用户',
       accessorFn: (row) => row.username || row.user_id,
       cell: function UserCell({ row }) {
         const { sensitiveVisible, setSelectedUserId, setUserInfoDialogOpen } =
@@ -165,7 +165,7 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
   columns.push(
     {
       accessorKey: 'task_id',
-      header: t('Task ID'),
+      header: '任务 ID',
       cell: ({ row }) => {
         const log = row.original
         const taskId = row.getValue('task_id') as string
@@ -182,7 +182,7 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
               className='border-border/60 bg-muted/30 !text-foreground max-w-full truncate rounded-md border px-1.5 py-0.5 font-mono'
             />
             <span className='text-muted-foreground/60 truncate text-[11px]'>
-              {t(log.platform)} · {t(taskActionMapper.getLabel(log.action))}
+              {log.platform} · {taskActionMapper.getLabel(log.action)}
             </span>
           </div>
         )
@@ -193,17 +193,17 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
       submitTimeKey: 'submit_time',
       finishTimeKey: 'finish_time',
       unit: 'seconds',
-      headerLabel: t('Duration'),
+      headerLabel: '耗时',
       warningThresholdSec: 300,
     }),
     {
       accessorKey: 'status',
-      header: t('Status'),
+      header: '状态',
       cell: ({ row }) => {
         const status = row.getValue('status') as string
         return (
           <StatusBadge
-            label={t(taskStatusMapper.getLabel(status, status || 'Submitting'))}
+            label={taskStatusMapper.getLabel(status, status || '提交中')}
             variant={taskStatusMapper.getVariant(status)}
             size='sm'
             copyable={false}
@@ -212,10 +212,10 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
         )
       },
     },
-    createProgressColumn<TaskLog>({ headerLabel: t('Progress') }),
+    createProgressColumn<TaskLog>({ headerLabel: '进度' }),
     {
       accessorKey: 'fail_reason',
-      header: t('Details'),
+      header: '详情',
       cell: function DetailsCell({ row }) {
         const log = row.original
         const failReason = row.getValue('fail_reason') as string

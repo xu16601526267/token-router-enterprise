@@ -212,6 +212,18 @@ function dateInputToTimestamp(value: string, boundary: 'start' | 'end') {
     : parsed.endOf('day').unix()
 }
 
+function formatRelativeTimestamp(timestamp: number): string {
+  if (timestamp <= 0) return '从未使用'
+  const diffSeconds = Math.max(0, dayjs().unix() - timestamp)
+  if (diffSeconds < 60) return '刚刚'
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} 分钟前`
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} 小时前`
+  if (diffSeconds < 30 * 86400) {
+    return `${Math.floor(diffSeconds / 86400)} 天前`
+  }
+  return dayjs.unix(timestamp).format('YYYY-MM-DD')
+}
+
 function keyOwner(item: EnterpriseApiKeyItem) {
   return item.display_name || item.username || `用户 #${item.user_id}`
 }
@@ -982,7 +994,7 @@ export function EnterpriseApiKeys() {
             description='面向企业客户的密钥发放、租户接入与访问控制'
           />
 
-          <div className='grid min-h-0 gap-2 2xl:grid-cols-[minmax(0,1fr)_384px]'>
+          <div className='grid min-h-0 gap-2 xl:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_384px]'>
             <div className='flex min-w-0 flex-col gap-2'>
               <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5'>
                 <MetricTile
@@ -1018,11 +1030,9 @@ export function EnterpriseApiKeys() {
                   loading={keysQuery.isLoading}
                 />
                 <MetricTile
-                  title='受限访问'
-                  value={formatCount(
-                    (summary?.exhausted ?? 0) + (summary?.disabled ?? 0)
-                  )}
-                  helper='禁用或额度耗尽'
+                  title='限流命中次数'
+                  value={formatCount(summary?.rate_limit_hits ?? 0)}
+                  helper='近 24h 触发'
                   icon={AlertTriangle}
                   tone='rose'
                   loading={keysQuery.isLoading}
@@ -1030,7 +1040,7 @@ export function EnterpriseApiKeys() {
               </div>
 
               <EnterprisePanel bodyClassName='p-2.5'>
-                <div className='grid gap-2 lg:grid-cols-[minmax(126px,0.9fr)_minmax(126px,0.9fr)_minmax(138px,0.95fr)_minmax(118px,0.78fr)_minmax(178px,1.18fr)_minmax(230px,1.45fr)_64px]'>
+                <div className='grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(126px,0.9fr)_minmax(126px,0.9fr)_minmax(138px,0.95fr)_minmax(118px,0.78fr)] 2xl:grid-cols-[minmax(126px,0.9fr)_minmax(126px,0.9fr)_minmax(138px,0.95fr)_minmax(118px,0.78fr)_minmax(178px,1.18fr)_minmax(230px,1.45fr)_64px]'>
                   <FilterField label='租户'>
                     <NativeSelect
                       value={tenantFilter}
@@ -1357,7 +1367,7 @@ export function EnterpriseApiKeys() {
                               </TableCell>
                               <TableCell>
                                 {item.accessed_time > 0
-                                  ? dayjs.unix(item.accessed_time).fromNow()
+                                  ? formatRelativeTimestamp(item.accessed_time)
                                   : '从未使用'}
                               </TableCell>
                               <TableCell>
@@ -1572,7 +1582,10 @@ export function EnterpriseApiKeys() {
               </EnterprisePanel>
             </div>
 
-            <EnterprisePanel className='min-w-0' bodyClassName='p-0'>
+            <EnterprisePanel
+              className='min-w-0 xl:sticky xl:top-3 xl:self-start'
+              bodyClassName='p-0 xl:max-h-[calc(100vh-88px)] xl:overflow-y-auto'
+            >
               {!selected ? (
                 <div className='flex min-h-[520px] flex-col items-center justify-center text-center'>
                   <span className='flex size-11 items-center justify-center rounded-md bg-blue-50 text-blue-600'>

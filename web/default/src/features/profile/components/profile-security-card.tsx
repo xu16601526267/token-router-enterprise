@@ -68,22 +68,22 @@ export function ProfileSecurityCard({
   const securityActions = [
     {
       icon: Shield,
-      title: t('Change Password'),
-      description: t('Update your password to keep your account secure'),
+      title: t('修改密码'),
+      description: t('更新登录密码，保持账号安全'),
       action: () => dialogs.open('password'),
       variant: 'default' as const,
     },
     {
       icon: Key,
-      title: t('Access Token'),
-      description: t('Generate and manage your API access token'),
+      title: t('访问令牌'),
+      description: t('生成和管理个人访问 Token'),
       action: () => dialogs.open('token'),
       variant: 'default' as const,
     },
     {
       icon: Trash2,
-      title: t('Delete Account'),
-      description: t('Permanently delete your account and all data'),
+      title: t('删除账号'),
+      description: t('永久删除账号和相关数据'),
       action: () => dialogs.open('delete'),
       variant: 'destructive' as const,
     },
@@ -92,10 +92,15 @@ export function ProfileSecurityCard({
   return (
     <>
       <TitledCard
-        title={t('Security')}
-        description={t('Manage your security settings and account access')}
+        title={t('安全设置')}
+        description={t('管理账号安全设置和访问权限')}
         icon={<Shield className='h-4 w-4' />}
         disableHoverEffect
+        className='rounded-md border-slate-200 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+        headerClassName='bg-slate-50/65 p-3 !pb-3'
+        contentClassName='p-3'
+        titleClassName='text-[14px] leading-5 font-semibold text-slate-900'
+        descriptionClassName='text-[11px] leading-4 text-slate-500'
       >
         <div className='grid grid-cols-1 gap-2.5 sm:gap-3 md:grid-cols-3'>
           {securityActions.map((item) => (
@@ -103,7 +108,7 @@ export function ProfileSecurityCard({
               key={item.title}
               type='button'
               onClick={item.action}
-              className={`flex items-center gap-3 rounded-lg border p-3 text-left md:flex-col md:gap-2 md:p-4 md:text-center ${
+              className={`flex items-center gap-3 rounded-md border border-slate-200 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40 md:flex-col md:gap-2 md:text-center ${
                 item.variant === 'destructive' ? 'border-destructive/30' : ''
               }`}
             >

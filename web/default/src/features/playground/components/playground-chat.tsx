@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { BotMessageSquare } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import {
@@ -106,6 +107,18 @@ export function PlaygroundChat({
       {/* Remove outer padding; apply padding to inner centered container to align with input */}
       <ConversationContent className='p-0'>
         <div className='mx-auto w-full max-w-4xl px-4 py-4'>
+          {messages.length === 0 && (
+            <div className='flex min-h-[420px] items-center justify-center'>
+              <div className='max-w-sm text-center'>
+                <div className='mx-auto flex size-10 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100'>
+                  <BotMessageSquare className='size-5' />
+                </div>
+                <h2 className='mt-3 text-[15px] font-semibold text-slate-900'>
+                  暂无调试消息
+                </h2>
+              </div>
+            </div>
+          )}
           {messages.map((message, messageIndex) => {
             const { versions = [] } = message
             const isLastAssistantMessage =

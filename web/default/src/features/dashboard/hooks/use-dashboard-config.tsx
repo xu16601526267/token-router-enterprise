@@ -45,37 +45,37 @@ export function useModelStatCardsConfig(): StatCardConfig[] {
   return [
     {
       key: 'count',
-      title: t('Total Count'),
-      description: t('Statistical count'),
+      title: t('总请求数'),
+      description: t('当前筛选范围'),
       icon: Hash,
       getValue: (stat) => stat?.rpm ?? 0,
     },
     {
       key: 'quota',
-      title: t('Total Quota'),
-      description: t('Statistical quota'),
+      title: t('消耗额度'),
+      description: t('按日志聚合'),
       icon: Coins,
       getValue: (stat) => stat?.quota ?? 0,
     },
     {
       key: 'tokens',
-      title: t('Total Tokens'),
-      description: t('Statistical tokens'),
+      title: t('Token 用量'),
+      description: t('输入与输出合计'),
       icon: Layers,
       getValue: (stat) => stat?.tpm ?? 0,
     },
     {
       key: 'avgRpm',
-      title: t('Average RPM'),
-      description: t('Requests per minute'),
+      title: t('平均 RPM'),
+      description: t('分钟请求均值'),
       icon: Gauge,
       getValue: (stat, timeRangeMinutes = 1) =>
         safeDivide(stat?.rpm ?? 0, timeRangeMinutes),
     },
     {
       key: 'avgTpm',
-      title: t('Average TPM'),
-      description: t('Tokens per minute'),
+      title: t('平均 TPM'),
+      description: t('分钟 Token 均值'),
       icon: Zap,
       getValue: (stat, timeRangeMinutes = 1) =>
         safeDivide(stat?.tpm ?? 0, timeRangeMinutes),

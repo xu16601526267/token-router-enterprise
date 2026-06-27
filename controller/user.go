@@ -895,11 +895,17 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 	// Even for admin users, we cannot fully trust them!
+	group := strings.TrimSpace(user.Group)
+	if group == "" {
+		group = "default"
+	}
 	cleanUser := model.User{
 		Username:    user.Username,
 		Password:    user.Password,
 		DisplayName: user.DisplayName,
 		Role:        user.Role, // 保持管理员设置的角色
+		Email:       strings.TrimSpace(user.Email),
+		Group:       group,
 	}
 	if err := cleanUser.Insert(0); err != nil {
 		common.ApiError(c, err)
@@ -910,9 +916,11 @@ func CreateUser(c *gin.Context) {
 		"username": cleanUser.Username,
 		"role":     cleanUser.Role,
 	})
+	cleanUser.Password = ""
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
+		"data":    cleanUser,
 	})
 	return
 }

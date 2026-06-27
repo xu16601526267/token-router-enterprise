@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import type { Table } from '@tanstack/react-table'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { useState, type ComponentProps, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { DataTableViewOptions } from '@/components/data-table'
 import { Badge } from '@/components/ui/badge'
@@ -79,13 +78,12 @@ export function LogsFilterInput(props: ComponentProps<typeof Input>) {
   return (
     <Input
       {...props}
-      className={cn('h-8 min-w-0 text-sm leading-5', props.className)}
+      className={cn('h-7 min-w-0 rounded-md text-[12px] leading-5', props.className)}
     />
   )
 }
 
 export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
-  const { t } = useTranslation()
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const isMobile = useMediaQuery('(max-width: 640px)')
@@ -112,13 +110,13 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
       onClick={() => setAdvancedOpen((open) => !open)}
       aria-expanded={advancedOpen}
       className={cn(
-        'text-muted-foreground hover:text-foreground gap-1 px-2',
+        'text-muted-foreground hover:text-foreground h-7 gap-1 rounded-md px-2 text-[12px]',
         props.hasAdvancedActiveFilters &&
           !advancedOpen &&
           'text-primary hover:text-primary'
       )}
     >
-      {advancedOpen ? t('Collapse') : t('Expand')}
+      {advancedOpen ? '收起' : '展开'}
       {activeAdvancedCount > 0 && (
         <Badge className='ml-0.5 size-5 justify-center p-0 text-[10px]'>
           {activeAdvancedCount}
@@ -136,9 +134,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
   if (isMobile && props.mobilePinnedFilters != null) {
     return (
       <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-        <div
-          className={cn('bg-card/50 rounded-lg border p-2.5', props.className)}
-        >
+        <div className={cn('rounded-md border bg-white p-2', props.className)}>
           <div className='grid gap-2'>{props.mobilePinnedFilters}</div>
 
           <div className='mt-2 flex flex-col gap-2'>
@@ -150,12 +146,12 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
                   type='button'
                   variant='ghost'
                   className={cn(
-                    'text-muted-foreground hover:text-foreground gap-1 px-2',
+                    'text-muted-foreground hover:text-foreground h-7 gap-1 rounded-md px-2 text-[12px]',
                     activeMobileFilterCount > 0 &&
                       'text-primary hover:text-primary'
                   )}
                 >
-                  {t('Filter')}
+                  筛选
                   {activeMobileFilterCount > 0 && (
                     <Badge className='ml-0.5 size-5 justify-center p-0 text-[10px]'>
                       {activeMobileFilterCount}
@@ -169,7 +165,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
                 disabled={props.searchLoading}
               >
                 {props.searchLoading && <Loader2 className='animate-spin' />}
-                {t('Search')}
+                查询
               </Button>
               <DataTableViewOptions table={props.table} />
             </div>
@@ -179,9 +175,9 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
         <DrawerContent className='max-h-[85dvh] p-0'>
           <div className='mx-auto flex w-full max-w-md flex-1 flex-col overflow-hidden'>
             <DrawerHeader className='border-border/70 border-b px-4 py-3 text-left'>
-              <DrawerTitle>{t('Filter')}</DrawerTitle>
+              <DrawerTitle>筛选</DrawerTitle>
               <DrawerDescription>
-                {t('Adjust filters, then search to refresh the logs.')}
+                调整筛选条件后查询日志。
               </DrawerDescription>
             </DrawerHeader>
             <div className='flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3'>
@@ -199,7 +195,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
                 onClick={handleMobileReset}
                 disabled={!props.hasActiveFilters}
               >
-                {t('Reset')}
+                重置
               </Button>
               <Button
                 type='button'
@@ -207,7 +203,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
                 disabled={props.searchLoading}
               >
                 {props.searchLoading && <Loader2 className='animate-spin' />}
-                {t('Search')}
+                查询
               </Button>
             </DrawerFooter>
           </div>
@@ -219,7 +215,7 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
   return (
     <div
       className={cn(
-        'bg-card/50 rounded-lg border p-2.5 sm:p-3',
+        'rounded-md border border-slate-200 bg-white p-2',
         props.className
       )}
     >
@@ -249,16 +245,18 @@ export function LogsFilterToolbar<TData>(props: LogsFilterToolbarProps<TData>) {
             variant='outline'
             onClick={props.onReset}
             disabled={!props.hasActiveFilters}
+            className='h-7 rounded-md px-2 text-[12px]'
           >
-            {t('Reset')}
+            重置
           </Button>
           <Button
             type='button'
             onClick={props.onSearch}
             disabled={props.searchLoading}
+            className='h-7 rounded-md px-2 text-[12px]'
           >
             {props.searchLoading && <Loader2 className='animate-spin' />}
-            {t('Search')}
+            查询
           </Button>
           <DataTableViewOptions table={props.table} />
         </div>

@@ -102,14 +102,14 @@ export function PerformanceOverview() {
 
   if (!loading && !hasData) {
     return (
-      <div className='text-muted-foreground overflow-hidden rounded-lg border px-4 py-3 text-center text-xs'>
-        {t('No performance data available')}
+      <div className='overflow-hidden rounded-md border border-slate-200 bg-white px-4 py-2.5 text-center text-xs text-slate-500 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+        {t('暂无性能数据')}
       </div>
     )
   }
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
+    <div className='overflow-hidden rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
       <div className='flex flex-wrap items-center gap-x-5 gap-y-2.5 px-4 py-2.5 sm:px-5 sm:py-3'>
         {/* Title */}
         <div className='flex items-center gap-1.5'>
@@ -118,7 +118,7 @@ export function PerformanceOverview() {
             aria-hidden='true'
           />
           <span className='text-xs font-semibold whitespace-nowrap'>
-            {t('Performance health')}
+            {t('性能健康')}
           </span>
         </div>
 
@@ -139,18 +139,18 @@ export function PerformanceOverview() {
           <div className='flex flex-wrap items-center gap-x-5 gap-y-2'>
             <InlineMetric
               icon={HeartPulse}
-              label={t('Success rate')}
+              label={t('成功率')}
               value={formatUptimePct(summary.successRate)}
               valueClassName={getSuccessRateTextClass(summary.successRate)}
             />
             <InlineMetric
               icon={Timer}
-              label={t('Average latency')}
+              label={t('平均延迟')}
               value={formatLatency(summary.avgLatencyMs)}
             />
             <InlineMetric
               icon={Gauge}
-              label={t('Throughput')}
+              label={t('吞吐')}
               value={formatThroughput(summary.avgTps)}
             />
           </div>

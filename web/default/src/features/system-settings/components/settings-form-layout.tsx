@@ -52,7 +52,7 @@ export function SettingsFormGrid(props: SettingsFormGridProps) {
     <div
       data-settings-form-span='full'
       className={cn(
-        'grid min-w-0 gap-x-4 gap-y-5 lg:grid-cols-2',
+        'grid min-w-0 gap-x-4 gap-y-4 lg:grid-cols-2',
         'lg:[&>[data-settings-form-span=full]]:col-span-2',
         '[&>[data-slot=form-item]]:min-w-0',
         'lg:[&>[data-slot=form-item]:has(textarea)]:col-span-2',
@@ -172,7 +172,7 @@ export function SettingsForm({ className, ...props }: ComponentProps<'form'>) {
   return (
     <form
       className={cn(
-        'grid min-w-0 gap-x-4 gap-y-5 lg:grid-cols-2',
+        'grid min-w-0 gap-x-4 gap-y-4 lg:grid-cols-2',
         'lg:[&>*:not([data-slot=form-item])]:col-span-2',
         'lg:[&>[data-settings-form-span=full]]:col-span-2',
         'lg:[&>[data-slot=alert]]:col-span-2',

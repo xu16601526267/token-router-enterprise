@@ -135,6 +135,41 @@ function aggregateUsage(rows: QuotaDataItem[]) {
   }
 }
 
+function startOfUtcDay(timestamp: number): number {
+  const date = new Date(timestamp * 1000)
+  return (
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) /
+    1000
+  )
+}
+
+function fillDailyUsageTrend(
+  rows: ReturnType<typeof aggregateUsage>['trend'],
+  startTimestamp: number,
+  endTimestamp: number
+) {
+  const byDayLabel = new Map(rows.map((item) => [item.label, item]))
+  const start = startOfUtcDay(startTimestamp)
+  const end = startOfUtcDay(endTimestamp)
+  const filled: ReturnType<typeof aggregateUsage>['trend'] = []
+
+  for (let timestamp = start; timestamp <= end; timestamp += 24 * 60 * 60) {
+    const label = formatDay(timestamp)
+    const existing = byDayLabel.get(label)
+    filled.push(
+      existing ?? {
+        timestamp,
+        label,
+        requests: 0,
+        tokens: 0,
+        quota: 0,
+      }
+    )
+  }
+
+  return filled
+}
+
 function buildRanges() {
   const now = new Date()
   const end = Math.floor(now.getTime() / 1000)
@@ -164,7 +199,7 @@ function paymentStatusClass(status: string) {
   return 'border-slate-200 bg-slate-50 text-slate-500'
 }
 
-const PERSONAL_STAT_CARD_CLASS = 'min-h-[96px] p-3.5'
+const PERSONAL_STAT_CARD_CLASS = 'min-h-[88px] p-3'
 
 function buildPersonalBaseUrl(configuredServerUrl?: string): string {
   if (configuredServerUrl != null && configuredServerUrl.length > 0) {
@@ -246,6 +281,15 @@ export function PersonalWorkbench() {
   const monthRows = monthUsageQuery.data?.data
   const trendUsage = useMemo(() => aggregateUsage(trendRows ?? []), [trendRows])
   const monthUsage = useMemo(() => aggregateUsage(monthRows ?? []), [monthRows])
+  const trendChartRows = useMemo(
+    () =>
+      fillDailyUsageTrend(
+        trendUsage.trend,
+        ranges.trend.start,
+        ranges.trend.end
+      ),
+    [ranges.trend.end, ranges.trend.start, trendUsage.trend]
+  )
   const keys = keysQuery.data?.data?.items ?? []
   const activeKeys = keys.filter((key) => key.status === 1)
   const preferredKey = activeKeys[0] ?? keys[0]
@@ -609,16 +653,16 @@ export function PersonalWorkbench() {
               近 7 天
             </Badge>
           }
-          bodyClassName='h-[176px] px-2 pb-2 pt-2.5 sm:px-3'
+          bodyClassName='h-[160px] px-2 pb-2 pt-2 sm:px-3'
         >
-          {trendUsage.trend.length > 0 ? (
+          {trendChartRows.length > 0 ? (
             <ResponsiveContainer
               width='100%'
               height='100%'
               initialDimension={{ width: 420, height: 170 }}
             >
               <AreaChart
-                data={trendUsage.trend}
+                data={trendChartRows}
                 margin={{ top: 8, right: 10, left: -6, bottom: 0 }}
               >
                 <defs>
@@ -676,6 +720,8 @@ export function PersonalWorkbench() {
                   name='请求量'
                   stroke='#2563eb'
                   strokeWidth={2}
+                  dot={{ r: 2, strokeWidth: 1, fill: '#fff' }}
+                  activeDot={{ r: 3 }}
                   fill='url(#personalUsageGradient)'
                 />
               </AreaChart>
@@ -694,7 +740,7 @@ export function PersonalWorkbench() {
         </EnterprisePanel>
       </div>
 
-      <div className='grid gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(250px,0.72fr)]'>
+      <div className='grid items-start gap-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(250px,0.72fr)]'>
         <EnterprisePanel
           title='最近活动'
           description='来自个人用量聚合记录'
@@ -713,27 +759,27 @@ export function PersonalWorkbench() {
                   </tr>
                 </thead>
                 <tbody className='divide-y divide-slate-100'>
-                  {recentActivities.map((item) => {
+                  {recentActivities.map((item, index) => {
                     const activityKey =
-                      item.id == null
-                        ? `${item.created_at}-${item.model_name ?? 'unknown'}-${item.count ?? 0}-${item.quota ?? 0}`
-                        : String(item.id)
+                      item.id == null || item.id <= 0
+                        ? `${item.created_at}-${item.model_name ?? 'unknown'}-${item.count ?? 0}-${item.quota ?? 0}-${index}`
+                        : `log-${item.id}`
 
                     return (
                       <tr key={activityKey}>
-                        <td className='px-3 py-2 text-slate-500'>
+                        <td className='px-3 py-1.5 text-slate-500'>
                           {formatTimestampToDate(item.created_at)}
                         </td>
-                        <td className='px-3 py-2 font-medium text-slate-900'>
+                        <td className='px-3 py-1.5 font-medium text-slate-900'>
                           模型调用
                         </td>
-                        <td className='max-w-[220px] truncate px-3 py-2 text-slate-600'>
+                        <td className='max-w-[220px] truncate px-3 py-1.5 text-slate-600'>
                           {item.model_name || '未分类模型'}
                         </td>
-                        <td className='px-3 py-2 text-right font-semibold text-slate-900 tabular-nums'>
+                        <td className='px-3 py-1.5 text-right font-semibold text-slate-900 tabular-nums'>
                           {formatQuota(item.quota ?? 0)}
                         </td>
-                        <td className='px-3 py-2 text-right'>
+                        <td className='px-3 py-1.5 text-right'>
                           <Badge className='rounded border-emerald-200 bg-emerald-50 px-1.5 text-[10px] text-emerald-700 shadow-none'>
                             成功
                           </Badge>
@@ -745,7 +791,7 @@ export function PersonalWorkbench() {
               </table>
             </div>
           ) : (
-            <div className='flex min-h-[156px] flex-col items-center justify-center text-center'>
+            <div className='flex min-h-[112px] flex-col items-center justify-center text-center'>
               <FileClock className='mb-2 size-7 text-slate-300' />
               <p className='text-[13px] font-medium text-slate-900'>
                 暂无活动记录
@@ -801,7 +847,7 @@ export function PersonalWorkbench() {
               </div>
             ))
           ) : (
-            <div className='flex min-h-[156px] flex-col items-center justify-center text-center'>
+            <div className='flex min-h-[112px] flex-col items-center justify-center text-center'>
               <FileClock className='mb-2 size-7 text-slate-300' />
               <p className='text-[13px] font-medium text-slate-900'>
                 暂无账单记录

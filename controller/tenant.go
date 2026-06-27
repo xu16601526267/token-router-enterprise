@@ -152,11 +152,16 @@ func UpdatePlatformTenantStatus(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if err := model.DB.Model(&model.Tenant{}).Where("id = ?", tenantId).Updates(map[string]interface{}{"status": input.Status, "updated_at": common.GetTimestamp()}).Error; err != nil {
+	status, err := service.NormalizeTenantStatus(input.Status)
+	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	_ = model.RecordScopedAuditLog(&model.AuditLog{ScopeType: model.ScopeTenant, ScopeId: tenantId, ActorId: c.GetInt("id"), Action: "tenant.status.update", Target: "tenant", After: common.GetJsonString(input), Ip: c.ClientIP()})
+	if err := model.DB.Model(&model.Tenant{}).Where("id = ?", tenantId).Updates(map[string]interface{}{"status": status, "updated_at": common.GetTimestamp()}).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	_ = model.RecordScopedAuditLog(&model.AuditLog{ScopeType: model.ScopeTenant, ScopeId: tenantId, ActorId: c.GetInt("id"), Action: "tenant.status.update", Target: "tenant", After: common.GetJsonString(gin.H{"status": status}), Ip: c.ClientIP()})
 	common.ApiSuccess(c, true)
 }
 

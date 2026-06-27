@@ -153,15 +153,17 @@ const SECTION_META: Record<DashboardSectionId, { titleKey: string }> = {
     titleKey: 'Overview',
   },
   models: {
-    titleKey: 'Model Call Analytics',
+    titleKey: '模型经营分析',
   },
   flow: {
-    titleKey: 'Flow',
+    titleKey: '流量链路分析',
   },
   users: {
-    titleKey: 'User Analytics',
+    titleKey: '用户用量分析',
   },
 }
+
+const DEFAULT_USER_USAGE_RANGE_DAYS = 7
 
 export function Dashboard() {
   const { t } = useTranslation()
@@ -183,7 +185,7 @@ export function Dashboard() {
       const granularity = getSavedGranularity()
       return {
         timeGranularity: granularity,
-        selectedRange: getDefaultDays(granularity),
+        selectedRange: Math.max(getDefaultDays(granularity), DEFAULT_USER_USAGE_RANGE_DAYS),
         topUserLimit: 10,
       }
     }
@@ -291,12 +293,12 @@ export function Dashboard() {
 
   return (
     <SectionPageLayout>
-      {activeSection !== 'overview' && (
+      {activeSection !== 'overview' && activeSection !== 'flow' && (
         <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
       )}
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
-          {activeSection !== 'overview' && (
+          {activeSection !== 'overview' && activeSection !== 'flow' && (
             <div className='flex flex-wrap items-center justify-between gap-1.5 sm:gap-2'>
               {showSectionTabs ? (
                 <Tabs value={activeSection} onValueChange={handleSectionChange}>

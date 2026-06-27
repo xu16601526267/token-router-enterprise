@@ -88,7 +88,7 @@ export function useDrawingLogsColumns(
   const columns: ColumnDef<MidjourneyLog>[] = [
     {
       accessorKey: 'submit_time',
-      header: t('Submit Time'),
+      header: '提交时间',
       cell: ({ row }) => {
         const log = row.original
         const submitTime = row.getValue('submit_time') as number
@@ -113,13 +113,13 @@ export function useDrawingLogsColumns(
 
   if (isAdmin) {
     columns.push(
-      createChannelColumn<MidjourneyLog>({ headerLabel: t('Channel') })
+      createChannelColumn<MidjourneyLog>({ headerLabel: '渠道' })
     )
   }
 
   columns.push({
     accessorKey: 'action',
-    header: t('Type'),
+    header: '类型',
     cell: ({ row }) => {
       const action = row.getValue('action') as string
       return (
@@ -137,7 +137,7 @@ export function useDrawingLogsColumns(
 
   columns.push({
     accessorKey: 'mj_id',
-    header: t('Task ID'),
+    header: '任务 ID',
     cell: ({ row }) => {
       const mjId = row.getValue('mj_id') as string
 
@@ -164,14 +164,14 @@ export function useDrawingLogsColumns(
     createDurationColumn<MidjourneyLog>({
       submitTimeKey: 'submit_time',
       finishTimeKey: 'finish_time',
-      headerLabel: t('Duration'),
+      headerLabel: '耗时',
     })
   )
 
   if (isAdmin) {
     columns.push({
       accessorKey: 'code',
-      header: t('Submit Result'),
+      header: '提交结果',
       cell: ({ row }) => {
         const code = row.getValue('code') as number
 
@@ -189,10 +189,10 @@ export function useDrawingLogsColumns(
   }
 
   columns.push(
-    createProgressColumn<MidjourneyLog>({ headerLabel: t('Progress') }),
+    createProgressColumn<MidjourneyLog>({ headerLabel: '进度' }),
     {
       accessorKey: 'image_url',
-      header: t('Image'),
+      header: '图片',
       cell: function ImageCell({ row }) {
         const log = row.original
         const imageUrl = row.getValue('image_url') as string
@@ -226,7 +226,7 @@ export function useDrawingLogsColumns(
     },
     {
       accessorKey: 'prompt',
-      header: t('Prompt'),
+      header: '提示词',
       cell: function PromptCell({ row }) {
         const log = row.original
         const prompt = row.getValue('prompt') as string
@@ -261,7 +261,7 @@ export function useDrawingLogsColumns(
       maxSize: 220,
     },
     createFailReasonColumn<MidjourneyLog>({
-      headerLabel: t('Fail Reason'),
+      headerLabel: '失败原因',
       cellTitle: t('Click to view full error message'),
     })
   )

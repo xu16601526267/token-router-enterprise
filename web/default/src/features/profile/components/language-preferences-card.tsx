@@ -104,17 +104,24 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
 
   return (
     <TitledCard
-      title={t('Language Preferences')}
-      description={t('Set the language used across the interface')}
+      title={t('语言偏好')}
+      description={t('设置控制台和接口错误信息使用的语言')}
       icon={<Languages className='h-4 w-4' />}
       disableHoverEffect
+      className='rounded-md border-slate-200 shadow-[0_1px_2px_rgb(15_23_42/0.04)]'
+      headerClassName='bg-slate-50/65 p-3 !pb-3'
+      contentClassName='p-3'
+      titleClassName='text-[14px] leading-5 font-semibold text-slate-900'
+      descriptionClassName='text-[11px] leading-4 text-slate-500'
     >
       <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
         <div className='space-y-1'>
-          <div className='text-sm font-medium'>{t('Interface Language')}</div>
-          <p className='text-muted-foreground line-clamp-2 text-xs sm:text-sm'>
+          <div className='text-[13px] font-semibold text-slate-900'>
+            {t('界面语言')}
+          </div>
+          <p className='line-clamp-2 text-xs text-slate-500'>
             {t(
-              'Language preferences sync across your signed-in devices and affect API error messages.'
+              '语言偏好会同步到当前账号，并影响 API 错误信息。'
             )}
           </p>
         </div>
@@ -129,7 +136,7 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
             disabled={saving}
           >
             <SelectTrigger className='w-full sm:w-48'>
-              <SelectValue placeholder={t('Select language')} />
+              <SelectValue placeholder={t('选择语言')} />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
               <SelectGroup>

@@ -48,40 +48,40 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
   return [
     {
       id: 'system-administration',
-      title: t('System Administration'),
+      title: t('系统管理'),
       items: [
         {
-          title: t('Site & Branding'),
+          title: t('站点与品牌'),
           icon: Settings,
           items: getSiteSectionNavItems(t),
         },
         {
-          title: t('Authentication'),
+          title: t('认证登录'),
           icon: Shield,
           items: getAuthSectionNavItems(t),
         },
         {
-          title: t('Billing & Payment'),
+          title: t('计费支付'),
           icon: CreditCard,
           items: getBillingSectionNavItems(t),
         },
         {
-          title: t('Models & Routing'),
+          title: t('模型与路由'),
           icon: Box,
           items: getModelsSectionNavItems(t),
         },
         {
-          title: t('Security & Limits'),
+          title: t('安全与限制'),
           icon: ShieldAlert,
           items: getSecuritySectionNavItems(t),
         },
         {
-          title: t('Console Content'),
+          title: t('控制台内容'),
           icon: Layout,
           items: getContentSectionNavItems(t),
         },
         {
-          title: t('Operations'),
+          title: t('运营维护'),
           icon: Wrench,
           items: getOperationsSectionNavItems(t),
         },
@@ -102,7 +102,7 @@ export const SYSTEM_SETTINGS_VIEW: SidebarView = {
   pathPattern: /^\/system-settings(\/|$)/,
   parent: {
     to: '/dashboard/overview',
-    label: 'Back to Dashboard',
+    label: '返回工作台',
   },
   getNavGroups: getSystemSettingsNavGroups,
 }
