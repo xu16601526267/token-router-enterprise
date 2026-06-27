@@ -30,10 +30,9 @@ import { listDeployments } from './api'
 import { DeploymentAccessGuard } from './components/deployment-access-guard'
 import { DeploymentsTable } from './components/deployments-table'
 import { CreateDeploymentDrawer } from './components/dialogs/create-deployment-drawer'
+import { EnterpriseModelCenter } from './components/enterprise-model-center'
 import { ModelsDialogs } from './components/models-dialogs'
-import { ModelsPrimaryButtons } from './components/models-primary-buttons'
 import { ModelsProvider, useModels } from './components/models-provider'
-import { ModelsTable } from './components/models-table'
 import { useModelDeploymentSettings } from './hooks/use-model-deployment-settings'
 import { deploymentsQueryKeys } from './lib'
 import {
@@ -83,19 +82,33 @@ function ModelsContent() {
 
   const meta = SECTION_META[activeSection] ?? SECTION_META.metadata
 
+  if (activeSection === 'metadata') {
+    return (
+      <>
+        <SectionPageLayout fixedContent>
+          <SectionPageLayout.Content>
+            <EnterpriseModelCenter onSectionChange={handleSectionChange} />
+          </SectionPageLayout.Content>
+        </SectionPageLayout>
+
+        <ModelsDialogs />
+        <CreateDeploymentDrawer
+          open={createDeploymentOpen}
+          onOpenChange={setCreateDeploymentOpen}
+        />
+      </>
+    )
+  }
+
   return (
     <>
       <SectionPageLayout fixedContent>
         <SectionPageLayout.Title>{t(meta.titleKey)}</SectionPageLayout.Title>
         <SectionPageLayout.Actions>
-          {activeSection === 'metadata' ? (
-            <ModelsPrimaryButtons />
-          ) : (
-            <Button onClick={() => setCreateDeploymentOpen(true)} size='sm'>
-              <Plus className='h-4 w-4' />
-              {t('Create deployment')}
-            </Button>
-          )}
+          <Button onClick={() => setCreateDeploymentOpen(true)} size='sm'>
+            <Plus className='h-4 w-4' />
+            {t('Create deployment')}
+          </Button>
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
           <div className='flex h-full min-h-0 flex-col gap-4'>
@@ -109,11 +122,7 @@ function ModelsContent() {
               </TabsList>
             </Tabs>
             <div className='min-h-0 flex-1'>
-              {activeSection === 'metadata' ? (
-                <ModelsTable />
-              ) : (
-                <DeploymentsSection />
-              )}
+              <DeploymentsSection />
             </div>
           </div>
         </SectionPageLayout.Content>
