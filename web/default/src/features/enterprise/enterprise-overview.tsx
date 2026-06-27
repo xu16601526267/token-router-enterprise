@@ -33,7 +33,6 @@ import {
   PieChart as PieChartIcon,
   ReceiptText,
   Route,
-  Settings2,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -425,17 +424,21 @@ function getOperationEvents(
 
 function OverviewPanel({
   title,
+  titleSuffix,
   description,
   action,
   children,
   className,
+  headerClassName,
   bodyClassName,
 }: {
   title: string
+  titleSuffix?: ReactNode
   description?: string
   action?: ReactNode
   children: ReactNode
   className?: string
+  headerClassName?: string
   bodyClassName?: string
 }) {
   return (
@@ -445,11 +448,21 @@ function OverviewPanel({
         className
       )}
     >
-      <div className='flex min-h-7 items-center justify-between gap-3 border-b border-slate-100/60 px-2.5 py-1'>
+      <div
+        className={cn(
+          'flex min-h-7 items-center justify-between gap-3 border-b border-slate-100/60 px-2.5 py-1',
+          headerClassName
+        )}
+      >
         <div className='min-w-0'>
-          <h2 className='truncate text-[12px] leading-4 font-semibold text-slate-950'>
-            {title}
-          </h2>
+          <div className='flex min-w-0 items-center gap-1.5'>
+            <h2 className='truncate text-[11px] leading-[14px] font-medium text-slate-950'>
+              {title}
+            </h2>
+            {titleSuffix != null && (
+              <span className='shrink-0'>{titleSuffix}</span>
+            )}
+          </div>
           {description != null && (
             <p className='truncate text-[9.5px] leading-[12px] text-slate-500'>
               {description}
@@ -590,6 +603,21 @@ export function EnterpriseOverview() {
     0,
     metrics.total_channels - metrics.healthy_channels
   )
+  const formatSlaRowValue = (title: string) => {
+    if (title.includes('延迟')) {
+      return `${formatNumber(metrics.average_latency_ms)}ms`
+    }
+
+    if (title.includes('成功') || title.includes('SLA')) {
+      return formatPercentage(metrics.success_rate)
+    }
+
+    if (unavailableChannels > 0) {
+      return `${unavailableChannels} 个`
+    }
+
+    return '正常'
+  }
   const requestTrend = metrics.total_requests > 0 ? '+12.4%' : '+0%'
   let successTrend = '告警'
   if (metrics.success_rate >= 0.995) {
@@ -614,6 +642,7 @@ export function EnterpriseOverview() {
             insight.summary ||
             insight.recommended_action ||
             '等待运营团队确认处理方案',
+          value: formatSlaRowValue(insight.title),
           badge: tone.priority,
           badgeClassName: tone.badge,
           dotClassName: tone.dot,
@@ -624,6 +653,7 @@ export function EnterpriseOverview() {
         return {
           title: insight.title,
           description: insight.summary,
+          value: formatSlaRowValue(insight.title),
           badge: tone.priority,
           badgeClassName: tone.badge,
           dotClassName: tone.dot,
@@ -687,6 +717,29 @@ export function EnterpriseOverview() {
         metrics.active_policies > 0
           ? 'border-blue-200/70 bg-blue-50/65 text-blue-700'
           : 'border-amber-200/70 bg-amber-50/70 text-amber-700',
+    },
+  ]
+
+  const estimatedIncome = Math.max(
+    0,
+    metrics.estimated_cost + metrics.estimated_gross_profit
+  )
+  const costSummaryItems = [
+    {
+      label: '本月收入',
+      value: formatCurrencyUSD(estimatedIncome),
+    },
+    {
+      label: '本月成本',
+      value: formatCurrencyUSD(Math.max(0, metrics.estimated_cost)),
+    },
+    {
+      label: '毛利',
+      value: formatCurrencyUSD(Math.max(0, metrics.estimated_gross_profit)),
+    },
+    {
+      label: '毛利率',
+      value: formatPercentage(metrics.gross_margin_rate),
     },
   ]
 
@@ -986,236 +1039,312 @@ export function EnterpriseOverview() {
         </OverviewPanel>
 
         <section className='grid gap-1.5 xl:grid-cols-3'>
-        <OverviewPanel
-          title='成本 vs 收入'
-          description='按当前定价口径估算'
-          action={<Settings2 className='size-4 text-slate-400' />}
-          bodyClassName='h-[158px] px-2 pb-1.5 pt-2 sm:px-2.5'
-        >
-          {costData.length > 0 ? (
-            <ResponsiveContainer
-              width='100%'
-              height='100%'
-              initialDimension={{ width: 420, height: 158 }}
-            >
-              <BarChart
-                data={costData}
-                barGap={3}
-                barCategoryGap='24%'
-                margin={{ top: 4, right: 8, bottom: 2, left: 2 }}
+          <OverviewPanel
+            title='成本 vs 收入'
+            titleSuffix={
+              <span className='flex size-3 items-center justify-center rounded-full border border-slate-200 text-[8px] font-medium text-slate-400'>
+                i
+              </span>
+            }
+            action={
+              <Button
+                variant='outline'
+                size='sm'
+                className='h-6 rounded-md border-slate-200 bg-white px-2 text-[10.5px] font-medium text-slate-600 shadow-none hover:bg-slate-50'
               >
-                <CartesianGrid
-                  vertical={false}
-                  stroke='#e5e7eb'
-                  strokeDasharray='2 8'
-                />
-                <XAxis
-                  dataKey='label'
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 9.5 }}
-                  dy={8}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  width={44}
-                  tickFormatter={(value) =>
-                    formatCurrencyCompact(Number(value))
-                  }
-                  tick={{ fill: '#64748b', fontSize: 9.5 }}
-                />
-                <ChartTooltip
-                  cursor={{ fill: '#f1f5f9' }}
-                  contentStyle={{
-                    borderRadius: 4,
-                    border: '1px solid #e2e8f0',
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
-                    fontSize: 11,
-                  }}
-                  formatter={(value, name) => [
-                    formatCurrencyUSD(Number(value)),
-                    name,
-                  ]}
-                />
-                <Bar
-                  dataKey='income'
-                  name='收入'
-                  fill='#3b82f6'
-                  radius={[2, 2, 0, 0]}
-                  maxBarSize={13}
-                />
-                <Bar
-                  dataKey='cost'
-                  name='成本'
-                  fill='#f6b73c'
-                  radius={[2, 2, 0, 0]}
-                  maxBarSize={13}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyChartState
-              icon={Coins}
-              title='暂无成本收入趋势'
-              description='产生调用并配置定价后，会展示收入、成本和毛利趋势。'
-            />
-          )}
-        </OverviewPanel>
-
-        <OverviewPanel
-          title='供应商流量分布'
-          description='按渠道消耗占比'
-          action={<PieChartIcon className='size-4 text-slate-400' />}
-          bodyClassName='h-[158px]'
-        >
-          {donutData.length > 0 ? (
-            <div className='grid h-full grid-cols-[minmax(0,1fr)_132px] items-center gap-2 max-sm:grid-cols-1'>
-              <ResponsiveContainer
-                width='100%'
-                height='100%'
-                initialDimension={{ width: 158, height: 158 }}
-              >
-                <RechartsPieChart>
-                  <Pie
-                    data={donutData}
-                    dataKey='value'
-                    nameKey='name'
-                    cx='50%'
-                    cy='50%'
-                    innerRadius='58%'
-                    outerRadius='82%'
-                    paddingAngle={3}
-                    stroke='none'
+                本月
+                <ChevronRight className='size-3 rotate-90' />
+              </Button>
+            }
+            headerClassName='min-h-8 px-3 py-1.5'
+            bodyClassName='h-[188px] px-3 pb-2 pt-1.5'
+          >
+            {costData.length > 0 ? (
+              <div className='grid h-full grid-rows-[18px_minmax(0,1fr)_34px]'>
+                <div className='flex items-center gap-5 text-[10.5px] leading-4 text-slate-500'>
+                  <span className='flex items-center gap-1.5'>
+                    <span className='h-1.5 w-4 rounded-full bg-blue-500' />
+                    成本（USD）
+                  </span>
+                  <span className='flex items-center gap-1.5'>
+                    <span className='h-1.5 w-4 rounded-full bg-emerald-500' />
+                    收入（USD）
+                  </span>
+                </div>
+                <ResponsiveContainer
+                  width='100%'
+                  height='100%'
+                  initialDimension={{ width: 420, height: 128 }}
+                >
+                  <BarChart
+                    data={costData}
+                    barGap={2}
+                    barCategoryGap='28%'
+                    margin={{ top: 3, right: 4, bottom: 0, left: 0 }}
                   >
-                    {donutData.map((entry, index) => (
-                      <Cell
-                        key={entry.name}
-                        fill={DONUT_COLORS[index % DONUT_COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <ChartTooltip
-                    contentStyle={{
-                      borderRadius: 4,
-                      border: '1px solid #e2e8f0',
-                      background: '#ffffff',
-                      color: '#0f172a',
-                      boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
-                      fontSize: 11,
-                    }}
-                    formatter={(value) => [
-                      `${formatCompactNumber(Number(value))} (${formatPercentage(
-                        donutTotal > 0 ? Number(value) / donutTotal : 0
-                      )})`,
-                      '消耗',
-                    ]}
-                  />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-              <div className='space-y-1'>
-                {donutData.map((item, index) => (
-                  <div
-                    key={item.name}
-                    className='flex items-center justify-between gap-2 text-[10.5px]'
-                  >
-                    <span className='flex min-w-0 items-center gap-2 text-slate-600'>
-                      <span
-                        className='size-2.5 shrink-0 rounded-full'
-                        style={{
-                          backgroundColor:
-                            DONUT_COLORS[index % DONUT_COLORS.length],
-                        }}
-                      />
-                      <span className='truncate'>{item.name}</span>
-                    </span>
-                    <span className='font-semibold text-slate-900 tabular-nums'>
-                      {formatPercentage(
-                        donutTotal > 0 ? item.value / donutTotal : 0
-                      )}
-                    </span>
-                  </div>
-                ))}
+                    <CartesianGrid
+                      vertical={false}
+                      stroke='#e5e7eb'
+                      strokeDasharray='2 7'
+                    />
+                    <XAxis
+                      dataKey='label'
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#64748b', fontSize: 9.5 }}
+                      dy={8}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      width={34}
+                      tickFormatter={(value) =>
+                        formatCurrencyCompact(Number(value))
+                      }
+                      tick={{ fill: '#64748b', fontSize: 9.5 }}
+                    />
+                    <ChartTooltip
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{
+                        borderRadius: 6,
+                        border: '1px solid #e2e8f0',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
+                        fontSize: 11,
+                      }}
+                      formatter={(value, name) => [
+                        formatCurrencyUSD(Number(value)),
+                        name,
+                      ]}
+                    />
+                    <Bar
+                      dataKey='cost'
+                      name='成本'
+                      fill='#3b82f6'
+                      radius={[2, 2, 0, 0]}
+                      maxBarSize={9}
+                    />
+                    <Bar
+                      dataKey='income'
+                      name='收入'
+                      fill='#22c55e'
+                      radius={[2, 2, 0, 0]}
+                      maxBarSize={9}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className='grid grid-cols-4 gap-2 border-t border-slate-100 pt-1.5'>
+                  {costSummaryItems.map((item) => (
+                    <div key={item.label} className='min-w-0'>
+                      <p className='truncate text-[10px] leading-3 text-slate-500'>
+                        {item.label}
+                      </p>
+                      <p className='mt-0.5 truncate text-[10.5px] leading-4 font-semibold text-slate-900 tabular-nums'>
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            <EmptyChartState
-              icon={PieChartIcon}
-              title='暂无供应商数据'
-              description='上游渠道产生消耗后，会展示供应商流量和成本占比。'
-            />
-          )}
-        </OverviewPanel>
+            ) : (
+              <EmptyChartState
+                icon={Coins}
+                title='暂无成本收入趋势'
+                description='产生调用并配置定价后，会展示收入、成本和毛利趋势。'
+              />
+            )}
+          </OverviewPanel>
+
+          <OverviewPanel
+            title='供应商流量分布'
+            titleSuffix={
+              <span className='flex size-3 items-center justify-center rounded-full border border-slate-200 text-[8px] font-medium text-slate-400'>
+                i
+              </span>
+            }
+            action={
+              <Button
+                variant='outline'
+                size='sm'
+                className='h-6 rounded-md border-slate-200 bg-white px-2 text-[10.5px] font-medium text-slate-600 shadow-none hover:bg-slate-50'
+              >
+                本月
+                <ChevronRight className='size-3 rotate-90' />
+              </Button>
+            }
+            headerClassName='min-h-8 px-3 py-1.5'
+            bodyClassName='h-[188px] px-3 pb-2 pt-2'
+          >
+            {donutData.length > 0 ? (
+              <div className='grid h-full grid-rows-[minmax(0,1fr)_20px]'>
+                <div className='grid min-h-0 grid-cols-[154px_minmax(0,1fr)] items-center gap-3 max-sm:grid-cols-1'>
+                  <div className='relative h-full min-h-0'>
+                    <ResponsiveContainer
+                      width='100%'
+                      height='100%'
+                      initialDimension={{ width: 154, height: 154 }}
+                    >
+                      <RechartsPieChart>
+                        <Pie
+                          data={donutData}
+                          dataKey='value'
+                          nameKey='name'
+                          cx='50%'
+                          cy='50%'
+                          innerRadius='54%'
+                          outerRadius='78%'
+                          paddingAngle={3}
+                          stroke='#ffffff'
+                          strokeWidth={2}
+                        >
+                          {donutData.map((entry, index) => (
+                            <Cell
+                              key={entry.name}
+                              fill={DONUT_COLORS[index % DONUT_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <ChartTooltip
+                          contentStyle={{
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
+                            color: '#0f172a',
+                            boxShadow: '0 8px 20px rgb(15 23 42 / 0.08)',
+                            fontSize: 11,
+                          }}
+                          formatter={(value) => [
+                            `${formatCompactNumber(Number(value))} (${formatPercentage(
+                              donutTotal > 0 ? Number(value) / donutTotal : 0
+                            )})`,
+                            '消耗',
+                          ]}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                    <div className='pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center'>
+                      <span className='text-[10px] leading-3 text-slate-500'>
+                        总请求量
+                      </span>
+                      <span className='mt-0.5 text-base leading-5 font-medium text-slate-900 tabular-nums'>
+                        {formatCompactNumber(donutTotal)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className='min-w-0 space-y-1.5'>
+                    {donutData.slice(0, 5).map((item, index) => (
+                      <div
+                        key={item.name}
+                        className='grid grid-cols-[minmax(0,1fr)_40px] items-center gap-2 text-[10.5px] leading-4'
+                      >
+                        <span className='flex min-w-0 items-center gap-2 text-slate-600'>
+                          <span
+                            className='size-2 shrink-0 rounded-full'
+                            style={{
+                              backgroundColor:
+                                DONUT_COLORS[index % DONUT_COLORS.length],
+                            }}
+                          />
+                          <span className='truncate'>{item.name}</span>
+                        </span>
+                        <span className='text-right font-medium text-slate-800 tabular-nums'>
+                          {formatPercentage(
+                            donutTotal > 0 ? item.value / donutTotal : 0
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className='flex items-end justify-end'>
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    className='h-5 px-0 text-[10.5px] font-medium text-blue-600 hover:bg-transparent hover:text-blue-700'
+                    render={<Link to='/channels' />}
+                  >
+                    查看供应商详情
+                    <ChevronRight className='size-3' />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <EmptyChartState
+                icon={PieChartIcon}
+                title='暂无供应商数据'
+                description='上游渠道产生消耗后，会展示供应商流量和成本占比。'
+              />
+            )}
+          </OverviewPanel>
 
           <OverviewPanel
             title='热门模型排行'
-            description='按请求量排序'
-          action={
-            <Button
-              variant='outline'
-              size='sm'
-              className='h-5 rounded-md border-slate-200 bg-white px-1.5 text-[10px] text-slate-600 shadow-none hover:bg-slate-50'
-            >
-              本月
-              <ChevronRight className='size-3 rotate-90' />
-            </Button>
-          }
-          bodyClassName='p-0'
-        >
-          <div className='overflow-hidden'>
-            <table className='w-full table-fixed text-left text-[10.5px]'>
-              <colgroup>
-                <col className='w-[52%]' />
-                <col className='w-[24%]' />
-                <col className='w-[24%]' />
-              </colgroup>
-              <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-medium text-slate-500'>
-                <tr>
-                  <th className='px-2.5 py-1.5 font-medium'>模型</th>
-                  <th className='px-1.5 py-1.5 text-right font-medium'>请求量</th>
-                  <th className='px-2 py-1.5 text-right font-medium'>成功率</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-slate-100'>
-                {overview.top_models.length > 0 ? (
-                  overview.top_models.slice(0, 5).map((model, index) => (
-                    <tr key={model.name} className='hover:bg-slate-50/70'>
-                      <td className='px-2.5 py-1.5'>
-                        <div className='flex min-w-0 items-center gap-2'>
-                          <span
-                            className={cn(
-                              'flex size-4.5 shrink-0 items-center justify-center rounded-[3px] text-[9px] font-semibold',
-                              index === 0 &&
-                                'bg-rose-500 text-white shadow-[0_1px_3px_rgb(244_63_94/0.22)]',
-                              index === 1 && 'bg-amber-500 text-white',
-                              index === 2 && 'bg-orange-100 text-orange-700',
-                              index > 2 && 'bg-slate-100 text-slate-500'
-                            )}
-                          >
-                            {index + 1}
-                          </span>
-                          <div className='min-w-0 flex-1'>
-                            <span className='block truncate font-semibold text-slate-900'>
+            titleSuffix={
+              <span className='flex size-3 items-center justify-center rounded-full border border-slate-200 text-[8px] font-medium text-slate-400'>
+                i
+              </span>
+            }
+            action={
+              <Button
+                variant='outline'
+                size='sm'
+                className='h-6 rounded-md border-slate-200 bg-white px-2 text-[10.5px] font-medium text-slate-600 shadow-none hover:bg-slate-50'
+              >
+                本月
+                <ChevronRight className='size-3 rotate-90' />
+              </Button>
+            }
+            headerClassName='min-h-8 px-3 py-1.5'
+            bodyClassName='flex h-[188px] flex-col p-0'
+          >
+            <div className='min-h-0 flex-1 overflow-hidden'>
+              <table className='w-full table-fixed text-left text-[10.5px]'>
+                <colgroup>
+                  <col className='w-[52%]' />
+                  <col className='w-[24%]' />
+                  <col className='w-[24%]' />
+                </colgroup>
+                <thead className='border-b border-slate-100 bg-slate-50/70 text-[10px] font-normal text-slate-500'>
+                  <tr>
+                    <th className='px-3 py-1.5 font-normal'>模型</th>
+                    <th className='px-2 py-1.5 text-right font-normal'>
+                      请求量
+                    </th>
+                    <th className='px-3 py-1.5 text-right font-normal'>
+                      成功率
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className='divide-y divide-slate-100'>
+                  {overview.top_models.length > 0 ? (
+                    overview.top_models.slice(0, 5).map((model, index) => (
+                      <tr
+                        key={model.name}
+                        className='h-6 hover:bg-slate-50/70'
+                      >
+                        <td className='px-3 py-1.5'>
+                          <div className='flex min-w-0 items-center gap-2'>
+                            <span
+                              className={cn(
+                                'flex size-4 shrink-0 items-center justify-center rounded-[3px] text-[9px] font-medium',
+                                index === 0 && 'bg-rose-500 text-white',
+                                index === 1 && 'bg-amber-500 text-white',
+                                index === 2 && 'bg-orange-100 text-orange-700',
+                                index > 2 && 'bg-slate-100 text-slate-500'
+                              )}
+                            >
+                              {index + 1}
+                            </span>
+                            <span className='block min-w-0 truncate font-normal text-slate-700'>
                               {model.name}
                             </span>
-                            <span className='mt-0.5 block h-1 overflow-hidden rounded-full bg-slate-100'>
-                              <span
-                                className='block h-full rounded-full bg-blue-500/80'
-                                style={{
-                                  width: `${clamp(model.share, 0.04, 1) * 100}%`,
-                                }}
-                              />
-                            </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className='px-1.5 py-1.5 text-right font-semibold text-slate-900 tabular-nums'>
-                        {formatCompactNumber(model.requests)}
-                      </td>
-                      <td className='px-2 py-1.5 text-right'>
-                        <span className='rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 tabular-nums'>
+                        </td>
+                        <td className='px-2 py-1.5 text-right font-normal text-slate-700 tabular-nums'>
+                          {formatCompactNumber(model.requests)}
+                        </td>
+                        <td className='px-3 py-1.5 text-right font-normal text-slate-700 tabular-nums'>
                           {formatPercentage(
                             clamp(
                               (metrics.success_rate || 0.9968) - index * 0.003,
@@ -1223,53 +1352,63 @@ export function EnterpriseOverview() {
                               0.9999
                             )
                           )}
-                        </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className='px-3 py-8 text-center text-xs text-slate-500'
+                      >
+                        暂无模型排行数据
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className='px-3 py-8 text-center text-sm text-slate-500'
-                    >
-                      暂无模型排行数据
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </OverviewPanel>
-      </section>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className='flex h-7 shrink-0 items-center justify-end border-t border-slate-100 px-3'>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-5 px-0 text-[10.5px] font-medium text-blue-600 hover:bg-transparent hover:text-blue-700'
+                render={<Link to='/models' />}
+              >
+                查看全部模型
+                <ChevronRight className='size-3' />
+              </Button>
+            </div>
+          </OverviewPanel>
+        </section>
 
         <section className='grid gap-1.5'>
-        <OverviewPanel
-          title='近期运营事件'
-          description='来自 SLA、渠道和定价治理的最近事件'
-          action={
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-6 px-1.5 text-[11px] text-blue-700 hover:bg-blue-50'
-              render={<Link to='/usage-logs' />}
-            >
-              查看日志
-              <ChevronRight className='size-3' />
-            </Button>
-          }
-          bodyClassName='p-0'
-        >
+          <OverviewPanel
+            title='近期运营事件'
+            description='来自 SLA、渠道和定价治理的最近事件'
+            action={
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-6 px-1.5 text-[11px] text-blue-700 hover:bg-blue-50'
+                render={<Link to='/usage-logs' />}
+              >
+                查看日志
+                <ChevronRight className='size-3' />
+              </Button>
+            }
+            bodyClassName='p-0'
+          >
           <div className='overflow-x-auto'>
             <table className='w-full min-w-[860px] text-left text-[11px]'>
-              <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-medium text-slate-500'>
+              <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-normal text-slate-500'>
                 <tr>
-                  <th className='px-3 py-1.5 font-medium'>时间</th>
-                  <th className='px-2.5 py-1.5 font-medium'>级别</th>
-                  <th className='px-2.5 py-1.5 font-medium'>事件</th>
-                  <th className='px-2.5 py-1.5 font-medium'>对象</th>
-                  <th className='px-2.5 py-1.5 font-medium'>影响</th>
-                  <th className='px-3 py-1.5 text-right font-medium'>状态</th>
+                  <th className='px-3 py-1.5 font-normal'>时间</th>
+                  <th className='px-2.5 py-1.5 font-normal'>级别</th>
+                  <th className='px-2.5 py-1.5 font-normal'>事件</th>
+                  <th className='px-2.5 py-1.5 font-normal'>对象</th>
+                  <th className='px-2.5 py-1.5 font-normal'>影响</th>
+                  <th className='px-3 py-1.5 text-right font-normal'>状态</th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-slate-100'>
@@ -1289,7 +1428,7 @@ export function EnterpriseOverview() {
                         {event.level}
                       </Badge>
                     </td>
-                    <td className='max-w-56 px-2.5 py-1.5 font-medium text-slate-900'>
+                    <td className='max-w-56 px-2.5 py-1.5 font-normal text-slate-800'>
                       <span className='line-clamp-1'>{event.title}</span>
                     </td>
                     <td className='max-w-44 px-2.5 py-1.5 text-slate-600'>
@@ -1311,45 +1450,54 @@ export function EnterpriseOverview() {
       </section>
         </div>
 
-        <aside className='grid min-w-0 content-stretch gap-1.5 min-[1360px]:grid-rows-[154px_154px_124px_minmax(0,1fr)]'>
+        <aside className='grid min-w-0 content-stretch gap-1.5 min-[1360px]:grid-rows-[112px_112px_86px_minmax(170px,1fr)]'>
           <OverviewPanel
             title='SLA 告警'
+            titleSuffix={
+              <Badge className='h-4 min-w-4 rounded-full bg-rose-500 px-1 text-[9px] leading-4 text-white shadow-none'>
+                {Math.max(metrics.open_insights, slaRows.length)}
+              </Badge>
+            }
             action={
-              <div className='flex items-center gap-2'>
-                <Badge className='h-4 min-w-4 rounded-full bg-rose-600 px-1 text-[9px] text-white'>
-                  {Math.max(metrics.open_insights, slaRows.length)}
-                </Badge>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  className='h-5 px-1 text-[10px] text-blue-700 hover:bg-blue-50'
-                  render={<Link to='/usage-logs' />}
-                >
-                  查看全部
-                  <ChevronRight className='size-3' />
-                </Button>
-              </div>
+              <Button
+                variant='ghost'
+                size='sm'
+                className='h-5 px-1 text-[10px] font-medium text-blue-700 hover:bg-blue-50'
+                render={<Link to='/usage-logs' />}
+              >
+                查看全部
+                <ChevronRight className='size-3' />
+              </Button>
             }
             className='h-full'
+            headerClassName='min-h-6 px-2.5 py-1'
             bodyClassName='p-0'
           >
             <div className='divide-y divide-slate-100/80'>
               {slaRows.map((item) => (
                 <div
                   key={item.title}
-                  className='flex min-h-[40px] items-center gap-2 px-2.5 py-1.5'
+                  className='grid min-h-[28px] grid-cols-[minmax(0,1fr)_54px_34px] items-center gap-2 px-2.5 py-0.5'
                   title={`${item.title}: ${item.description}`}
                 >
-                  <span
-                    className={cn('size-1.5 shrink-0 rounded-full', item.dotClassName)}
-                  />
-                  <span className='min-w-0 flex-1 truncate text-[11px] font-medium text-slate-800'>
-                    {item.title}
+                  <span className='flex min-w-0 items-center gap-2'>
+                    <span
+                      className={cn(
+                        'size-1.5 shrink-0 rounded-full',
+                        item.dotClassName
+                      )}
+                    />
+                    <span className='min-w-0 truncate text-[10.5px] font-medium text-slate-700'>
+                      {item.title}
+                    </span>
+                  </span>
+                  <span className='text-right text-[10.5px] font-normal text-slate-700 tabular-nums'>
+                    {item.value}
                   </span>
                   <Badge
                     variant='outline'
                     className={cn(
-                      'h-4 rounded-md px-1.5 text-[9px]',
+                      'h-4 justify-center rounded-md px-1 text-[9px] font-medium',
                       item.badgeClassName
                     )}
                   >
@@ -1362,11 +1510,16 @@ export function EnterpriseOverview() {
 
           <OverviewPanel
             title='待审批事项'
+            titleSuffix={
+              <Badge className='h-4 min-w-4 rounded-full bg-amber-500 px-1 text-[9px] leading-4 text-white shadow-none'>
+                {approvalRows.reduce((sum, item) => sum + item.count, 0)}
+              </Badge>
+            }
             action={
               <Button
                 variant='ghost'
                 size='sm'
-                className='h-5 px-1 text-[10px] text-blue-700 hover:bg-blue-50'
+                className='h-5 px-1 text-[10px] font-medium text-blue-700 hover:bg-blue-50'
                 render={<Link to='/subscriptions' />}
               >
                 查看全部
@@ -1374,30 +1527,26 @@ export function EnterpriseOverview() {
               </Button>
             }
             className='h-full'
+            headerClassName='min-h-6 px-2.5 py-1'
             bodyClassName='p-0'
           >
             <div className='divide-y divide-slate-100/80'>
               {approvalRows.map((item) => {
-                const Icon = item.icon
                 return (
                   <div
                     key={item.label}
-                    className='flex min-h-[40px] items-center justify-between gap-2 px-2.5 py-1.5'
+                    className='grid min-h-[28px] grid-cols-[minmax(0,1fr)_86px_24px] items-center gap-2 px-2.5 py-0.5'
                   >
-                    <div className='flex min-w-0 items-center gap-2'>
-                      <span className='flex size-5 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700'>
-                        <Icon className='size-3' />
+                    <span className='flex min-w-0 items-center gap-1.5'>
+                      <span className='size-1.5 shrink-0 rounded-full bg-amber-400 ring-2 ring-amber-100' />
+                      <span className='truncate text-[10.5px] font-medium text-slate-700'>
+                        {item.label}（{item.count} 条）
                       </span>
-                      <div className='min-w-0'>
-                        <div className='truncate text-[11px] font-medium text-slate-800'>
-                          {item.label}
-                        </div>
-                        <div className='truncate text-[9.5px] text-slate-500'>
-                          来自 {item.source}
-                        </div>
-                      </div>
-                    </div>
-                    <span className='flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-semibold text-slate-700 tabular-nums'>
+                    </span>
+                    <span className='truncate text-right text-[10px] text-slate-500'>
+                      来自 {item.source}
+                    </span>
+                    <span className='flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-[10px] font-medium text-slate-700 tabular-nums shadow-[0_1px_2px_rgb(15_23_42/0.04)]'>
                       {item.count}
                     </span>
                   </div>
@@ -1408,11 +1557,16 @@ export function EnterpriseOverview() {
 
           <OverviewPanel
             title='资源风险'
+            titleSuffix={
+              <Badge className='h-4 min-w-4 rounded-full bg-rose-500 px-1 text-[9px] leading-4 text-white shadow-none'>
+                {riskRows.filter((item) => item.badge !== '正常').length}
+              </Badge>
+            }
             action={
               <Button
                 variant='ghost'
                 size='sm'
-                className='h-5 px-1 text-[10px] text-blue-700 hover:bg-blue-50'
+                className='h-5 px-1 text-[10px] font-medium text-blue-700 hover:bg-blue-50'
                 render={<Link to='/channels' />}
               >
                 查看全部
@@ -1420,23 +1574,27 @@ export function EnterpriseOverview() {
               </Button>
             }
             className='h-full'
+            headerClassName='min-h-6 px-2.5 py-1'
             bodyClassName='p-0'
           >
             <div className='divide-y divide-slate-100/80'>
               {riskRows.slice(0, 2).map((item) => (
                 <div
                   key={item.label}
-                  className='flex min-h-[46px] items-center justify-between gap-2 px-2.5 py-1.5'
+                  className='flex min-h-[29px] items-center justify-between gap-2 px-2.5 py-0.5'
                 >
                   <div className='flex min-w-0 items-center gap-2'>
-                    <span className='size-1.5 shrink-0 rounded-full bg-orange-500' />
-                    <span className='truncate text-[11px] font-medium text-slate-800'>
+                    <span className='size-1.5 shrink-0 rounded-full border border-orange-500 bg-white ring-1 ring-orange-100' />
+                    <span className='truncate text-[10.5px] font-medium text-slate-700'>
                       {item.label}
                     </span>
                   </div>
                   <Badge
                     variant='outline'
-                    className={cn('h-4 rounded-md px-1.5 text-[9px]', item.className)}
+                    className={cn(
+                      'h-4 rounded-md px-1.5 text-[9px] font-medium',
+                      item.className
+                    )}
                   >
                     {item.badge}
                   </Badge>
@@ -1448,21 +1606,24 @@ export function EnterpriseOverview() {
           <OverviewPanel
             title='快捷操作'
             className='h-full'
-            bodyClassName='p-1.5'
+            headerClassName='min-h-6 px-2.5 py-1'
+            bodyClassName='px-2.5 py-2'
           >
-            <div className='grid grid-cols-3 gap-x-2 gap-y-1.5'>
+            <div className='grid grid-cols-4 gap-x-2.5 gap-y-2.5'>
               {QUICK_ACTIONS.slice(0, 6).map((item) => {
                 const Icon = item.icon
                 return (
                   <Link
                     key={item.label}
                     to={item.to}
-                    className='group flex min-h-[43px] flex-col items-center justify-center gap-1 rounded-md text-center text-[9.5px] font-medium text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
+                    className='group flex min-h-[52px] flex-col items-center justify-start gap-1.5 rounded-md pt-1 text-center text-[9.5px] font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
                   >
-                    <span className='flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'>
-                      <Icon className='size-3' />
+                    <span className='flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700 shadow-[0_1px_2px_rgb(37_99_235/0.05)] group-hover:bg-blue-600 group-hover:text-white'>
+                      <Icon className='size-3.5' />
                     </span>
-                    <span className='max-w-full truncate'>{item.label}</span>
+                    <span className='max-w-full truncate leading-3'>
+                      {item.label}
+                    </span>
                   </Link>
                 )
               })}
