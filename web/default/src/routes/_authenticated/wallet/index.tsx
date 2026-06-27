@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 
-import { PersonalWorkbench } from '@/features/enterprise/personal-workbench'
+import { Wallet } from '@/features/wallet'
 
 const walletSearchSchema = z.object({
   show_history: z.boolean().optional(),
@@ -31,6 +31,6 @@ export const Route = createFileRoute('/_authenticated/wallet/')({
 })
 
 function RouteComponent() {
-  Route.useSearch()
-  return <PersonalWorkbench />
+  const { show_history } = Route.useSearch()
+  return <Wallet initialShowHistory={show_history} />
 }
