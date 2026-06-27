@@ -164,6 +164,16 @@ function paymentStatusClass(status: string) {
   return 'border-slate-200 bg-slate-50 text-slate-500'
 }
 
+const PERSONAL_STAT_CARD_CLASS = 'min-h-[96px] p-3.5'
+
+function buildPersonalBaseUrl(configuredServerUrl?: string): string {
+  if (configuredServerUrl != null && configuredServerUrl.length > 0) {
+    return `${configuredServerUrl.replace(/\/$/, '')}/v1`
+  }
+  if (typeof window === 'undefined') return '/v1'
+  return `${window.location.origin}/v1`
+}
+
 export function PersonalWorkbench() {
   const user = useAuthStore((state) => state.auth.user)
   const { copyToClipboard, copiedText } = useCopyToClipboard({
@@ -278,8 +288,10 @@ export function PersonalWorkbench() {
     trendUsage.models.reduce((sum, model) => sum + model.requests, 0),
     1
   )
-  const baseUrl =
-    typeof window === 'undefined' ? '/v1' : `${window.location.origin}/v1`
+  const configuredServerUrl = import.meta.env.VITE_REACT_APP_SERVER_URL as
+    | string
+    | undefined
+  const baseUrl = buildPersonalBaseUrl(configuredServerUrl)
 
   const handleCopyKey = async () => {
     if (!preferredKey) return
@@ -338,7 +350,7 @@ export function PersonalWorkbench() {
   }
 
   return (
-    <div className='enterprise-dashboard space-y-2 px-0.5 pb-2 text-slate-950 sm:px-0'>
+    <div className='personal-workbench enterprise-dashboard space-y-2 px-0.5 pt-2 pb-2 text-slate-950 sm:px-0'>
       <div className='flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between'>
         <div className='min-w-0'>
           <h1 className='text-[22px] leading-7 font-semibold tracking-normal text-slate-950'>
@@ -377,6 +389,7 @@ export function PersonalWorkbench() {
           helper='当前账户余额'
           icon={Wallet}
           tone='blue'
+          className={PERSONAL_STAT_CARD_CLASS}
         />
         <EnterpriseStatCard
           title='本月调用'
@@ -385,6 +398,7 @@ export function PersonalWorkbench() {
           icon={Zap}
           tone='emerald'
           loading={monthUsageQuery.isLoading}
+          className={PERSONAL_STAT_CARD_CLASS}
         />
         <EnterpriseStatCard
           title='活跃 API Key'
@@ -393,6 +407,7 @@ export function PersonalWorkbench() {
           icon={KeyRound}
           tone='violet'
           loading={keysQuery.isLoading}
+          className={PERSONAL_STAT_CARD_CLASS}
         />
         <EnterpriseStatCard
           title='最近充值'
@@ -405,6 +420,7 @@ export function PersonalWorkbench() {
           icon={CircleDollarSign}
           tone='amber'
           loading={billingQuery.isLoading}
+          className={PERSONAL_STAT_CARD_CLASS}
         />
         <EnterpriseStatCard
           title='订阅状态'
@@ -417,6 +433,7 @@ export function PersonalWorkbench() {
           icon={CreditCard}
           tone={activeSubscription ? 'emerald' : 'slate'}
           loading={subscriptionQuery.isLoading}
+          className={PERSONAL_STAT_CARD_CLASS}
         />
       </div>
 
@@ -800,7 +817,7 @@ export function PersonalWorkbench() {
           <EnterprisePanel
             title='充值中心'
             description='按系统配置展示可用金额'
-            bodyClassName='space-y-1.5 px-2.5 py-2'
+            bodyClassName='space-y-1 px-2 py-1.5'
           >
             {amountOptions.length > 0 ? (
               <div className='grid grid-cols-5 gap-1'>
@@ -811,7 +828,7 @@ export function PersonalWorkbench() {
                       key={amount}
                       type='button'
                       className={cn(
-                        'h-[26px] rounded-md border px-1 text-[11px] font-semibold transition-colors',
+                        'h-6 rounded-md border px-1 text-[11px] font-semibold transition-colors',
                         active
                           ? 'border-blue-300 bg-blue-50 text-blue-700'
                           : 'border-slate-100 bg-white text-slate-700 hover:border-blue-200'
@@ -829,14 +846,14 @@ export function PersonalWorkbench() {
               </div>
             )}
             <Button
-              className='h-[26px] w-full rounded-md text-[11px]'
+              className='h-6 w-full rounded-md text-[11px]'
               disabled={!canTopup || paymentProcessing}
               onClick={() => void handleStartPayment()}
             >
               <CircleDollarSign className='size-3.5' />
               {paymentProcessing ? '处理中' : '立即充值'}
             </Button>
-            <p className='text-[10px] leading-4 text-slate-500'>
+            <p className='truncate text-[10px] leading-4 text-slate-500'>
               {primaryPaymentMethod
                 ? `默认支付方式：${paymentMethods[0]?.name || primaryPaymentMethod}`
                 : '请先在系统设置中配置支付方式'}
@@ -857,7 +874,7 @@ export function PersonalWorkbench() {
                 <ExternalLink className='size-3' />
               </Button>
             }
-            bodyClassName='space-y-1 px-2.5 py-2'
+            bodyClassName='space-y-0.5 px-2 py-1.5'
           >
             {[
               {
@@ -889,9 +906,9 @@ export function PersonalWorkbench() {
               return (
                 <div
                   key={item.label}
-                  className='flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-slate-100 bg-white px-1.5'
+                  className='flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-slate-100 bg-white px-1.5'
                 >
-                  <span className='flex size-5 shrink-0 items-center justify-center rounded bg-slate-50 text-slate-500 ring-1 ring-slate-100'>
+                  <span className='flex size-[18px] shrink-0 items-center justify-center rounded bg-slate-50 text-slate-500 ring-1 ring-slate-100'>
                     <Icon className='size-3' />
                   </span>
                   <span className='shrink-0 text-[10px] text-slate-500'>
@@ -910,22 +927,26 @@ export function PersonalWorkbench() {
         </div>
       </div>
 
-      <div className='grid gap-2 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]'>
-        <EnterprisePanel
-          title='常用模型（已授权）'
-          description='按近 7 天请求量排序'
-          bodyClassName='p-2.5'
-        >
+      <section className='rounded-md border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+        <div className='flex flex-col gap-2 lg:flex-row lg:items-center'>
+          <div className='min-w-40 shrink-0'>
+            <h3 className='text-[13px] font-semibold text-slate-900'>
+              常用模型（已授权）
+            </h3>
+            <p className='mt-0.5 text-[10px] text-slate-500'>
+              按近 7 天请求量排序
+            </p>
+          </div>
           {trendUsage.models.length > 0 ? (
-            <div className='grid gap-1.5 md:grid-cols-2 xl:grid-cols-3'>
-              {trendUsage.models.slice(0, 6).map((model, index) => {
+            <div className='grid flex-1 gap-1.5 md:grid-cols-3 xl:grid-cols-5'>
+              {trendUsage.models.slice(0, 5).map((model, index) => {
                 const percent = Math.round(
                   (model.requests / modelTotalRequests) * 100
                 )
                 return (
                   <div
                     key={model.name}
-                    className='rounded-md border border-slate-100 bg-white p-2'
+                    className='rounded-md border border-slate-100 bg-slate-50/35 px-1.5 py-1'
                   >
                     <div className='flex items-center gap-2'>
                       <span className='flex size-6 shrink-0 items-center justify-center rounded-md bg-violet-50 text-[10px] font-semibold text-violet-700 ring-1 ring-violet-100'>
@@ -943,7 +964,7 @@ export function PersonalWorkbench() {
                         {formatCompactNumber(model.requests)}
                       </span>
                     </div>
-                    <div className='mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100'>
+                    <div className='mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100'>
                       <div
                         className='h-full rounded-full bg-blue-500'
                         style={{ width: `${Math.max(percent, 4)}%` }}
@@ -954,18 +975,24 @@ export function PersonalWorkbench() {
               })}
             </div>
           ) : (
-            <div className='flex min-h-20 items-center justify-center text-[12px] text-slate-500'>
+            <div className='flex min-h-10 flex-1 items-center justify-center text-[12px] text-slate-500'>
               暂无模型用量
             </div>
           )}
-        </EnterprisePanel>
+        </div>
+      </section>
 
-        <EnterprisePanel
-          title='快捷操作'
-          description='围绕个人调用链路'
-          bodyClassName='p-2.5'
-        >
-          <div className='grid gap-1.5 sm:grid-cols-2'>
+      <section className='rounded-md border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgb(15_23_42/0.035)]'>
+        <div className='flex flex-col gap-2 lg:flex-row lg:items-center'>
+          <div className='min-w-28 shrink-0'>
+            <h3 className='text-[13px] font-semibold text-slate-900'>
+              快捷操作
+            </h3>
+            <p className='mt-0.5 text-[10px] text-slate-500'>
+              围绕个人调用链路
+            </p>
+          </div>
+          <div className='grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-5'>
             <Button
               variant='outline'
               className='h-8 justify-start rounded-md bg-white text-[12px]'
@@ -1000,9 +1027,17 @@ export function PersonalWorkbench() {
               <BadgeCheck className='size-4 text-slate-600' />
               更新资料
             </Button>
+            <Button
+              variant='outline'
+              className='h-8 justify-start rounded-md bg-white text-[12px]'
+              render={<Link to='/profile' />}
+            >
+              <ShieldCheck className='size-4 text-blue-600' />
+              开启 MFA
+            </Button>
           </div>
-        </EnterprisePanel>
-      </div>
+        </div>
+      </section>
     </div>
   )
 }

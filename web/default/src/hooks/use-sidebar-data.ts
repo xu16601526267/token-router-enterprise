@@ -20,7 +20,6 @@ import {
   Activity,
   BadgeDollarSign,
   BarChart3,
-  Bot,
   Box,
   Building2,
   FileText,
@@ -60,78 +59,76 @@ export function useSidebarData(): SidebarData {
     return {
       navGroups: [
         {
-          id: 'console',
-          title: '个人工作台',
+          id: 'overview',
+          title: '总览',
           items: [
             {
-              title: '个人总览',
+              title: '总览',
               url: '/dashboard/overview',
-              icon: Activity,
+              icon: LayoutDashboard,
             },
             {
-              title: '用量分析',
+              title: '仪表盘',
               url: '/dashboard/models',
-              icon: BarChart3,
+              icon: Activity,
             },
           ],
         },
         {
           id: 'development',
-          title: '开发与体验',
+          title: '开发者工具',
           items: [
             {
-              title: '接口密钥',
+              title: 'API Keys',
               url: '/keys',
               icon: KeyRound,
             },
             {
-              title: '在线调试台',
+              title: 'Playground',
               url: '/playground',
               icon: FlaskConical,
             },
             {
-              title: '智能对话',
-              icon: MessageSquare,
-              type: 'chat-presets',
+              title: 'Models',
+              url: '/models',
+              icon: Box,
             },
             {
-              title: '模型与价格',
-              url: '/pricing',
-              icon: Bot,
-            },
-          ],
-        },
-        {
-          id: 'usage',
-          title: '调用记录',
-          items: [
-            {
-              title: '用量日志',
+              title: 'Usage Logs',
               url: '/usage-logs/common',
               icon: FileText,
-            },
-            {
-              title: '任务日志',
-              url: '/usage-logs/task',
-              activeUrls: ['/usage-logs/drawing'],
-              configUrls: ['/usage-logs/drawing', '/usage-logs/task'],
-              icon: ListTodo,
             },
           ],
         },
         {
           id: 'personal',
-          title: '账户服务',
+          title: '账户与资源',
           items: [
             {
-              title: '钱包与充值',
+              title: 'Wallet',
               url: '/wallet',
               icon: Wallet,
             },
             {
-              title: '个人资料',
+              title: '订阅与账单',
+              url: '/subscriptions',
+              icon: ReceiptText,
+            },
+          ],
+        },
+        {
+          id: 'profile',
+          title: '个人中心',
+          items: [
+            {
+              title: 'Profile',
               url: '/profile',
               icon: UserRound,
+            },
+            {
+              title: '安全设置',
+              url: '/profile',
+              icon: ShieldCheck,
             },
           ],
         },

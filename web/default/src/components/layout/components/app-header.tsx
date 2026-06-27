@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query'
+import { useLocation } from '@tanstack/react-router'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -25,15 +27,12 @@ import {
   UserRound,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { useLocation } from '@tanstack/react-router'
 
 import { ConfigDrawer } from '@/components/config-drawer'
 import { NotificationPopover } from '@/components/notification-popover'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +41,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import {
   Popover,
   PopoverContent,
@@ -165,15 +165,12 @@ function EnterpriseDateRangeControl({
   controlClassName: string
   selectedMarkClassName: string
 }) {
-  const {
-    range,
-    rangePreset,
-    rangeLabel,
-    setRangePreset,
-    setCustomRange,
-  } = useEnterpriseConsole()
+  const { range, rangePreset, rangeLabel, setRangePreset, setCustomRange } =
+    useEnterpriseConsole()
   const [open, setOpen] = useState(false)
-  const [draftStart, setDraftStart] = useState(toDateTimeInputValue(range.start))
+  const [draftStart, setDraftStart] = useState(
+    toDateTimeInputValue(range.start)
+  )
   const [draftEnd, setDraftEnd] = useState(toDateTimeInputValue(range.end))
   const [error, setError] = useState('')
 
@@ -296,10 +293,7 @@ function EnterpriseDateRangeControl({
 function EnterpriseHeaderContext() {
   const user = useAuthStore((state) => state.auth.user)
   const pathname = useLocation({ select: (location) => location.pathname })
-  const {
-    workspaceId,
-    setWorkspaceId,
-  } = useEnterpriseConsole()
+  const { workspaceId, setWorkspaceId } = useEnterpriseConsole()
   const isPersonalWorkbench = pathname.startsWith('/wallet')
   const isAdmin = (user?.role ?? 0) >= ROLE.ADMIN
   const rawGroup = user?.group?.trim()
@@ -415,6 +409,10 @@ export function AppHeader({
   showProfileDropdown = true,
 }: AppHeaderProps) {
   const notifications = useNotifications()
+  const pathname = useLocation({ select: (location) => location.pathname })
+  const user = useAuthStore((state) => state.auth.user)
+  const isPersonalWorkbench =
+    pathname.startsWith('/wallet') && (user?.role ?? 0) < ROLE.ADMIN
 
   return (
     <Header>
@@ -426,7 +424,7 @@ export function AppHeader({
 
       {rightContent ?? (
         <div className='ms-auto flex min-w-0 items-center gap-1.5 sm:gap-2'>
-          {showSearch && (
+          {showSearch && !isPersonalWorkbench && (
             <Search
               className='hidden h-8 border-slate-200 bg-white text-[12px] md:flex lg:w-64 xl:w-80'
               placeholder='搜索客户、密钥、渠道、模型'

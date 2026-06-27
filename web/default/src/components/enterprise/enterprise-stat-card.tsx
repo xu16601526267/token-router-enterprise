@@ -50,6 +50,7 @@ type EnterpriseStatCardProps = {
   icon: LucideIcon
   tone?: EnterpriseStatTone
   loading?: boolean
+  className?: string
 }
 
 export function EnterpriseStatCard({
@@ -61,9 +62,15 @@ export function EnterpriseStatCard({
   icon: Icon,
   tone = 'blue',
   loading = false,
+  className,
 }: EnterpriseStatCardProps) {
   return (
-    <article className='enterprise-stat-card min-h-[84px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200'>
+    <article
+      className={cn(
+        'enterprise-stat-card min-h-[84px] overflow-hidden rounded-md border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] transition-colors hover:border-blue-200',
+        className
+      )}
+    >
       <div className='flex items-start gap-2.5'>
         <span
           className={cn(
@@ -78,7 +85,9 @@ export function EnterpriseStatCard({
             <p className='text-muted-foreground truncate text-[11px] font-medium'>
               {title}
             </p>
-            <span className='text-muted-foreground text-lg leading-none'>›</span>
+            <span className='text-muted-foreground text-lg leading-none'>
+              ›
+            </span>
           </div>
           {loading ? (
             <div className='bg-muted mt-2 h-7 w-24 animate-pulse rounded-md' />
