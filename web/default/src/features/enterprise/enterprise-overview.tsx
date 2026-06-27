@@ -391,7 +391,7 @@ function getOperationEvents(
   overview: EnterpriseOverviewData,
   fallbackInsights: ReturnType<typeof buildFallbackInsights>
 ): OperationEvent[] {
-  const insightEvents = overview.insights.slice(0, 5).map((insight) => {
+  const insightEvents = overview.insights.slice(0, 3).map((insight) => {
     const tone = getInsightTone(insight.severity)
     return {
       id: `insight-${insight.id}`,
@@ -1450,7 +1450,7 @@ export function EnterpriseOverview() {
       </section>
         </div>
 
-        <aside className='grid min-w-0 content-stretch gap-1.5 min-[1360px]:grid-rows-[112px_112px_86px_minmax(170px,1fr)]'>
+        <aside className='grid min-w-0 content-start gap-1.5'>
           <OverviewPanel
             title='SLA 告警'
             titleSuffix={
@@ -1469,7 +1469,6 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            className='h-full'
             headerClassName='min-h-6 px-2.5 py-1'
             bodyClassName='p-0'
           >
@@ -1526,7 +1525,6 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            className='h-full'
             headerClassName='min-h-6 px-2.5 py-1'
             bodyClassName='p-0'
           >
@@ -1573,7 +1571,6 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            className='h-full'
             headerClassName='min-h-6 px-2.5 py-1'
             bodyClassName='p-0'
           >
@@ -1605,20 +1602,19 @@ export function EnterpriseOverview() {
 
           <OverviewPanel
             title='快捷操作'
-            className='h-full'
             headerClassName='min-h-6 px-2.5 py-1'
-            bodyClassName='px-2.5 py-2'
+            bodyClassName='px-3.5 py-3'
           >
-            <div className='grid grid-cols-4 gap-x-2.5 gap-y-2.5'>
+            <div className='grid grid-cols-4 gap-x-3 gap-y-3.5'>
               {QUICK_ACTIONS.slice(0, 6).map((item) => {
                 const Icon = item.icon
                 return (
                   <Link
                     key={item.label}
                     to={item.to}
-                    className='group flex min-h-[52px] flex-col items-center justify-start gap-1.5 rounded-md pt-1 text-center text-[9.5px] font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
+                    className='group flex min-h-[48px] flex-col items-center justify-start gap-1.5 rounded-md text-center text-[9.5px] font-medium text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:ring-3 focus-visible:ring-blue-500/25 focus-visible:outline-none'
                   >
-                    <span className='flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700 shadow-[0_1px_2px_rgb(37_99_235/0.05)] group-hover:bg-blue-600 group-hover:text-white'>
+                    <span className='flex size-7 items-center justify-center rounded-md bg-blue-50 text-blue-700 shadow-[0_1px_2px_rgb(37_99_235/0.05)] group-hover:bg-blue-600 group-hover:text-white'>
                       <Icon className='size-3.5' />
                     </span>
                     <span className='max-w-full truncate leading-3'>
