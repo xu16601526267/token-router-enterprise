@@ -227,17 +227,21 @@ function EnterpriseDateRangeControl({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[342px] rounded-md border-slate-200 p-2.5 shadow-[0_8px_22px_rgb(15_23_42/0.10)]'
+        collisionPadding={8}
+        className='w-[448px] overflow-hidden rounded-md border-slate-200 p-0 shadow-[0_8px_22px_rgb(15_23_42/0.10)]'
       >
-        <div className='space-y-2.5'>
-          <div className='grid grid-cols-4 gap-1'>
+        <div className='grid grid-cols-[136px_minmax(0,1fr)]'>
+          <div className='border-r border-slate-100 bg-slate-50/70 p-2'>
+            <p className='mb-1.5 px-1 text-[10.5px] font-semibold text-slate-500'>
+              快捷范围
+            </p>
             {ENTERPRISE_TIME_RANGE_OPTIONS.map((option) => (
               <Button
                 key={option.value}
                 type='button'
                 variant='outline'
                 className={cn(
-                  'h-7 rounded-md px-1.5 text-[11px] font-medium shadow-none',
+                  'mb-1 flex h-7 w-full justify-start rounded-md px-2 text-[11px] font-medium shadow-none last:mb-0',
                   rangePreset === option.value
                     ? 'border-blue-200 bg-blue-50 text-blue-700'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -252,37 +256,53 @@ function EnterpriseDateRangeControl({
             ))}
           </div>
 
-          <div className='grid gap-2'>
-            <label className='grid gap-1 text-[11px] font-medium text-slate-600'>
-              开始时间
-              <Input
-                type='datetime-local'
-                value={draftStart}
-                onChange={(event) => setDraftStart(event.target.value)}
-                className='h-8 rounded-md border-slate-200 bg-white text-[12px] tabular-nums'
-              />
-            </label>
-            <label className='grid gap-1 text-[11px] font-medium text-slate-600'>
-              结束时间
-              <Input
-                type='datetime-local'
-                value={draftEnd}
-                onChange={(event) => setDraftEnd(event.target.value)}
-                className='h-8 rounded-md border-slate-200 bg-white text-[12px] tabular-nums'
-              />
-            </label>
-          </div>
+          <div className='space-y-2.5 p-2.5'>
+            <div className='flex items-center justify-between gap-2'>
+              <div className='min-w-0'>
+                <p className='text-[11px] font-semibold text-slate-800'>
+                  自定义时间段
+                </p>
+                <p className='mt-0.5 text-[10px] text-slate-500'>
+                  选择起止时间后立即应用
+                </p>
+              </div>
+              <Button
+                type='button'
+                className='h-7 shrink-0 rounded-md bg-blue-600 px-3 text-[11px] font-semibold text-white shadow-none hover:bg-blue-700'
+                onClick={applyCustomRange}
+              >
+                应用时间段
+              </Button>
+            </div>
 
-          {error && <p className='text-[11px] text-rose-600'>{error}</p>}
+            <div className='grid gap-2'>
+              <label className='grid gap-1 text-[11px] font-medium text-slate-600'>
+                开始时间
+                <Input
+                  type='datetime-local'
+                  value={draftStart}
+                  onChange={(event) => setDraftStart(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') applyCustomRange()
+                  }}
+                  className='h-8 rounded-md border-slate-200 bg-white text-[12px] tabular-nums'
+                />
+              </label>
+              <label className='grid gap-1 text-[11px] font-medium text-slate-600'>
+                结束时间
+                <Input
+                  type='datetime-local'
+                  value={draftEnd}
+                  onChange={(event) => setDraftEnd(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') applyCustomRange()
+                  }}
+                  className='h-8 rounded-md border-slate-200 bg-white text-[12px] tabular-nums'
+                />
+              </label>
+            </div>
 
-          <div className='flex justify-end'>
-            <Button
-              type='button'
-              className='h-7 rounded-md px-3 text-[11px] font-semibold'
-              onClick={applyCustomRange}
-            >
-              应用时间段
-            </Button>
+            {error && <p className='text-[11px] text-rose-600'>{error}</p>}
           </div>
         </div>
       </PopoverContent>
