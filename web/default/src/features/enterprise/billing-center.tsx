@@ -533,19 +533,19 @@ function FeatureShortcut({
   return (
     <button
       type='button'
-      className='flex min-h-[84px] flex-col items-start border-r border-slate-100 px-2.5 py-2.5 text-left last:border-r-0 hover:bg-slate-50/70'
+      className='flex min-h-[76px] flex-col items-start border-r border-slate-100 px-2.5 py-2 text-left last:border-r-0 hover:bg-slate-50/70'
       onClick={onClick}
     >
       <span className='flex size-6 items-center justify-center rounded-md bg-blue-50 text-blue-600'>
         <Icon className='size-3.5' />
       </span>
-      <span className='mt-1.5 text-[12px] font-semibold text-slate-950'>
+      <span className='mt-1 text-[12px] font-semibold text-slate-950'>
         {title}
       </span>
-      <span className='mt-0.5 line-clamp-2 text-[10px] leading-4 text-slate-500'>
+      <span className='mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-500'>
         {description}
       </span>
-      <span className='mt-auto inline-flex items-center gap-1 pt-1 text-[10px] font-semibold text-blue-600'>
+      <span className='mt-auto inline-flex items-center gap-1 pt-0.5 text-[10px] font-semibold text-blue-600'>
         {action}
         <ChevronRight className='size-3' />
       </span>
@@ -582,7 +582,7 @@ function SettlementTable({
   }
 
   return (
-    <div className='overflow-x-auto'>
+    <div className='min-h-[164px] overflow-x-auto'>
       <Table>
         <TableHeader>
           <TableRow className='bg-slate-50/90 hover:bg-slate-50'>
@@ -606,7 +606,11 @@ function SettlementTable({
                 ? item.gross_profit_quota / item.total_sell_quota
                 : 0
             return (
-              <TableRow key={item.id} className='h-9 hover:bg-slate-50/80'>
+              <TableRow
+                key={item.id}
+                className='h-9 hover:bg-slate-50/80'
+                style={{ animation: 'none', opacity: 1, transform: 'none' }}
+              >
                 <TableCell className='text-[12px] whitespace-nowrap text-slate-600'>
                   {formatShortDate(item.period_start)} -{' '}
                   {formatShortDate(item.period_end)}
@@ -676,6 +680,7 @@ export function EnterpriseBillingCenter(props: {
     useEnterpriseConsole()
   const [exportingBilling, setExportingBilling] = useState(false)
   const [settlementDialogOpen, setSettlementDialogOpen] = useState(false)
+  const [classicDialogOpen, setClassicDialogOpen] = useState(false)
   const [settlementSubjectType, setSettlementSubjectType] = useState<
     'user' | 'supplier'
   >('user')
@@ -859,13 +864,11 @@ export function EnterpriseBillingCenter(props: {
   }
 
   const openClassicSubscriptions = () => {
-    const element = document.querySelector<HTMLDetailsElement>(
-      '#classic-subscriptions'
-    )
-    if (element instanceof HTMLDetailsElement) {
-      element.open = true
+    if (props.classicContent == null) {
+      toast.info('当前没有可管理的订阅计划')
+      return
     }
-    scrollToElement('classic-subscriptions')
+    setClassicDialogOpen(true)
   }
 
   return (
@@ -1457,28 +1460,22 @@ export function EnterpriseBillingCenter(props: {
       </div>
 
       {props.classicContent && (
-        <details
-          id='classic-subscriptions'
-          className='rounded-md border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.025)]'
-        >
-          <summary className='flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-[13px] font-semibold text-slate-900'>
-            订阅计划管理
-            <span className='ml-auto text-[11px] font-medium text-slate-500'>
-              展开套餐创建、支付平台关联、启停和编辑能力
-            </span>
+        <Dialog open={classicDialogOpen} onOpenChange={setClassicDialogOpen}>
+          <DialogContent className='max-h-[88vh] overflow-y-auto sm:max-w-6xl'>
+            <DialogHeader>
+              <DialogTitle>订阅计划管理</DialogTitle>
+              <DialogDescription>
+                管理套餐创建、支付平台关联、启停和编辑能力。
+              </DialogDescription>
+            </DialogHeader>
             {props.actions != null && (
-              <span
-                className='shrink-0'
-                onClick={(event) => event.stopPropagation()}
-              >
-                {props.actions}
-              </span>
+              <div className='flex justify-end'>{props.actions}</div>
             )}
-          </summary>
-          <div className='border-t border-slate-100 p-2'>
-            {props.classicContent}
-          </div>
-        </details>
+            <div className='rounded-md border border-slate-200 bg-slate-50/40 p-2'>
+              {props.classicContent}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       <Dialog
