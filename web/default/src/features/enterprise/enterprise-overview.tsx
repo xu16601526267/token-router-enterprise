@@ -744,7 +744,7 @@ export function EnterpriseOverview() {
   ]
 
   return (
-    <div className='enterprise-overview mx-auto max-w-[1586px] space-y-1.5 bg-[#f6f8fb] pb-2 text-slate-950'>
+    <div className='enterprise-overview mx-auto flex min-h-full w-full max-w-[1586px] flex-col gap-1.5 bg-[#f6f8fb] pb-2 text-slate-950'>
       <header className='flex flex-col gap-1.5 px-1 pt-0.5 sm:flex-row sm:items-center sm:justify-between'>
         <div className='min-w-0'>
           <h1 className='text-lg leading-5 font-semibold text-slate-950'>
@@ -863,8 +863,8 @@ export function EnterpriseOverview() {
         />
       </section>
 
-      <section className='grid items-stretch gap-1.5 min-[1360px]:grid-cols-[minmax(0,1fr)_368px]'>
-        <div className='grid min-w-0 content-start gap-1.5'>
+      <section className='grid min-h-0 flex-1 items-stretch gap-1.5 min-[1360px]:grid-cols-[minmax(0,1fr)_368px]'>
+        <div className='grid min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] gap-1.5'>
         <OverviewPanel
           title='请求趋势'
           description='成功请求、失败请求与平均延迟'
@@ -914,7 +914,7 @@ export function EnterpriseOverview() {
               </Select>
             </div>
           }
-          bodyClassName='h-[168px] px-2 pb-1.5 pt-1.5 sm:px-2.5'
+          bodyClassName='h-[168px] px-2 pb-1.5 pt-1.5 sm:px-2.5 [@media(min-height:900px)]:h-[230px] [@media(min-height:1050px)]:!h-[300px]'
         >
           {trendData.length > 0 ? (
             <ResponsiveContainer
@@ -1057,10 +1057,10 @@ export function EnterpriseOverview() {
               </Button>
             }
             headerClassName='min-h-8 px-3 py-1.5'
-            bodyClassName='h-[152px] px-3 pb-1.5 pt-1'
+            bodyClassName='h-[152px] px-3 pb-1.5 pt-1 [@media(min-height:900px)]:h-[214px] [@media(min-height:1050px)]:!h-[266px]'
           >
             {costData.length > 0 ? (
-              <div className='grid h-full grid-rows-[16px_minmax(0,1fr)_30px]'>
+              <div className='grid h-full grid-rows-[16px_minmax(0,1fr)_30px] [@media(min-height:900px)]:grid-rows-[18px_minmax(0,1fr)_34px]'>
                 <div className='flex items-center gap-5 text-[10.5px] leading-4 text-slate-500'>
                   <span className='flex items-center gap-1.5'>
                     <span className='h-1.5 w-4 rounded-full bg-blue-500' />
@@ -1174,11 +1174,11 @@ export function EnterpriseOverview() {
               </Button>
             }
             headerClassName='min-h-8 px-3 py-1.5'
-            bodyClassName='h-[152px] px-3 pb-1.5 pt-1.5'
+            bodyClassName='h-[152px] px-3 pb-1.5 pt-1.5 [@media(min-height:900px)]:h-[214px] [@media(min-height:1050px)]:!h-[266px]'
           >
             {donutData.length > 0 ? (
               <div className='grid h-full grid-rows-[minmax(0,1fr)_18px]'>
-                <div className='grid min-h-0 grid-cols-[124px_minmax(0,1fr)] items-center gap-3 max-sm:grid-cols-1'>
+                <div className='grid min-h-0 grid-cols-[124px_minmax(0,1fr)] items-center gap-3 max-sm:grid-cols-1 [@media(min-height:900px)]:grid-cols-[158px_minmax(0,1fr)] [@media(min-height:1050px)]:!grid-cols-[178px_minmax(0,1fr)]'>
                   <div className='relative h-full min-h-0'>
                     <ResponsiveContainer
                       width='100%'
@@ -1296,7 +1296,7 @@ export function EnterpriseOverview() {
               </Button>
             }
             headerClassName='min-h-8 px-3 py-1.5'
-            bodyClassName='flex h-[152px] flex-col p-0'
+            bodyClassName='flex h-[152px] flex-col p-0 [@media(min-height:900px)]:h-[214px] [@media(min-height:1050px)]:!h-[266px]'
           >
             <div className='min-h-0 flex-1 overflow-hidden'>
               <table className='w-full table-fixed text-left text-[10.5px]'>
@@ -1382,7 +1382,7 @@ export function EnterpriseOverview() {
           </OverviewPanel>
         </section>
 
-        <section className='grid gap-1.5'>
+        <section className='grid min-h-0'>
           <OverviewPanel
             title='近期运营事件'
             description='来自 SLA、渠道和定价治理的最近事件'
@@ -1397,9 +1397,10 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            bodyClassName='p-0'
+            className='flex min-h-0 flex-col'
+            bodyClassName='min-h-0 flex-1 p-0'
           >
-          <div className='overflow-x-auto'>
+          <div className='h-full overflow-x-auto'>
             <table className='w-full min-w-[860px] text-left text-[11px]'>
               <thead className='border-b border-slate-100 bg-slate-50 text-[10.5px] font-normal text-slate-500'>
                 <tr>
@@ -1414,10 +1415,10 @@ export function EnterpriseOverview() {
               <tbody className='divide-y divide-slate-100'>
                 {operationEvents.map((event) => (
                   <tr key={event.id} className='hover:bg-slate-50/70'>
-                    <td className='px-3 py-1 text-slate-500 tabular-nums'>
+                    <td className='px-3 py-1 text-slate-500 tabular-nums [@media(min-height:900px)]:py-1.5'>
                       {event.time}
                     </td>
-                    <td className='px-2.5 py-1'>
+                    <td className='px-2.5 py-1 [@media(min-height:900px)]:py-1.5'>
                       <Badge
                         variant='outline'
                         className={cn(
@@ -1428,16 +1429,16 @@ export function EnterpriseOverview() {
                         {event.level}
                       </Badge>
                     </td>
-                    <td className='max-w-56 px-2.5 py-1 font-normal text-slate-800'>
+                    <td className='max-w-56 px-2.5 py-1 font-normal text-slate-800 [@media(min-height:900px)]:py-1.5'>
                       <span className='line-clamp-1'>{event.title}</span>
                     </td>
-                    <td className='max-w-44 px-2.5 py-1 text-slate-600'>
+                    <td className='max-w-44 px-2.5 py-1 text-slate-600 [@media(min-height:900px)]:py-1.5'>
                       <span className='line-clamp-1'>{event.object}</span>
                     </td>
-                    <td className='max-w-80 px-2.5 py-1 text-slate-500'>
+                    <td className='max-w-80 px-2.5 py-1 text-slate-500 [@media(min-height:900px)]:py-1.5'>
                       <span className='line-clamp-1'>{event.impact}</span>
                     </td>
-                    <td className='px-3 py-1 text-right text-slate-700'>
+                    <td className='px-3 py-1 text-right text-slate-700 [@media(min-height:900px)]:py-1.5'>
                       {event.status}
                     </td>
                   </tr>
@@ -1450,7 +1451,7 @@ export function EnterpriseOverview() {
       </section>
         </div>
 
-        <aside className='grid min-w-0 content-start gap-1.5'>
+        <aside className='grid min-h-0 min-w-0 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-1.5 [@media(min-height:900px)]:grid-rows-[132px_132px_108px_minmax(0,1fr)] [@media(min-height:1050px)]:!grid-rows-[166px_166px_138px_minmax(0,1fr)]'>
           <OverviewPanel
             title='SLA 告警'
             titleSuffix={
@@ -1469,14 +1470,15 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            headerClassName='min-h-6 px-2.5 py-1'
+            className='min-h-0'
+            headerClassName='min-h-6 px-2.5 py-1 [@media(min-height:1050px)]:!min-h-8'
             bodyClassName='p-0'
           >
             <div className='divide-y divide-slate-100/80'>
               {slaRows.map((item) => (
                 <div
                   key={item.title}
-                  className='grid min-h-[28px] grid-cols-[minmax(0,1fr)_54px_34px] items-center gap-2 px-2.5 py-0.5'
+                  className='grid min-h-[28px] grid-cols-[minmax(0,1fr)_54px_34px] items-center gap-2 px-2.5 py-0.5 [@media(min-height:1050px)]:!min-h-[40px]'
                   title={`${item.title}: ${item.description}`}
                 >
                   <span className='flex min-w-0 items-center gap-2'>
@@ -1525,7 +1527,8 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            headerClassName='min-h-6 px-2.5 py-1'
+            className='min-h-0'
+            headerClassName='min-h-6 px-2.5 py-1 [@media(min-height:1050px)]:!min-h-8'
             bodyClassName='p-0'
           >
             <div className='divide-y divide-slate-100/80'>
@@ -1533,7 +1536,7 @@ export function EnterpriseOverview() {
                 return (
                   <div
                     key={item.label}
-                    className='grid min-h-[28px] grid-cols-[minmax(0,1fr)_86px_24px] items-center gap-2 px-2.5 py-0.5'
+                    className='grid min-h-[28px] grid-cols-[minmax(0,1fr)_86px_24px] items-center gap-2 px-2.5 py-0.5 [@media(min-height:1050px)]:!min-h-[40px]'
                   >
                     <span className='flex min-w-0 items-center gap-1.5'>
                       <span className='size-1.5 shrink-0 rounded-full bg-amber-400 ring-2 ring-amber-100' />
@@ -1571,14 +1574,15 @@ export function EnterpriseOverview() {
                 <ChevronRight className='size-3' />
               </Button>
             }
-            headerClassName='min-h-6 px-2.5 py-1'
+            className='min-h-0'
+            headerClassName='min-h-6 px-2.5 py-1 [@media(min-height:1050px)]:!min-h-8'
             bodyClassName='p-0'
           >
             <div className='divide-y divide-slate-100/80'>
               {riskRows.slice(0, 2).map((item) => (
                 <div
                   key={item.label}
-                  className='flex min-h-[29px] items-center justify-between gap-2 px-2.5 py-0.5'
+                  className='flex min-h-[29px] items-center justify-between gap-2 px-2.5 py-0.5 [@media(min-height:1050px)]:!min-h-[48px]'
                 >
                   <div className='flex min-w-0 items-center gap-2'>
                     <span className='size-1.5 shrink-0 rounded-full border border-orange-500 bg-white ring-1 ring-orange-100' />
@@ -1602,10 +1606,11 @@ export function EnterpriseOverview() {
 
           <OverviewPanel
             title='快捷操作'
+            className='flex min-h-0 flex-col'
             headerClassName='min-h-6 px-2.5 py-1'
-            bodyClassName='px-3 py-2.5'
+            bodyClassName='min-h-0 flex-1 px-3 py-2.5'
           >
-            <div className='grid grid-cols-4 gap-x-2.5 gap-y-2.5'>
+            <div className='grid h-full grid-cols-4 content-start gap-x-2.5 gap-y-2.5 [@media(min-height:900px)]:content-center'>
               {QUICK_ACTIONS.slice(0, 6).map((item) => {
                 const Icon = item.icon
                 return (
