@@ -118,6 +118,7 @@ func main() {
 	}
 	initAPIOnlyChannelCache()
 	service.StartSupplyTelemetryWorker()
+	service.StartUsageRecordOutboxWorker()
 	defer func() {
 		if err := model.CloseDB(); err != nil {
 			common.FatalLog("failed to close database: " + err.Error())

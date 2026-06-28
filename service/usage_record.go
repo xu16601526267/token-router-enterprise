@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -12,12 +15,50 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
+
+const (
+	usageRecordOutboxDefaultInterval = 5 * time.Second
+	usageRecordOutboxStaleAfter      = 2 * time.Minute
+	usageRecordOutboxBatchLimit      = 200
+)
+
+var usageRecordOutboxWorkerOnce sync.Once
+
+type usageRecordOutboxPayload struct {
+	RelayInfo usageRecordOutboxRelayInfo `json:"relay_info"`
+	Usage     *dto.Usage                 `json:"usage"`
+	SellQuota int                        `json:"sell_quota"`
+	Meta      UsageRecordMeta            `json:"meta"`
+}
+
+type usageRecordOutboxRelayInfo struct {
+	UserId                 int                    `json:"user_id"`
+	TokenId                int                    `json:"token_id"`
+	TokenKey               string                 `json:"token_key"`
+	TenantId               int                    `json:"tenant_id"`
+	AppId                  int                    `json:"app_id"`
+	EndCustomerId          int                    `json:"end_customer_id"`
+	ModelPolicyId          int                    `json:"model_policy_id"`
+	TenantBillingMode      string                 `json:"tenant_billing_mode"`
+	OriginModelName        string                 `json:"origin_model_name"`
+	UsingGroup             string                 `json:"using_group"`
+	FinalPreConsumedQuota  int                    `json:"final_pre_consumed_quota"`
+	BillingSource          string                 `json:"billing_source"`
+	PriceData              types.PriceData        `json:"price_data"`
+	ChannelId              int                    `json:"channel_id"`
+	ChannelBaseUrl         string                 `json:"channel_base_url"`
+	StartUnixMilli         int64                  `json:"start_unix_milli"`
+	RequestId              string                 `json:"request_id"`
+	RequestHeaders         map[string]string      `json:"request_headers"`
+	RuntimeHeadersOverride map[string]interface{} `json:"runtime_headers_override"`
+}
 
 type UsageCostInput struct {
 	PromptTokens        int
@@ -249,6 +290,95 @@ func newUsageRecordMeta(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) Usag
 	}
 }
 
+func newUsageRecordOutboxPayload(relayInfo *relaycommon.RelayInfo, usage *dto.Usage, sellQuota int, meta UsageRecordMeta) usageRecordOutboxPayload {
+	payload := usageRecordOutboxPayload{
+		Usage:     usage,
+		SellQuota: sellQuota,
+		Meta:      meta,
+	}
+	if relayInfo == nil {
+		return payload
+	}
+	payload.RelayInfo = usageRecordOutboxRelayInfo{
+		UserId:                 relayInfo.UserId,
+		TokenId:                relayInfo.TokenId,
+		TokenKey:               relayInfo.TokenKey,
+		TenantId:               relayInfo.TenantId,
+		AppId:                  relayInfo.AppId,
+		EndCustomerId:          relayInfo.EndCustomerId,
+		ModelPolicyId:          relayInfo.ModelPolicyId,
+		TenantBillingMode:      relayInfo.TenantBillingMode,
+		OriginModelName:        relayInfo.OriginModelName,
+		UsingGroup:             relayInfo.UsingGroup,
+		FinalPreConsumedQuota:  relayInfo.FinalPreConsumedQuota,
+		BillingSource:          relayInfo.BillingSource,
+		PriceData:              relayInfo.PriceData,
+		RequestId:              relayInfo.RequestId,
+		RequestHeaders:         cloneStringMap(relayInfo.RequestHeaders),
+		RuntimeHeadersOverride: cloneInterfaceMap(relayInfo.RuntimeHeadersOverride),
+	}
+	if !relayInfo.StartTime.IsZero() {
+		payload.RelayInfo.StartUnixMilli = relayInfo.StartTime.UnixMilli()
+	}
+	if relayInfo.ChannelMeta != nil {
+		payload.RelayInfo.ChannelId = relayInfo.ChannelMeta.ChannelId
+		payload.RelayInfo.ChannelBaseUrl = relayInfo.ChannelMeta.ChannelBaseUrl
+	}
+	return payload
+}
+
+func (p usageRecordOutboxPayload) relayInfo() *relaycommon.RelayInfo {
+	startTime := time.Now()
+	if p.RelayInfo.StartUnixMilli > 0 {
+		startTime = time.UnixMilli(p.RelayInfo.StartUnixMilli)
+	}
+	return &relaycommon.RelayInfo{
+		UserId:                 p.RelayInfo.UserId,
+		TokenId:                p.RelayInfo.TokenId,
+		TokenKey:               p.RelayInfo.TokenKey,
+		TenantId:               p.RelayInfo.TenantId,
+		AppId:                  p.RelayInfo.AppId,
+		EndCustomerId:          p.RelayInfo.EndCustomerId,
+		ModelPolicyId:          p.RelayInfo.ModelPolicyId,
+		TenantBillingMode:      p.RelayInfo.TenantBillingMode,
+		OriginModelName:        p.RelayInfo.OriginModelName,
+		UsingGroup:             p.RelayInfo.UsingGroup,
+		FinalPreConsumedQuota:  p.RelayInfo.FinalPreConsumedQuota,
+		BillingSource:          p.RelayInfo.BillingSource,
+		PriceData:              p.RelayInfo.PriceData,
+		RequestId:              p.RelayInfo.RequestId,
+		RequestHeaders:         cloneStringMap(p.RelayInfo.RequestHeaders),
+		RuntimeHeadersOverride: cloneInterfaceMap(p.RelayInfo.RuntimeHeadersOverride),
+		StartTime:              startTime,
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelId:      p.RelayInfo.ChannelId,
+			ChannelBaseUrl: p.RelayInfo.ChannelBaseUrl,
+		},
+	}
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneInterfaceMap(values map[string]interface{}) map[string]interface{} {
+	if len(values) == 0 {
+		return nil
+	}
+	cloned := make(map[string]interface{}, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
+}
+
 func recordUsageWithMeta(relayInfo *relaycommon.RelayInfo, usage *dto.Usage, sellQuota int, meta UsageRecordMeta) (*model.UsageLedger, error) {
 	if relayInfo == nil {
 		return nil, errors.New("relayInfo is required")
@@ -318,7 +448,10 @@ func insertUsageLedgerWithTenantCredit(ledger *model.UsageLedger) (int64, error)
 			if affected == 0 {
 				return nil
 			}
-			return applyTenantLedgerCreditTx(tx, ledger)
+			if err := applyTenantLedgerCreditTx(tx, ledger); err != nil {
+				return err
+			}
+			return model.UpsertUsageAggregateDailyTx(tx, ledger)
 		})
 	})
 	return rowsAffected, err
@@ -330,9 +463,148 @@ func RecordUsage(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.
 
 func RecordUsageAsync(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, sellQuota int) {
 	meta := newUsageRecordMeta(ctx, relayInfo)
+	payload := newUsageRecordOutboxPayload(relayInfo, usage, sellQuota, meta)
+	rawPayload, err := json.Marshal(payload)
+	if err != nil {
+		logger.LogError(context.Background(), "failed to marshal usage record outbox payload: "+err.Error())
+		gopool.Go(func() {
+			if _, err := recordUsageWithMeta(relayInfo, usage, sellQuota, meta); err != nil {
+				logger.LogError(context.Background(), "failed to record usage ledger: "+err.Error())
+			}
+		})
+		return
+	}
+	outbox := &model.UsageRecordOutbox{
+		RequestId:   meta.RequestID,
+		Payload:     string(rawPayload),
+		Status:      model.UsageRecordOutboxStatusPending,
+		NextRetryAt: common.GetTimestamp(),
+	}
+	if err := outbox.InsertIdempotent(); err != nil {
+		logger.LogError(context.Background(), "failed to enqueue usage record outbox: "+err.Error())
+		gopool.Go(func() {
+			if _, err := recordUsageWithMeta(relayInfo, usage, sellQuota, meta); err != nil {
+				logger.LogError(context.Background(), "failed to record usage ledger: "+err.Error())
+			}
+		})
+		return
+	}
+
 	gopool.Go(func() {
-		if _, err := recordUsageWithMeta(relayInfo, usage, sellQuota, meta); err != nil {
-			logger.LogError(context.Background(), "failed to record usage ledger: "+err.Error())
+		if err := ProcessUsageRecordOutboxByRequestID(context.Background(), meta.RequestID); err != nil {
+			logger.LogError(context.Background(), "failed to process usage record outbox: "+err.Error())
 		}
 	})
+}
+
+func StartUsageRecordOutboxWorker() {
+	if parseTruthyEnv(os.Getenv("USAGE_RECORD_OUTBOX_WORKER_DISABLED")) || !common.IsMasterNode {
+		return
+	}
+	usageRecordOutboxWorkerOnce.Do(func() {
+		gopool.Go(func() {
+			logger.LogInfo(context.Background(), fmt.Sprintf("usage record outbox worker started: interval=%s", usageRecordOutboxDefaultInterval))
+			ticker := time.NewTicker(usageRecordOutboxDefaultInterval)
+			defer ticker.Stop()
+			runUsageRecordOutboxWorkerOnce(context.Background())
+			for range ticker.C {
+				runUsageRecordOutboxWorkerOnce(context.Background())
+			}
+		})
+	})
+}
+
+func runUsageRecordOutboxWorkerOnce(ctx context.Context) {
+	if _, err := ProcessUsageRecordOutboxBatch(ctx, usageRecordOutboxBatchLimit); err != nil {
+		logger.LogError(ctx, "usage record outbox worker failed: "+err.Error())
+	}
+}
+
+func ProcessUsageRecordOutboxBatch(ctx context.Context, limit int) (int, error) {
+	now := common.GetTimestamp()
+	staleBefore := now - int64(usageRecordOutboxStaleAfter/time.Second)
+	items, err := model.ListDueUsageRecordOutbox(now, staleBefore, limit)
+	if err != nil {
+		return 0, err
+	}
+	var lastErr error
+	processed := 0
+	for _, item := range items {
+		if err := processUsageRecordOutboxItem(ctx, item); err != nil {
+			lastErr = err
+			logger.LogError(ctx, fmt.Sprintf("usage record outbox item %d failed: %v", item.Id, err))
+		}
+		processed++
+	}
+	return processed, lastErr
+}
+
+func ProcessUsageRecordOutboxByRequestID(ctx context.Context, requestID string) error {
+	if strings.TrimSpace(requestID) == "" {
+		return errors.New("usage record outbox request id is required")
+	}
+	item, err := model.GetUsageRecordOutboxByRequestID(requestID)
+	if err != nil {
+		return err
+	}
+	if item.Status == model.UsageRecordOutboxStatusSucceeded {
+		return nil
+	}
+	return processUsageRecordOutboxItem(ctx, *item)
+}
+
+func processUsageRecordOutboxItem(ctx context.Context, item model.UsageRecordOutbox) error {
+	now := common.GetTimestamp()
+	staleBefore := now - int64(usageRecordOutboxStaleAfter/time.Second)
+	claimed, err := model.MarkUsageRecordOutboxProcessing(item.Id, now, staleBefore)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		return nil
+	}
+
+	var payload usageRecordOutboxPayload
+	if err := json.Unmarshal([]byte(item.Payload), &payload); err != nil {
+		_ = markUsageRecordOutboxFailed(item, err)
+		return err
+	}
+	if _, err := recordUsageWithMeta(payload.relayInfo(), payload.Usage, payload.SellQuota, payload.Meta); err != nil {
+		_ = markUsageRecordOutboxFailed(item, err)
+		return err
+	}
+	if err := model.MarkUsageRecordOutboxSucceeded(item.Id, common.GetTimestamp()); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("failed to mark usage record outbox %d succeeded: %v", item.Id, err))
+		return err
+	}
+	return nil
+}
+
+func markUsageRecordOutboxFailed(item model.UsageRecordOutbox, err error) error {
+	return model.MarkUsageRecordOutboxFailed(item.Id, usageRecordOutboxErrorString(err), nextUsageRecordOutboxRetryAt(item.RetryCount+1), common.GetTimestamp())
+}
+
+func nextUsageRecordOutboxRetryAt(retryCount int) int64 {
+	if retryCount <= 0 {
+		retryCount = 1
+	}
+	delay := 5 * time.Second
+	for i := 1; i < retryCount && delay < 5*time.Minute; i++ {
+		delay *= 2
+	}
+	if delay > 5*time.Minute {
+		delay = 5 * time.Minute
+	}
+	return common.GetTimestamp() + int64(delay/time.Second)
+}
+
+func usageRecordOutboxErrorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	message := err.Error()
+	if len(message) > 2000 {
+		return message[:2000]
+	}
+	return message
 }

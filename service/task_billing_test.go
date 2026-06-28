@@ -46,6 +46,8 @@ func TestMain(m *testing.M) {
 		&model.Supplier{},
 		&model.SupplierAgreement{},
 		&model.UsageLedger{},
+		&model.UsageAggregateDaily{},
+		&model.UsageRecordOutbox{},
 		&model.Tenant{},
 		&model.TenantMember{},
 		&model.TenantEndCustomer{},
@@ -78,6 +80,8 @@ func TestMain(m *testing.M) {
 func truncate(t *testing.T) {
 	t.Helper()
 	model.DB.Exec("DELETE FROM audit_logs")
+	model.DB.Exec("DELETE FROM usage_record_outboxes")
+	model.DB.Exec("DELETE FROM usage_aggregate_dailies")
 	model.DB.Exec("DELETE FROM tenant_routing_preferences")
 	model.DB.Exec("DELETE FROM invoices")
 	model.DB.Exec("DELETE FROM payment_records")
@@ -106,6 +110,8 @@ func truncate(t *testing.T) {
 	model.DB.Exec("DELETE FROM user_subscriptions")
 	t.Cleanup(func() {
 		model.DB.Exec("DELETE FROM audit_logs")
+		model.DB.Exec("DELETE FROM usage_record_outboxes")
+		model.DB.Exec("DELETE FROM usage_aggregate_dailies")
 		model.DB.Exec("DELETE FROM tenant_routing_preferences")
 		model.DB.Exec("DELETE FROM invoices")
 		model.DB.Exec("DELETE FROM payment_records")

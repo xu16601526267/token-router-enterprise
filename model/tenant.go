@@ -254,6 +254,7 @@ type CreditAccount struct {
 	Id                 int    `json:"id"`
 	TenantId           int    `json:"tenant_id" gorm:"not null;uniqueIndex"`
 	CreditLimit        int64  `json:"credit_limit" gorm:"default:0"`
+	ReservedAmount     int64  `json:"reserved_amount" gorm:"default:0"`
 	UnbilledAmount     int64  `json:"unbilled_amount" gorm:"default:0"`
 	BilledUnpaidAmount int64  `json:"billed_unpaid_amount" gorm:"default:0"`
 	OverdueAmount      int64  `json:"overdue_amount" gorm:"default:0"`
@@ -264,7 +265,7 @@ type CreditAccount struct {
 }
 
 func (a *CreditAccount) Recalculate() {
-	a.AvailableCredit = a.CreditLimit - a.UnbilledAmount - a.BilledUnpaidAmount - a.OverdueAmount
+	a.AvailableCredit = a.CreditLimit - a.ReservedAmount - a.UnbilledAmount - a.BilledUnpaidAmount - a.OverdueAmount
 }
 
 type BillingStatement struct {
@@ -422,7 +423,7 @@ func UpsertCreditAccount(account *CreditAccount) error {
 	tenantNowCreateUpdate(&account.CreatedAt, &account.UpdatedAt)
 	return DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "tenant_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"credit_limit", "unbilled_amount", "billed_unpaid_amount", "overdue_amount", "available_credit", "status", "updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"credit_limit", "reserved_amount", "unbilled_amount", "billed_unpaid_amount", "overdue_amount", "available_credit", "status", "updated_at"}),
 	}).Create(account).Error
 }
 

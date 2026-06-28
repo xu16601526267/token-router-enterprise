@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -13,6 +14,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
+	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -99,6 +101,32 @@ func normalizeOverCreditPolicy(policy string) string {
 	}
 }
 
+func tenantForUpdate(tx *gorm.DB) *gorm.DB {
+	if tx == nil || common.UsingSQLite {
+		return tx
+	}
+	return tx.Clauses(clause.Locking{Strength: "UPDATE"})
+}
+
+func billingStatementRegenerationLocked(status string) bool {
+	switch strings.TrimSpace(status) {
+	case model.BillingStatementStatusConfirmed,
+		model.BillingStatementStatusInvoiced,
+		model.BillingStatementStatusPaid,
+		model.BillingStatementStatusOverdue:
+		return true
+	default:
+		return false
+	}
+}
+
+func minInt64(a int64, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func CreateTenantWithDefaults(input TenantCreateInput, actorId int, ip string) (*model.Tenant, error) {
 	tenant := &model.Tenant{
 		Name:        input.Name,
@@ -160,6 +188,7 @@ func SetTenantBillingConfig(tenantId int, config *model.BillingConfig, actorId i
 	}
 	account := &model.CreditAccount{TenantId: tenantId, CreditLimit: config.CreditLimit, Status: model.CreditAccountStatusActive}
 	if existing, err := model.GetCreditAccountByTenantId(tenantId); err == nil {
+		account.ReservedAmount = existing.ReservedAmount
 		account.UnbilledAmount = existing.UnbilledAmount
 		account.BilledUnpaidAmount = existing.BilledUnpaidAmount
 		account.OverdueAmount = existing.OverdueAmount
@@ -423,6 +452,81 @@ func EnsureTenantCreditAvailable(tenantId int, quota int) error {
 	return nil
 }
 
+func ReserveTenantCredit(tenantId int, quota int) error {
+	if tenantId <= 0 || quota <= 0 {
+		return nil
+	}
+	return retryTenantDBWrite(func() error {
+		return model.DB.Transaction(func(tx *gorm.DB) error {
+			var config model.BillingConfig
+			if err := tx.Where("tenant_id = ?", tenantId).First(&config).Error; err != nil {
+				return err
+			}
+			var account model.CreditAccount
+			err := tenantForUpdate(tx).Where("tenant_id = ?", tenantId).First(&account).Error
+			if err != nil {
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+				account = model.CreditAccount{
+					TenantId:       tenantId,
+					CreditLimit:    config.CreditLimit,
+					Status:         model.CreditAccountStatusActive,
+					ReservedAmount: 0,
+				}
+				account.Recalculate()
+				if err := tx.Create(&account).Error; err != nil {
+					return err
+				}
+			}
+			if account.Status != model.CreditAccountStatusActive {
+				return fmt.Errorf("tenant %d credit account is %s", tenantId, account.Status)
+			}
+			account.Recalculate()
+			if normalizeOverCreditPolicy(config.OverCreditPolicy) == "block" && int64(quota) > account.AvailableCredit {
+				return fmt.Errorf("tenant %d credit quota insufficient, available=%d, required=%d", tenantId, account.AvailableCredit, quota)
+			}
+			account.ReservedAmount += int64(quota)
+			account.Recalculate()
+			now := common.GetTimestamp()
+			return tx.Model(&model.CreditAccount{}).Where("tenant_id = ?", tenantId).Updates(map[string]interface{}{
+				"reserved_amount":  account.ReservedAmount,
+				"available_credit": account.AvailableCredit,
+				"updated_at":       now,
+			}).Error
+		})
+	})
+}
+
+func ReleaseTenantCredit(tenantId int, quota int) error {
+	if tenantId <= 0 || quota <= 0 {
+		return nil
+	}
+	return retryTenantDBWrite(func() error {
+		return model.DB.Transaction(func(tx *gorm.DB) error {
+			var account model.CreditAccount
+			if err := tenantForUpdate(tx).Where("tenant_id = ?", tenantId).First(&account).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil
+				}
+				return err
+			}
+			release := minInt64(account.ReservedAmount, int64(quota))
+			if release <= 0 {
+				return nil
+			}
+			account.ReservedAmount -= release
+			account.Recalculate()
+			now := common.GetTimestamp()
+			return tx.Model(&model.CreditAccount{}).Where("tenant_id = ?", tenantId).Updates(map[string]interface{}{
+				"reserved_amount":  account.ReservedAmount,
+				"available_credit": account.AvailableCredit,
+				"updated_at":       now,
+			}).Error
+		})
+	})
+}
+
 func ApplyTenantLedgerCredit(ledger *model.UsageLedger) error {
 	if ledger == nil || ledger.TenantId <= 0 || ledger.PostpaidQuota <= 0 {
 		return nil
@@ -442,7 +546,7 @@ func applyTenantLedgerCreditTx(tx *gorm.DB, ledger *model.UsageLedger) error {
 		return errors.New("tenant credit db is required")
 	}
 	var account model.CreditAccount
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("tenant_id = ?", ledger.TenantId).First(&account).Error; err != nil {
+	if err := tenantForUpdate(tx).Where("tenant_id = ?", ledger.TenantId).First(&account).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
@@ -460,13 +564,15 @@ func applyTenantLedgerCreditTx(tx *gorm.DB, ledger *model.UsageLedger) error {
 		}
 	}
 	now := common.GetTimestamp()
+	consumeReserved := minInt64(account.ReservedAmount, int64(ledger.PostpaidQuota))
+	account.ReservedAmount -= consumeReserved
+	account.UnbilledAmount += int64(ledger.PostpaidQuota)
+	account.Recalculate()
 	result := tx.Model(&model.CreditAccount{}).Where("tenant_id = ?", ledger.TenantId).Updates(map[string]interface{}{
-		"unbilled_amount": gorm.Expr("unbilled_amount + ?", ledger.PostpaidQuota),
-		"available_credit": gorm.Expr(
-			"credit_limit - (unbilled_amount + ? + billed_unpaid_amount + overdue_amount)",
-			ledger.PostpaidQuota,
-		),
-		"updated_at": now,
+		"reserved_amount":  account.ReservedAmount,
+		"unbilled_amount":  account.UnbilledAmount,
+		"available_credit": account.AvailableCredit,
+		"updated_at":       now,
 	})
 	if result.Error != nil {
 		return result.Error
@@ -481,8 +587,16 @@ func retryTenantDBWrite(operation func() error) error {
 	if operation == nil {
 		return nil
 	}
+	maxAttempts := 8
+	baseDelay := 10 * time.Millisecond
+	maxDelay := 0 * time.Millisecond
+	if common.UsingSQLite {
+		maxAttempts = 40
+		baseDelay = 25 * time.Millisecond
+		maxDelay = 500 * time.Millisecond
+	}
 	var err error
-	for attempt := 0; attempt < 8; attempt++ {
+	for attempt := 0; attempt < maxAttempts; attempt++ {
 		err = operation()
 		if err == nil {
 			return nil
@@ -490,7 +604,16 @@ func retryTenantDBWrite(operation func() error) error {
 		if !isRetryableTenantDBWriteError(err) {
 			return err
 		}
-		time.Sleep(time.Duration(10*(1<<attempt)) * time.Millisecond)
+		delay := baseDelay
+		if maxDelay > 0 && attempt >= 6 {
+			delay = maxDelay
+		} else {
+			delay = baseDelay * time.Duration(1<<attempt)
+			if maxDelay > 0 && delay > maxDelay {
+				delay = maxDelay
+			}
+		}
+		time.Sleep(delay)
 	}
 	return err
 }
@@ -543,14 +666,37 @@ func GenerateTenantBillingStatement(tenantId int, periodStart int64, periodEnd i
 	if statement.Payable < 0 {
 		statement.Payable = 0
 	}
-	err := model.DB.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "tenant_id"}, {Name: "period_start"}, {Name: "period_end"}},
-		DoUpdates: clause.AssignmentColumns([]string{"amount", "adjustment", "payable", "status", "due_date", "generated_at", "updated_at"}),
-	}).Create(statement).Error
+	err := retryTenantDBWrite(func() error {
+		return model.DB.Transaction(func(tx *gorm.DB) error {
+			var existing model.BillingStatement
+			err := tenantForUpdate(tx).
+				Where("tenant_id = ? AND period_start = ? AND period_end = ?", tenantId, periodStart, periodEnd).
+				First(&existing).Error
+			if err == nil {
+				if billingStatementRegenerationLocked(existing.Status) {
+					return fmt.Errorf("billing statement %d is %s and cannot be regenerated", existing.Id, existing.Status)
+				}
+				updates := map[string]interface{}{
+					"amount":       statement.Amount,
+					"adjustment":   statement.Adjustment,
+					"payable":      statement.Payable,
+					"status":       model.BillingStatementStatusDraft,
+					"due_date":     statement.DueDate,
+					"generated_at": statement.GeneratedAt,
+					"updated_at":   now,
+				}
+				if err := tx.Model(&existing).Updates(updates).Error; err != nil {
+					return err
+				}
+				return tx.Where("id = ?", existing.Id).First(statement).Error
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			return tx.Create(statement).Error
+		})
+	})
 	if err != nil {
-		return nil, err
-	}
-	if err := model.DB.Where("tenant_id = ? AND period_start = ? AND period_end = ?", tenantId, periodStart, periodEnd).First(statement).Error; err != nil {
 		return nil, err
 	}
 	_ = model.RecordScopedAuditLog(&model.AuditLog{ScopeType: model.ScopeTenant, ScopeId: tenantId, ActorId: actorId, Action: "tenant.billing_statement.generate", Target: fmt.Sprintf("statement:%d", statement.Id), After: common.GetJsonString(statement), Ip: ip})
@@ -558,34 +704,36 @@ func GenerateTenantBillingStatement(tenantId int, periodStart int64, periodEnd i
 }
 
 func ConfirmTenantBillingStatement(tenantId int, statementId int, actorId int, ip string) (*model.BillingStatement, error) {
-	statement, err := getTenantStatement(tenantId, statementId)
-	if err != nil {
-		return nil, err
-	}
-	if statement.Status != model.BillingStatementStatusDraft && statement.Status != model.BillingStatementStatusAdjusted {
-		return nil, fmt.Errorf("statement status %s cannot be confirmed", statement.Status)
-	}
 	now := common.GetTimestamp()
-	if err := model.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(statement).Updates(map[string]interface{}{"status": model.BillingStatementStatusConfirmed, "confirmed_at": now, "updated_at": now}).Error; err != nil {
-			return err
-		}
-		var account model.CreditAccount
-		if err := tx.Where("tenant_id = ?", tenantId).First(&account).Error; err != nil {
-			return err
-		}
-		account.UnbilledAmount -= statement.Payable
-		if account.UnbilledAmount < 0 {
-			account.UnbilledAmount = 0
-		}
-		account.BilledUnpaidAmount += statement.Payable
-		account.Recalculate()
-		return tx.Model(&account).Select("unbilled_amount", "billed_unpaid_amount", "available_credit", "updated_at").Updates(map[string]interface{}{
-			"unbilled_amount":      account.UnbilledAmount,
-			"billed_unpaid_amount": account.BilledUnpaidAmount,
-			"available_credit":     account.AvailableCredit,
-			"updated_at":           now,
-		}).Error
+	if err := retryTenantDBWrite(func() error {
+		return model.DB.Transaction(func(tx *gorm.DB) error {
+			var statement model.BillingStatement
+			if err := tenantForUpdate(tx).Where("id = ? AND tenant_id = ?", statementId, tenantId).First(&statement).Error; err != nil {
+				return err
+			}
+			if statement.Status != model.BillingStatementStatusDraft && statement.Status != model.BillingStatementStatusAdjusted {
+				return fmt.Errorf("statement status %s cannot be confirmed", statement.Status)
+			}
+			if err := tx.Model(&statement).Updates(map[string]interface{}{"status": model.BillingStatementStatusConfirmed, "confirmed_at": now, "updated_at": now}).Error; err != nil {
+				return err
+			}
+			var account model.CreditAccount
+			if err := tenantForUpdate(tx).Where("tenant_id = ?", tenantId).First(&account).Error; err != nil {
+				return err
+			}
+			account.UnbilledAmount -= statement.Payable
+			if account.UnbilledAmount < 0 {
+				account.UnbilledAmount = 0
+			}
+			account.BilledUnpaidAmount += statement.Payable
+			account.Recalculate()
+			return tx.Model(&account).Select("unbilled_amount", "billed_unpaid_amount", "available_credit", "updated_at").Updates(map[string]interface{}{
+				"unbilled_amount":      account.UnbilledAmount,
+				"billed_unpaid_amount": account.BilledUnpaidAmount,
+				"available_credit":     account.AvailableCredit,
+				"updated_at":           now,
+			}).Error
+		})
 	}); err != nil {
 		return nil, err
 	}
@@ -594,10 +742,6 @@ func ConfirmTenantBillingStatement(tenantId int, statementId int, actorId int, i
 }
 
 func RegisterTenantPaymentAndInvoice(tenantId int, statementId int, amount int64, method string, invoiceNo string, invoiceStatus string, actorId int, ip string) (*model.BillingStatement, error) {
-	statement, err := getTenantStatement(tenantId, statementId)
-	if err != nil {
-		return nil, err
-	}
 	if amount <= 0 {
 		return nil, errors.New("payment amount must be positive")
 	}
@@ -605,50 +749,73 @@ func RegisterTenantPaymentAndInvoice(tenantId int, statementId int, amount int64
 	if invoiceStatus == "" {
 		invoiceStatus = "issued"
 	}
-	if err := model.DB.Transaction(func(tx *gorm.DB) error {
-		payment := &model.PaymentRecord{StatementId: statementId, TenantId: tenantId, Amount: amount, Method: method, PaidAt: now, OperatorId: actorId, CreatedAt: now}
-		if err := tx.Create(payment).Error; err != nil {
-			return err
-		}
-		if invoiceNo != "" || invoiceStatus != "" {
-			invoice := &model.Invoice{StatementId: statementId, TenantId: tenantId, Amount: amount, InvoiceNo: invoiceNo, InvoiceStatus: invoiceStatus, OperatorId: actorId, CreatedAt: now, UpdatedAt: now}
-			if err := tx.Create(invoice).Error; err != nil {
+	if err := retryTenantDBWrite(func() error {
+		return model.DB.Transaction(func(tx *gorm.DB) error {
+			var statement model.BillingStatement
+			if err := tenantForUpdate(tx).Where("id = ? AND tenant_id = ?", statementId, tenantId).First(&statement).Error; err != nil {
 				return err
 			}
-		}
-		var paid struct{ Amount int64 }
-		if err := tx.Model(&model.PaymentRecord{}).Select("COALESCE(SUM(amount), 0) AS amount").Where("statement_id = ?", statementId).Scan(&paid).Error; err != nil {
-			return err
-		}
-		status := model.BillingStatementStatusInvoiced
-		if paid.Amount >= statement.Payable {
-			status = model.BillingStatementStatusPaid
-		}
-		if err := tx.Model(statement).Updates(map[string]interface{}{"status": status, "updated_at": now}).Error; err != nil {
-			return err
-		}
-		var account model.CreditAccount
-		if err := tx.Where("tenant_id = ?", tenantId).First(&account).Error; err != nil {
-			return err
-		}
-		account.BilledUnpaidAmount -= amount
-		if account.BilledUnpaidAmount < 0 {
-			account.BilledUnpaidAmount = 0
-		}
-		if account.OverdueAmount > 0 {
-			if account.OverdueAmount >= amount {
-				account.OverdueAmount -= amount
-			} else {
-				account.OverdueAmount = 0
+			if statement.Status != model.BillingStatementStatusConfirmed &&
+				statement.Status != model.BillingStatementStatusInvoiced &&
+				statement.Status != model.BillingStatementStatusOverdue {
+				return fmt.Errorf("statement status %s cannot register payment", statement.Status)
 			}
-		}
-		account.Recalculate()
-		return tx.Model(&account).Select("billed_unpaid_amount", "overdue_amount", "available_credit", "updated_at").Updates(map[string]interface{}{
-			"billed_unpaid_amount": account.BilledUnpaidAmount,
-			"overdue_amount":       account.OverdueAmount,
-			"available_credit":     account.AvailableCredit,
-			"updated_at":           now,
-		}).Error
+			var paid struct{ Amount int64 }
+			if err := tx.Model(&model.PaymentRecord{}).Select("COALESCE(SUM(amount), 0) AS amount").Where("statement_id = ?", statementId).Scan(&paid).Error; err != nil {
+				return err
+			}
+			remaining := statement.Payable - paid.Amount
+			if remaining <= 0 {
+				return fmt.Errorf("statement %d is already fully paid", statementId)
+			}
+			if amount > remaining {
+				return fmt.Errorf("payment amount %d exceeds remaining payable %d", amount, remaining)
+			}
+			payment := &model.PaymentRecord{StatementId: statementId, TenantId: tenantId, Amount: amount, Method: method, PaidAt: now, OperatorId: actorId, CreatedAt: now}
+			if err := tx.Create(payment).Error; err != nil {
+				return err
+			}
+			if invoiceNo != "" || invoiceStatus != "" {
+				invoice := &model.Invoice{StatementId: statementId, TenantId: tenantId, Amount: amount, InvoiceNo: invoiceNo, InvoiceStatus: invoiceStatus, OperatorId: actorId, CreatedAt: now, UpdatedAt: now}
+				if err := tx.Create(invoice).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(&model.PaymentRecord{}).Select("COALESCE(SUM(amount), 0) AS amount").Where("statement_id = ?", statementId).Scan(&paid).Error; err != nil {
+				return err
+			}
+			status := model.BillingStatementStatusInvoiced
+			if paid.Amount >= statement.Payable {
+				status = model.BillingStatementStatusPaid
+			} else if statement.Status == model.BillingStatementStatusOverdue {
+				status = model.BillingStatementStatusOverdue
+			}
+			if err := tx.Model(&statement).Updates(map[string]interface{}{"status": status, "updated_at": now}).Error; err != nil {
+				return err
+			}
+			var account model.CreditAccount
+			if err := tenantForUpdate(tx).Where("tenant_id = ?", tenantId).First(&account).Error; err != nil {
+				return err
+			}
+			account.BilledUnpaidAmount -= amount
+			if account.BilledUnpaidAmount < 0 {
+				account.BilledUnpaidAmount = 0
+			}
+			if account.OverdueAmount > 0 {
+				if account.OverdueAmount >= amount {
+					account.OverdueAmount -= amount
+				} else {
+					account.OverdueAmount = 0
+				}
+			}
+			account.Recalculate()
+			return tx.Model(&account).Select("billed_unpaid_amount", "overdue_amount", "available_credit", "updated_at").Updates(map[string]interface{}{
+				"billed_unpaid_amount": account.BilledUnpaidAmount,
+				"overdue_amount":       account.OverdueAmount,
+				"available_credit":     account.AvailableCredit,
+				"updated_at":           now,
+			}).Error
+		})
 	}); err != nil {
 		return nil, err
 	}
@@ -665,21 +832,43 @@ func MarkOverdueTenantStatements(now int64) error {
 		return err
 	}
 	for _, statement := range statements {
-		if err := model.DB.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Model(&statement).Updates(map[string]interface{}{"status": model.BillingStatementStatusOverdue, "updated_at": now}).Error; err != nil {
-				return err
-			}
-			var account model.CreditAccount
-			if err := tx.Where("tenant_id = ?", statement.TenantId).First(&account).Error; err != nil {
-				return err
-			}
-			account.OverdueAmount += statement.Payable
-			account.Recalculate()
-			return tx.Model(&account).Select("overdue_amount", "available_credit", "updated_at").Updates(map[string]interface{}{
-				"overdue_amount":   account.OverdueAmount,
-				"available_credit": account.AvailableCredit,
-				"updated_at":       now,
-			}).Error
+		if err := retryTenantDBWrite(func() error {
+			return model.DB.Transaction(func(tx *gorm.DB) error {
+				var locked model.BillingStatement
+				if err := tenantForUpdate(tx).Where("id = ?", statement.Id).First(&locked).Error; err != nil {
+					return err
+				}
+				if locked.Status != model.BillingStatementStatusConfirmed && locked.Status != model.BillingStatementStatusInvoiced {
+					return nil
+				}
+				var paid struct{ Amount int64 }
+				if err := tx.Model(&model.PaymentRecord{}).Select("COALESCE(SUM(amount), 0) AS amount").Where("statement_id = ?", locked.Id).Scan(&paid).Error; err != nil {
+					return err
+				}
+				remaining := locked.Payable - paid.Amount
+				if remaining <= 0 {
+					return tx.Model(&locked).Updates(map[string]interface{}{"status": model.BillingStatementStatusPaid, "updated_at": now}).Error
+				}
+				if err := tx.Model(&locked).Updates(map[string]interface{}{"status": model.BillingStatementStatusOverdue, "updated_at": now}).Error; err != nil {
+					return err
+				}
+				var account model.CreditAccount
+				if err := tenantForUpdate(tx).Where("tenant_id = ?", locked.TenantId).First(&account).Error; err != nil {
+					return err
+				}
+				account.BilledUnpaidAmount -= remaining
+				if account.BilledUnpaidAmount < 0 {
+					account.BilledUnpaidAmount = 0
+				}
+				account.OverdueAmount += remaining
+				account.Recalculate()
+				return tx.Model(&account).Select("billed_unpaid_amount", "overdue_amount", "available_credit", "updated_at").Updates(map[string]interface{}{
+					"billed_unpaid_amount": account.BilledUnpaidAmount,
+					"overdue_amount":       account.OverdueAmount,
+					"available_credit":     account.AvailableCredit,
+					"updated_at":           now,
+				}).Error
+			})
 		}); err != nil {
 			return err
 		}
@@ -869,9 +1058,13 @@ func tenantRoutingChannelSupportsRequestPath(channel *model.Channel, requestPath
 }
 
 type TenantCreditBillingSession struct {
-	relayInfo *relaycommon.RelayInfo
-	prepaid   relaycommon.BillingSettler
-	mode      string
+	relayInfo             *relaycommon.RelayInfo
+	prepaid               relaycommon.BillingSettler
+	mode                  string
+	reservedPostpaidQuota int
+	settled               bool
+	refunded              bool
+	mu                    sync.Mutex
 }
 
 func NewTenantPostpaidBillingSession(relayInfo *relaycommon.RelayInfo, mode string) *TenantCreditBillingSession {
@@ -896,40 +1089,156 @@ func (s *TenantCreditBillingSession) Settle(actualQuota int) error {
 	if s == nil {
 		return nil
 	}
-	preConsumed := s.GetPreConsumedQuota()
-	if s.prepaid != nil {
-		if actualQuota <= preConsumed {
-			return s.prepaid.Settle(actualQuota)
-		}
-		return s.prepaid.Settle(preConsumed)
+	s.mu.Lock()
+	if s.settled {
+		s.mu.Unlock()
+		return nil
 	}
+	preConsumed := s.prepaidConsumedLocked()
+	targetPostpaid := s.targetPostpaidQuotaLocked(actualQuota)
+	currentReserved := s.reservedPostpaidQuota
+	s.mu.Unlock()
+
+	if err := s.reservePostpaid(targetPostpaid); err != nil {
+		return err
+	}
+	if s.prepaid != nil {
+		var err error
+		if actualQuota <= preConsumed {
+			err = s.prepaid.Settle(actualQuota)
+		} else {
+			err = s.prepaid.Settle(preConsumed)
+		}
+		if err != nil {
+			if targetPostpaid != currentReserved {
+				_ = s.reservePostpaid(currentReserved)
+			}
+			return err
+		}
+	}
+	s.mu.Lock()
+	s.settled = true
+	s.mu.Unlock()
 	return nil
 }
 
 func (s *TenantCreditBillingSession) Refund(c *gin.Context) {
-	if s != nil && s.prepaid != nil {
-		s.prepaid.Refund(c)
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	if s.settled || s.refunded || !s.needsRefundLocked() {
+		s.mu.Unlock()
+		return
+	}
+	tenantId := 0
+	if s.relayInfo != nil {
+		tenantId = s.relayInfo.TenantId
+	}
+	reserved := s.reservedPostpaidQuota
+	prepaid := s.prepaid
+	s.refunded = true
+	s.reservedPostpaidQuota = 0
+	s.mu.Unlock()
+
+	if reserved > 0 && tenantId > 0 {
+		gopool.Go(func() {
+			if err := ReleaseTenantCredit(tenantId, reserved); err != nil {
+				common.SysLog("error releasing tenant credit reservation: " + err.Error())
+			}
+		})
+	}
+	if prepaid != nil {
+		prepaid.Refund(c)
 	}
 }
 
 func (s *TenantCreditBillingSession) NeedsRefund() bool {
-	return s != nil && s.prepaid != nil && s.prepaid.NeedsRefund()
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.needsRefundLocked()
+}
+
+func (s *TenantCreditBillingSession) needsRefundLocked() bool {
+	if s == nil || s.settled || s.refunded {
+		return false
+	}
+	if s.reservedPostpaidQuota > 0 {
+		return true
+	}
+	return s.prepaid != nil && s.prepaid.NeedsRefund()
 }
 
 func (s *TenantCreditBillingSession) GetPreConsumedQuota() int {
-	if s != nil && s.prepaid != nil {
-		return s.prepaid.GetPreConsumedQuota()
+	if s == nil {
+		return 0
 	}
-	return 0
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.prepaidConsumedLocked()
 }
 
 func (s *TenantCreditBillingSession) Reserve(targetQuota int) error {
-	if s != nil && s.prepaid != nil {
-		return s.prepaid.Reserve(targetQuota)
+	if s == nil {
+		return nil
 	}
-	if s != nil && s.relayInfo != nil {
-		return EnsureTenantCreditAvailable(s.relayInfo.TenantId, targetQuota)
+	if s.prepaid != nil {
+		if err := s.prepaid.Reserve(targetQuota); err != nil {
+			return err
+		}
 	}
+	s.mu.Lock()
+	targetPostpaid := s.targetPostpaidQuotaLocked(targetQuota)
+	s.mu.Unlock()
+	return s.reservePostpaid(targetPostpaid)
+}
+
+func (s *TenantCreditBillingSession) prepaidConsumedLocked() int {
+	if s == nil || s.prepaid == nil {
+		return 0
+	}
+	return s.prepaid.GetPreConsumedQuota()
+}
+
+func (s *TenantCreditBillingSession) targetPostpaidQuotaLocked(actualQuota int) int {
+	if s == nil || actualQuota <= 0 {
+		return 0
+	}
+	return TenantPostpaidQuota(s.mode, actualQuota, s.prepaidConsumedLocked())
+}
+
+func (s *TenantCreditBillingSession) reservePostpaid(targetQuota int) error {
+	if s == nil || s.relayInfo == nil || s.relayInfo.TenantId <= 0 {
+		return nil
+	}
+	if targetQuota < 0 {
+		targetQuota = 0
+	}
+	s.mu.Lock()
+	if s.settled || s.refunded {
+		s.mu.Unlock()
+		return nil
+	}
+	current := s.reservedPostpaidQuota
+	s.mu.Unlock()
+
+	if targetQuota == current {
+		return nil
+	}
+	if targetQuota > current {
+		if err := ReserveTenantCredit(s.relayInfo.TenantId, targetQuota-current); err != nil {
+			return err
+		}
+	} else if err := ReleaseTenantCredit(s.relayInfo.TenantId, current-targetQuota); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.reservedPostpaidQuota = targetQuota
+	s.mu.Unlock()
 	return nil
 }
 
@@ -941,18 +1250,20 @@ func PrepareTenantBillingSession(c *gin.Context, preConsumedQuota int, relayInfo
 	relayInfo.TenantBillingMode = mode
 	switch mode {
 	case model.BillingModePostpaid:
-		if err := EnsureTenantCreditAvailable(relayInfo.TenantId, preConsumedQuota); err != nil {
+		session := NewTenantPostpaidBillingSession(relayInfo, mode)
+		if err := session.Reserve(preConsumedQuota); err != nil {
 			return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 		}
-		return NewTenantPostpaidBillingSession(relayInfo, mode), nil
+		return session, nil
 	case model.BillingModeMixed:
 		session, apiErr := NewBillingSession(c, relayInfo, preConsumedQuota)
 		if apiErr != nil {
 			if apiErr.GetErrorCode() == types.ErrorCodeInsufficientUserQuota || apiErr.GetErrorCode() == types.ErrorCodePreConsumeTokenQuotaFailed {
-				if err := EnsureTenantCreditAvailable(relayInfo.TenantId, preConsumedQuota); err != nil {
+				tenantSession := NewTenantPostpaidBillingSession(relayInfo, mode)
+				if err := tenantSession.Reserve(preConsumedQuota); err != nil {
 					return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 				}
-				return NewTenantPostpaidBillingSession(relayInfo, mode), nil
+				return tenantSession, nil
 			}
 			return nil, apiErr
 		}

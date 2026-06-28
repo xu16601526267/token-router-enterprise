@@ -121,6 +121,7 @@ func main() {
 
 	// Optional token-router supply telemetry worker (disabled by default)
 	service.StartSupplyTelemetryWorker()
+	service.StartUsageRecordOutboxWorker()
 
 	// Wire task polling adaptor factory (breaks service -> relay import cycle)
 	service.GetTaskAdaptorFunc = func(platform constant.TaskPlatform) service.TaskPollingAdaptor {

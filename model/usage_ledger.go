@@ -14,14 +14,14 @@ type UsageLedger struct {
 	Id                  int    `json:"id"`
 	RequestId           string `json:"request_id" gorm:"size:128;not null;uniqueIndex:uk_usage_ledger_request_id"`
 	SessionId           string `json:"session_id" gorm:"size:128;default:'';index"`
-	SupplierId          int    `json:"supplier_id" gorm:"index"`
-	ChannelId           int    `json:"channel_id" gorm:"index"`
-	UserId              int    `json:"user_id" gorm:"index"`
-	TokenId             int    `json:"token_id" gorm:"index"`
-	TenantId            int    `json:"tenant_id" gorm:"index;default:0"`
-	EndCustomerId       int    `json:"end_customer_id" gorm:"index;default:0"`
-	AppId               int    `json:"app_id" gorm:"index;default:0"`
-	ModelName           string `json:"model_name" gorm:"size:128;default:'';index"`
+	SupplierId          int    `json:"supplier_id" gorm:"index;index:idx_usage_supplier_created,priority:1"`
+	ChannelId           int    `json:"channel_id" gorm:"index;index:idx_usage_channel_created,priority:1"`
+	UserId              int    `json:"user_id" gorm:"index;index:idx_usage_user_created,priority:1"`
+	TokenId             int    `json:"token_id" gorm:"index;index:idx_usage_token_created,priority:1"`
+	TenantId            int    `json:"tenant_id" gorm:"index;default:0;index:idx_usage_tenant_created,priority:1;index:idx_usage_tenant_period,priority:1"`
+	EndCustomerId       int    `json:"end_customer_id" gorm:"index;default:0;index:idx_usage_customer_created,priority:1"`
+	AppId               int    `json:"app_id" gorm:"index;default:0;index:idx_usage_app_created,priority:1"`
+	ModelName           string `json:"model_name" gorm:"size:128;default:'';index;index:idx_usage_model_created,priority:1"`
 	PromptTokens        int    `json:"prompt_tokens" gorm:"default:0"`
 	FreshPromptTokens   int    `json:"fresh_prompt_tokens" gorm:"default:0"`
 	CachedTokens        int    `json:"cached_tokens" gorm:"default:0"`
@@ -30,7 +30,7 @@ type UsageLedger struct {
 	SellQuota           int    `json:"sell_quota" gorm:"default:0"`
 	CostQuota           int    `json:"cost_quota" gorm:"default:0"`
 	BillingMode         string `json:"billing_mode" gorm:"size:32;default:'';index"`
-	BillingPeriod       string `json:"billing_period" gorm:"size:32;default:'';index"`
+	BillingPeriod       string `json:"billing_period" gorm:"size:32;default:'';index;index:idx_usage_tenant_period,priority:2"`
 	PriceSnapshot       string `json:"price_snapshot" gorm:"type:text"`
 	PostpaidQuota       int    `json:"postpaid_quota" gorm:"default:0"`
 	CacheHit            bool   `json:"cache_hit" gorm:"default:false;index"`
@@ -38,7 +38,7 @@ type UsageLedger struct {
 	Status              string `json:"status" gorm:"size:32;default:'success';index"`
 	SlaTier             string `json:"sla_tier" gorm:"size:64;default:'';index"`
 	SupplyNode          string `json:"supply_node" gorm:"size:128;default:'';index"`
-	CreatedAt           int64  `json:"created_at" gorm:"bigint;index"`
+	CreatedAt           int64  `json:"created_at" gorm:"bigint;index;index:idx_usage_tenant_created,priority:2;index:idx_usage_supplier_created,priority:2;index:idx_usage_channel_created,priority:2;index:idx_usage_user_created,priority:2;index:idx_usage_token_created,priority:2;index:idx_usage_customer_created,priority:2;index:idx_usage_app_created,priority:2;index:idx_usage_model_created,priority:2"`
 }
 
 func (l *UsageLedger) normalize() {

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -109,4 +110,75 @@ func TestRecordUsageWritesLedgerAndIsIdempotent(t *testing.T) {
 	var saved model.UsageLedger
 	require.NoError(t, model.DB.Where("request_id = ?", "demand-req-1").First(&saved).Error)
 	require.Equal(t, 200, saved.SellQuota)
+}
+
+func TestRecordUsageAsyncOutboxWritesLedgerAggregateAndIsIdempotent(t *testing.T) {
+	truncate(t)
+	gin.SetMode(gin.TestMode)
+
+	supplier := &model.Supplier{Name: "async-supplier", Type: model.SupplierTypeThirdParty}
+	require.NoError(t, supplier.Insert())
+	channel := &model.Channel{
+		Id:         202,
+		Name:       "async-channel",
+		Key:        "sk-test",
+		Status:     common.ChannelStatusEnabled,
+		SupplierId: supplier.Id,
+	}
+	require.NoError(t, model.DB.Create(channel).Error)
+	require.NoError(t, (&model.SupplierAgreement{
+		SupplierId:             supplier.Id,
+		ModelName:              "gpt-async",
+		CostModelRatio:         1,
+		CostCompletionRatio:    2,
+		CostCacheRatio:         0.1,
+		CostCacheCreationRatio: 0.5,
+		Status:                 1,
+	}).Insert())
+
+	ctx := tenantTestContext("async-usage-req-1")
+	ctx.Set("sla_tier", "standard")
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:            77,
+		TokenId:           88,
+		RequestId:         "async-usage-req-1",
+		OriginModelName:   "gpt-async",
+		TenantBillingMode: model.BillingModePrepaid,
+		StartTime:         time.Now().Add(-time.Second),
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelId:      channel.Id,
+			ChannelBaseUrl: "async-upstream",
+		},
+	}
+	usage := &dto.Usage{PromptTokens: 100, CompletionTokens: 20}
+
+	RecordUsageAsync(ctx, relayInfo, usage, 200)
+	require.Eventually(t, func() bool {
+		_ = ProcessUsageRecordOutboxByRequestID(context.Background(), "async-usage-req-1")
+		var count int64
+		if err := model.DB.Model(&model.UsageLedger{}).Where("request_id = ?", "async-usage-req-1").Count(&count).Error; err != nil {
+			return false
+		}
+		return count == 1
+	}, time.Second, 10*time.Millisecond)
+
+	item, err := model.GetUsageRecordOutboxByRequestID("async-usage-req-1")
+	require.NoError(t, err)
+	require.Equal(t, model.UsageRecordOutboxStatusSucceeded, item.Status)
+	var aggregate model.UsageAggregateDaily
+	require.NoError(t, model.DB.Where("day = ? AND user_id = ? AND token_id = ? AND model_name = ?", model.UsageLedgerDay(common.GetTimestamp()), relayInfo.UserId, relayInfo.TokenId, "gpt-async").First(&aggregate).Error)
+	require.Equal(t, int64(1), aggregate.RequestCount)
+	require.Equal(t, int64(200), aggregate.SellQuota)
+
+	RecordUsageAsync(ctx, relayInfo, usage, 999)
+	require.Eventually(t, func() bool {
+		var count int64
+		if err := model.DB.Model(&model.UsageLedger{}).Where("request_id = ?", "async-usage-req-1").Count(&count).Error; err != nil {
+			return false
+		}
+		return count == 1
+	}, time.Second, 10*time.Millisecond)
+	require.NoError(t, model.DB.Where("day = ? AND user_id = ? AND token_id = ? AND model_name = ?", aggregate.Day, relayInfo.UserId, relayInfo.TokenId, "gpt-async").First(&aggregate).Error)
+	require.Equal(t, int64(1), aggregate.RequestCount)
+	require.Equal(t, int64(200), aggregate.SellQuota)
 }

@@ -220,6 +220,197 @@ func TestTenantPostpaidB2B2CLedgerStatementPaymentClosure(t *testing.T) {
 	require.GreaterOrEqual(t, auditCount, int64(6))
 }
 
+func TestTenantBillingStatementImmutableAfterConfirmAndRejectsOverpay(t *testing.T) {
+	truncate(t)
+
+	owner := tenantTestUser(t, 1, "immutable-owner", 0, common.RoleCommonUser)
+	tenant := tenantTestCreatePostpaidTenant(t, owner.Id, "Immutable Tenant", 1000)
+	now := common.GetTimestamp()
+	ledger := &model.UsageLedger{
+		RequestId:     "immutable-ledger-1",
+		TenantId:      tenant.Id,
+		ModelName:     "gpt-immutable",
+		SellQuota:     300,
+		PostpaidQuota: 300,
+		BillingMode:   model.BillingModePostpaid,
+		BillingPeriod: billingPeriodFromUnix(now),
+		Status:        "success",
+		CreatedAt:     now,
+	}
+	_, err := insertUsageLedgerWithTenantCredit(ledger)
+	require.NoError(t, err)
+
+	statement, err := GenerateTenantBillingStatement(tenant.Id, now-60, now+60, 0, owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, int64(300), statement.Payable)
+	statement, err = ConfirmTenantBillingStatement(tenant.Id, statement.Id, owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusConfirmed, statement.Status)
+
+	_, err = insertUsageLedgerWithTenantCredit(&model.UsageLedger{
+		RequestId:     "immutable-ledger-2",
+		TenantId:      tenant.Id,
+		ModelName:     "gpt-immutable",
+		SellQuota:     100,
+		PostpaidQuota: 100,
+		BillingMode:   model.BillingModePostpaid,
+		BillingPeriod: billingPeriodFromUnix(now),
+		Status:        "success",
+		CreatedAt:     now + 1,
+	})
+	require.NoError(t, err)
+	_, err = GenerateTenantBillingStatement(tenant.Id, now-60, now+60, 0, owner.Id, "127.0.0.1")
+	require.Error(t, err)
+	saved, err := getTenantStatement(tenant.Id, statement.Id)
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusConfirmed, saved.Status)
+	require.Equal(t, int64(300), saved.Payable)
+
+	_, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 301, "bank_transfer", "INV-OVERPAY", "issued", owner.Id, "127.0.0.1")
+	require.Error(t, err)
+	var payments int64
+	require.NoError(t, model.DB.Model(&model.PaymentRecord{}).Where("statement_id = ?", statement.Id).Count(&payments).Error)
+	require.Equal(t, int64(0), payments)
+
+	saved, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 100, "bank_transfer", "INV-PARTIAL", "issued", owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusInvoiced, saved.Status)
+	_, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 250, "bank_transfer", "INV-OVERPAY-2", "issued", owner.Id, "127.0.0.1")
+	require.Error(t, err)
+	saved, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 200, "bank_transfer", "INV-FINAL", "issued", owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusPaid, saved.Status)
+	account, err := model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), account.BilledUnpaidAmount)
+	require.Equal(t, int64(100), account.UnbilledAmount)
+	require.Equal(t, int64(900), account.AvailableCredit)
+}
+
+func TestTenantCreditReservationLifecycle(t *testing.T) {
+	truncate(t)
+	gin.SetMode(gin.TestMode)
+
+	owner := tenantTestUser(t, 1, "reservation-owner", 0, common.RoleCommonUser)
+	endUser := tenantTestUser(t, 2, "reservation-user", 0, common.RoleCommonUser)
+	tenant := tenantTestCreatePostpaidTenant(t, owner.Id, "Reservation Tenant", 1000)
+	policy := tenantTestCreatePolicy(t, tenant.Id, "gpt-reserve")
+	app, customer := tenantTestCreateAppAndCustomer(t, tenant.Id, endUser.Id, "reserve")
+	token, _, err := CreateTenantAPIKey(tenant.Id, TenantAPIKeyInput{
+		UserId:         endUser.Id,
+		Name:           "reserve-key",
+		AppId:          app.Id,
+		EndCustomerId:  customer.Id,
+		ModelPolicyId:  policy.Id,
+		UnlimitedQuota: true,
+	}, owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	_, channel := tenantTestSupply(t, "gpt-reserve")
+
+	ctx := tenantTestContext("reservation-success")
+	relayInfo := &relaycommon.RelayInfo{
+		UserId:            endUser.Id,
+		TokenId:           token.Id,
+		TenantId:          tenant.Id,
+		AppId:             app.Id,
+		EndCustomerId:     customer.Id,
+		ModelPolicyId:     policy.Id,
+		TenantBillingMode: model.BillingModePostpaid,
+		RequestId:         "reservation-success",
+		OriginModelName:   "gpt-reserve",
+		StartTime:         time.Now().Add(-time.Second),
+		ChannelMeta:       &relaycommon.ChannelMeta{ChannelId: channel.Id, ChannelBaseUrl: "upstream"},
+	}
+	apiErr := PreConsumeBilling(ctx, 200, relayInfo)
+	require.Nil(t, apiErr)
+	account, err := model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(200), account.ReservedAmount)
+	require.Equal(t, int64(800), account.AvailableCredit)
+
+	require.NoError(t, SettleBilling(ctx, relayInfo, 150))
+	account, err = model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(150), account.ReservedAmount)
+	require.Equal(t, int64(850), account.AvailableCredit)
+
+	_, err = RecordUsage(ctx, relayInfo, &dto.Usage{PromptTokens: 40, CompletionTokens: 10}, 150)
+	require.NoError(t, err)
+	account, err = model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), account.ReservedAmount)
+	require.Equal(t, int64(150), account.UnbilledAmount)
+	require.Equal(t, int64(850), account.AvailableCredit)
+
+	refundCtx := tenantTestContext("reservation-refund")
+	refundRelay := &relaycommon.RelayInfo{TenantId: tenant.Id, TenantBillingMode: model.BillingModePostpaid, OriginModelName: "gpt-reserve", RequestId: "reservation-refund"}
+	apiErr = PreConsumeBilling(refundCtx, 100, refundRelay)
+	require.Nil(t, apiErr)
+	account, err = model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(100), account.ReservedAmount)
+	require.Equal(t, int64(750), account.AvailableCredit)
+	refundRelay.Billing.Refund(refundCtx)
+	require.Eventually(t, func() bool {
+		account, err := model.GetCreditAccountByTenantId(tenant.Id)
+		return err == nil && account.ReservedAmount == 0 && account.AvailableCredit == 850
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestMarkOverdueTenantStatementsMovesOnlyRemainingBalance(t *testing.T) {
+	truncate(t)
+
+	owner := tenantTestUser(t, 1, "overdue-owner", 0, common.RoleCommonUser)
+	tenant := tenantTestCreatePostpaidTenant(t, owner.Id, "Overdue Tenant", 1000)
+	now := common.GetTimestamp()
+	_, err := insertUsageLedgerWithTenantCredit(&model.UsageLedger{
+		RequestId:     "overdue-ledger",
+		TenantId:      tenant.Id,
+		ModelName:     "gpt-overdue",
+		SellQuota:     300,
+		PostpaidQuota: 300,
+		BillingMode:   model.BillingModePostpaid,
+		BillingPeriod: billingPeriodFromUnix(now),
+		Status:        "success",
+		CreatedAt:     now,
+	})
+	require.NoError(t, err)
+	statement, err := GenerateTenantBillingStatement(tenant.Id, now-60, now+60, 0, owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	statement, err = ConfirmTenantBillingStatement(tenant.Id, statement.Id, owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	statement, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 100, "bank_transfer", "INV-PARTIAL-OVERDUE", "issued", owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusInvoiced, statement.Status)
+	require.NoError(t, model.DB.Model(&model.BillingStatement{}).Where("id = ?", statement.Id).Update("due_date", now-1).Error)
+
+	require.NoError(t, MarkOverdueTenantStatements(now))
+	statement, err = getTenantStatement(tenant.Id, statement.Id)
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusOverdue, statement.Status)
+	account, err := model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), account.BilledUnpaidAmount)
+	require.Equal(t, int64(200), account.OverdueAmount)
+	require.Equal(t, int64(800), account.AvailableCredit)
+
+	statement, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 50, "bank_transfer", "INV-OVERDUE-PARTIAL", "issued", owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusOverdue, statement.Status)
+	account, err = model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(150), account.OverdueAmount)
+	require.Equal(t, int64(850), account.AvailableCredit)
+
+	statement, err = RegisterTenantPaymentAndInvoice(tenant.Id, statement.Id, 150, "bank_transfer", "INV-OVERDUE-FINAL", "issued", owner.Id, "127.0.0.1")
+	require.NoError(t, err)
+	require.Equal(t, model.BillingStatementStatusPaid, statement.Status)
+	account, err = model.GetCreditAccountByTenantId(tenant.Id)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), account.OverdueAmount)
+	require.Equal(t, int64(1000), account.AvailableCredit)
+}
+
 func TestTenantIsolationAndModelPolicy(t *testing.T) {
 	truncate(t)
 
